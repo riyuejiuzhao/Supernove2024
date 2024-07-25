@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package=".;miniRouterRpc";
+option go_package=".;miniRouterProto";
 
 message InstanceInfo {
   string InstanceID = 1;
