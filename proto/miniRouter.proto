@@ -2,45 +2,39 @@ syntax = "proto3";
 
 option go_package=".;miniRouterRpc";
 
-message RpcTopic {
-  string type_ = 1;
-  int32 count = 2;
+message InstanceInfo {
+  string InstanceID = 1;
+  string Host = 2;
+  int32 Port = 3;
+  int32 weight = 4;
 }
 
-message VoteTopicRequest {
-  string userID = 1;
-  RpcTopic topic = 2;
+message RegisterInstanceRequest{
+  string ServiceName = 1;
+  string Host = 2;
+  int32 Port = 3;
+  int32 weight = 4;
 }
 
-message VoteTopicReply {
+message RegisterInstanceReply{
+  string InstanceID = 1;
+  bool Existed = 2;
 }
 
-message GetTopicCountRequest{
-  repeated string type_ = 1;
+service RegisterService{
+  rpc RegisterInstance(RegisterInstanceRequest) returns (RegisterInstanceReply){}
 }
 
-
-message GetTopicCountReply{
-  repeated RpcTopic topics = 1;
+message GetInstancesRequest{
+  string Name = 1;
+  int64 revision = 2;
 }
 
-message PingRequest{
+message GetInstancesReply{
+  int64 revision = 1;
+  repeated InstanceInfo Instances = 2;
 }
 
-message PingReply{
-}
-
-message UndoVoteRequest{
-  string userID = 1;
-  RpcTopic topic = 2;
-}
-
-message UndoVoteReply{
-}
-
-service TopicService{
-  rpc VoteTopic(VoteTopicRequest) returns (VoteTopicReply){}
-  rpc GetTopicCount(GetTopicCountRequest) returns (GetTopicCountReply){}
-  rpc Ping(PingRequest) returns (PingReply){}
-  rpc UndoVote(UndoVoteRequest) returns (UndoVoteReply){}
+service DiscoveryService{
+  rpc GetInstances(GetInstancesRequest) returns (GetInstancesReply){}
 }
