@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+option go_package=".;miniRouterRpc";
+
+message RpcTopic {
+  string type_ = 1;
+  int32 count = 2;
+}
+
+message VoteTopicRequest {
+  string userID = 1;
+  RpcTopic topic = 2;
+}
+
+message VoteTopicReply {
+}
+
+message GetTopicCountRequest{
+  repeated string type_ = 1;
+}
+
+
+message GetTopicCountReply{
+  repeated RpcTopic topics = 1;
+}
+
+message PingRequest{
+}
+
+message PingReply{
+}
+
+message UndoVoteRequest{
+  string userID = 1;
+  RpcTopic topic = 2;
+}
+
+message UndoVoteReply{
+}
+
+service TopicService{
+  rpc VoteTopic(VoteTopicRequest) returns (VoteTopicReply){}
+  rpc GetTopicCount(GetTopicCountRequest) returns (GetTopicCountReply){}
+  rpc Ping(PingRequest) returns (PingReply){}
+  rpc UndoVote(UndoVoteRequest) returns (UndoVoteReply){}
+}
