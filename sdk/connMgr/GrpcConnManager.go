@@ -1,6 +1,7 @@
-package sdk
+package connMgr
 
 import (
+	"Supernove2024/sdk"
 	"github.com/shimingyah/pool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -88,19 +89,21 @@ type GrpcConnManager struct {
 	poolDic map[string]pool.Pool
 }
 
-func NewConnManager(services []ServiceConfig) *GrpcConnManager {
+func ConnManagerInstance()
+
+func newConnManager(services []sdk.ServiceConfig) *GrpcConnManager {
 	poolDic := make(map[string]pool.Pool)
 	for _, service := range services {
 		address := service.String()
 		p, err := pool.New(service.String(), DefaultOptions)
 		if err != nil {
-			Error("创建连接池失败，地址：%s", address)
+			sdk.Error("创建连接池失败，地址：%s", address)
 			continue
 		}
-		Info("创建连接池，地址: %s", address)
+		sdk.Info("创建连接池，地址: %s", address)
 		poolDic[address] = p
 	}
-	Info("初始化GrpcConnManager成功")
+	sdk.Info("初始化GrpcConnManager成功")
 	return &GrpcConnManager{poolDic: poolDic}
 }
 
@@ -111,7 +114,7 @@ func (m *GrpcConnManager) GetConn(address string) (pool.Conn, error) {
 		if err != nil {
 			return nil, err
 		}
-		Info("创建连接池 %s", address)
+		sdk.Info("创建连接池 %s", address)
 		m.poolDic[address] = newPool
 		p = newPool
 	}

@@ -1,4 +1,4 @@
-package sdk
+package config
 
 import (
 	"errors"
@@ -33,30 +33,30 @@ func GlobalConfig() (*Config, error) {
 	if globalConfig != nil {
 		return globalConfig, nil
 	}
-	err := loadConfig()
+	config, err := loadConfig()
 	if err != nil {
 		return nil, err
 	}
+	globalConfig = config
 	return globalConfig, nil
 }
 
 // 从文件中读取配置
-func loadConfig(configFileOpts ...string) error {
+func loadConfig(configFileOpts ...string) (*Config, error) {
 	configFile := defaultConfigFilePath
 	if len(configFileOpts) == 1 {
 		configFile = configFileOpts[0]
 	} else if len(configFileOpts) > 1 {
-		return errors.New("配置文件路径数量超过1")
+		return nil, errors.New("配置文件路径数量超过1")
 	}
 	configYaml, err := os.ReadFile(configFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var config Config
 	err = yaml.Unmarshal(configYaml, config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	globalConfig = &config
-	return nil
+	return &config, nil
 }
