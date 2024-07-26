@@ -33,7 +33,8 @@ func Instance() (*GrpcConnManager, error) {
 		if err != nil {
 			return nil, errors.New("创建连接管理器失败")
 		}
-		connMgr = newConnManager(cfg.Global.RegisterService, cfg.Global.DiscoverService)
+		connMgr = newConnManager(cfg.Global.RegisterService,
+			cfg.Global.DiscoverService, cfg.Global.HealthService)
 	}
 	return connMgr, nil
 }
@@ -54,10 +55,12 @@ func newAddressPoolDic(serviceConfig []config.ServiceConfig) AddressPoolDic {
 }
 
 func newConnManager(register []config.ServiceConfig,
-	discovery []config.ServiceConfig) *GrpcConnManager {
+	discovery []config.ServiceConfig,
+	health []config.ServiceConfig) *GrpcConnManager {
 	poolDic := make(map[ServiceType]AddressPoolDic)
 	poolDic[Discovery] = newAddressPoolDic(discovery)
 	poolDic[Register] = newAddressPoolDic(register)
+	poolDic[HealthCheck] = newAddressPoolDic(health)
 	util.Info("初始化GrpcConnManager成功")
 	return &GrpcConnManager{poolDic: poolDic}
 }

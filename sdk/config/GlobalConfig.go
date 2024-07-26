@@ -20,6 +20,7 @@ type Config struct {
 	Global struct {
 		DiscoverService []ServiceConfig `yaml:"DiscoverService"`
 		RegisterService []ServiceConfig `yaml:"RegisterService"`
+		HealthService   []ServiceConfig `yaml:"HealthService"`
 		Register        struct {
 			DefaultWeight int32 `yaml:"DefaultWeight"`
 		} `yaml:"Register"`
