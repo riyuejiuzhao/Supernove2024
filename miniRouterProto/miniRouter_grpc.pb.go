@@ -22,7 +22,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RegisterServiceClient interface {
-	RegisterInstance(ctx context.Context, in *RegisterInstanceRequest, opts ...grpc.CallOption) (*RegisterInstanceReply, error)
+	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterReply, error)
+	Deregister(ctx context.Context, in *DeregisterRequest, opts ...grpc.CallOption) (*DeregisterReply, error)
 }
 
 type registerServiceClient struct {
@@ -33,9 +34,18 @@ func NewRegisterServiceClient(cc grpc.ClientConnInterface) RegisterServiceClient
 	return &registerServiceClient{cc}
 }
 
-func (c *registerServiceClient) RegisterInstance(ctx context.Context, in *RegisterInstanceRequest, opts ...grpc.CallOption) (*RegisterInstanceReply, error) {
-	out := new(RegisterInstanceReply)
-	err := c.cc.Invoke(ctx, "/RegisterService/RegisterInstance", in, out, opts...)
+func (c *registerServiceClient) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterReply, error) {
+	out := new(RegisterReply)
+	err := c.cc.Invoke(ctx, "/RegisterService/Register", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *registerServiceClient) Deregister(ctx context.Context, in *DeregisterRequest, opts ...grpc.CallOption) (*DeregisterReply, error) {
+	out := new(DeregisterReply)
+	err := c.cc.Invoke(ctx, "/RegisterService/Deregister", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +56,8 @@ func (c *registerServiceClient) RegisterInstance(ctx context.Context, in *Regist
 // All implementations must embed UnimplementedRegisterServiceServer
 // for forward compatibility
 type RegisterServiceServer interface {
-	RegisterInstance(context.Context, *RegisterInstanceRequest) (*RegisterInstanceReply, error)
+	Register(context.Context, *RegisterRequest) (*RegisterReply, error)
+	Deregister(context.Context, *DeregisterRequest) (*DeregisterReply, error)
 	mustEmbedUnimplementedRegisterServiceServer()
 }
 
@@ -54,8 +65,11 @@ type RegisterServiceServer interface {
 type UnimplementedRegisterServiceServer struct {
 }
 
-func (UnimplementedRegisterServiceServer) RegisterInstance(context.Context, *RegisterInstanceRequest) (*RegisterInstanceReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RegisterInstance not implemented")
+func (UnimplementedRegisterServiceServer) Register(context.Context, *RegisterRequest) (*RegisterReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
+}
+func (UnimplementedRegisterServiceServer) Deregister(context.Context, *DeregisterRequest) (*DeregisterReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Deregister not implemented")
 }
 func (UnimplementedRegisterServiceServer) mustEmbedUnimplementedRegisterServiceServer() {}
 
@@ -70,20 +84,38 @@ func RegisterRegisterServiceServer(s grpc.ServiceRegistrar, srv RegisterServiceS
 	s.RegisterService(&RegisterService_ServiceDesc, srv)
 }
 
-func _RegisterService_RegisterInstance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RegisterInstanceRequest)
+func _RegisterService_Register_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RegisterServiceServer).RegisterInstance(ctx, in)
+		return srv.(RegisterServiceServer).Register(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/RegisterService/RegisterInstance",
+		FullMethod: "/RegisterService/Register",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RegisterServiceServer).RegisterInstance(ctx, req.(*RegisterInstanceRequest))
+		return srv.(RegisterServiceServer).Register(ctx, req.(*RegisterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RegisterService_Deregister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeregisterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RegisterServiceServer).Deregister(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/RegisterService/Deregister",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RegisterServiceServer).Deregister(ctx, req.(*DeregisterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -96,8 +128,12 @@ var RegisterService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*RegisterServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RegisterInstance",
-			Handler:    _RegisterService_RegisterInstance_Handler,
+			MethodName: "Register",
+			Handler:    _RegisterService_Register_Handler,
+		},
+		{
+			MethodName: "Deregister",
+			Handler:    _RegisterService_Deregister_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

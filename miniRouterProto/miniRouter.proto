@@ -9,20 +9,30 @@ message InstanceInfo {
   int32 weight = 4;
 }
 
-message RegisterInstanceRequest{
+message RegisterRequest{
   string ServiceName = 1;
   string Host = 2;
   int32 Port = 3;
   int32 weight = 4;
 }
 
-message RegisterInstanceReply{
+message RegisterReply{
   string InstanceID = 1;
   bool Existed = 2;
 }
 
+message DeregisterRequest{
+  string ServiceName =1;
+  string Host = 2;
+  int32 Port = 3;
+}
+
+message DeregisterReply{
+}
+
 service RegisterService{
-  rpc RegisterInstance(RegisterInstanceRequest) returns (RegisterInstanceReply){}
+  rpc Register(RegisterRequest) returns (RegisterReply){}
+  rpc Deregister(DeregisterRequest) returns (DeregisterReply){}
 }
 
 message GetInstancesRequest{
