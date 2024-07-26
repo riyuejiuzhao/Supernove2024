@@ -16,7 +16,13 @@ type RegisterInstanceResult struct {
 	Existed    bool
 }
 
-func (c *RegisterCli) Register(serviceName string, host string, port int32) (*RegisterInstanceResult, error) {
+type ServiceInfo struct {
+	Name string
+	Host string
+	Port int32
+}
+
+func (c *RegisterCli) Register(service ServiceInfo) (*RegisterInstanceResult, error) {
 	conn, err := c.connManager.GetConn(c.registerSvrAddress)
 	if err != nil {
 		return nil, err
@@ -24,9 +30,9 @@ func (c *RegisterCli) Register(serviceName string, host string, port int32) (*Re
 	defer conn.Close()
 	rpcCli := miniRouterProto.NewRegisterServiceClient(conn.Value())
 	request := miniRouterProto.RegisterRequest{
-		ServiceName: serviceName,
-		Host:        host,
-		Port:        port,
+		ServiceName: service.Name,
+		Host:        service.Host,
+		Port:        service.Port,
 		Weight:      c.config.Global.Register.DefaultWeight}
 	reply, err := rpcCli.Register(context.Background(), &request)
 	if err != nil {
@@ -38,7 +44,7 @@ func (c *RegisterCli) Register(serviceName string, host string, port int32) (*Re
 	return &RegisterInstanceResult{InstanceID: reply.InstanceID, Existed: reply.Existed}, nil
 }
 
-func (c *RegisterCli) Deregister(serviceName string, host string, port int32) error {
+func (c *RegisterCli) Deregister(service ServiceInfo) error {
 	conn, err := c.connManager.GetConn(c.registerSvrAddress)
 	if err != nil {
 		return err
@@ -46,9 +52,9 @@ func (c *RegisterCli) Deregister(serviceName string, host string, port int32) er
 	defer conn.Close()
 	rpcCli := miniRouterProto.NewRegisterServiceClient(conn.Value())
 	request := miniRouterProto.DeregisterRequest{
-		ServiceName: serviceName,
-		Host:        host,
-		Port:        port,
+		ServiceName: service.Name,
+		Host:        service.Host,
+		Port:        service.Port,
 	}
 	_, err = rpcCli.Deregister(context.Background(), &request)
 	if err != nil {
@@ -62,8 +68,8 @@ func (c *RegisterCli) Deregister(serviceName string, host string, port int32) er
 // RegisterAPI 功能：
 // 服务注册
 type RegisterAPI interface {
-	Register(serviceName string, host string, port int32) (*RegisterInstanceResult, error)
-	Deregister(serviceName string, host string, port int32) error
+	Register(service ServiceInfo) (*RegisterInstanceResult, error)
+	Deregister(service ServiceInfo) error
 }
 
 func NewRegisterAPI() (RegisterAPI, error) {
