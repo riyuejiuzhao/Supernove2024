@@ -2,13 +2,15 @@ package sdk
 
 import (
 	"Supernove2024/miniRouterProto"
+	config2 "Supernove2024/sdk/config"
+	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/util"
 	"context"
 )
 
 type RegisterCli struct {
-	registerSvrAddress string
-	config             *Config
-	connManager        *GrpcConnManager
+	config      *config2.Config
+	connManager *connMgr.GrpcConnManager
 }
 
 type RegisterInstanceResult struct {
@@ -16,14 +18,8 @@ type RegisterInstanceResult struct {
 	Existed    bool
 }
 
-type ServiceInfo struct {
-	Name string
-	Host string
-	Port int32
-}
-
-func (c *RegisterCli) Register(service ServiceInfo) (*RegisterInstanceResult, error) {
-	conn, err := c.connManager.GetConn(c.registerSvrAddress)
+func (c *RegisterCli) Register(service ServiceBaseInfo) (*RegisterInstanceResult, error) {
+	conn, err := c.connManager.GetServiceConn(connMgr.Register)
 	if err != nil {
 		return nil, err
 	}
@@ -38,14 +34,14 @@ func (c *RegisterCli) Register(service ServiceInfo) (*RegisterInstanceResult, er
 	if err != nil {
 		return nil, err
 	}
-	Info("注册服务: Name: %v, Host: %v, Port: %v, Weight: %v, InstanceID: %v, Exited: %v",
+	util.Info("注册服务: Name: %v, Host: %v, Port: %v, Weight: %v, InstanceID: %v, Exited: %v",
 		request.ServiceName, request.Host, request.Port, request.Weight,
 		reply.InstanceID, reply.Existed)
 	return &RegisterInstanceResult{InstanceID: reply.InstanceID, Existed: reply.Existed}, nil
 }
 
-func (c *RegisterCli) Deregister(service ServiceInfo) error {
-	conn, err := c.connManager.GetConn(c.registerSvrAddress)
+func (c *RegisterCli) Deregister(service ServiceBaseInfo) error {
+	conn, err := c.connManager.GetServiceConn(connMgr.Register)
 	if err != nil {
 		return err
 	}
@@ -60,7 +56,7 @@ func (c *RegisterCli) Deregister(service ServiceInfo) error {
 	if err != nil {
 		return err
 	}
-	Info("注销服务: Name: %v, Host: %v, Port: %v, InstanceID: %v, Exited: %v",
+	util.Info("注销服务: Name: %v, Host: %v, Port: %v, InstanceID: %v, Exited: %v",
 		request.ServiceName, request.Host, request.Port)
 	return nil
 }
@@ -68,20 +64,22 @@ func (c *RegisterCli) Deregister(service ServiceInfo) error {
 // RegisterAPI 功能：
 // 服务注册
 type RegisterAPI interface {
-	Register(service ServiceInfo) (*RegisterInstanceResult, error)
-	Deregister(service ServiceInfo) error
+	Register(service ServiceBaseInfo) (*RegisterInstanceResult, error)
+	Deregister(service ServiceBaseInfo) error
 }
 
 func NewRegisterAPI() (RegisterAPI, error) {
-	globalConfig, err := GlobalConfig()
+	globalConfig, err := config2.GlobalConfig()
 	if err != nil {
 		return nil, err
 	}
 	//随机选择一个配置中的DiscoverySvr
-	serviceHost := RandomItem(globalConfig.Global.RegisterService)
-	api := RegisterCli{registerSvrAddress: serviceHost.String(),
-		connManager: NewConnManager(globalConfig.Global.RegisterService),
-		config:      globalConfig}
-	Info("成功创建RegisterAPI，连接到%s", api.registerSvrAddress)
+	connManager, err := connMgr.Instance()
+	if err != nil {
+		return nil, err
+	}
+	api := RegisterCli{connManager: connManager,
+		config: globalConfig}
+	util.Info("成功创建RegisterAPI")
 	return &api, nil
 }
