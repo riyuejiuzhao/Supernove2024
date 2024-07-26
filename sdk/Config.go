@@ -2,20 +2,27 @@ package sdk
 
 import (
 	"errors"
+	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
 )
 
+type ServiceConfig struct {
+	Host string `yaml:"Host"`
+	Port int32  `yaml:"Port"`
+}
+
+func (s ServiceConfig) String() string {
+	return fmt.Sprintf("%s:%v", s.Host, s.Port)
+}
+
 type Config struct {
 	Global struct {
-		discoverCluster struct {
-			host string `yaml:"host"`
-			port int32  `yaml:"port"`
-		} `yaml:"discoverCluster"`
-		registerCluster struct {
-			host string `yaml:"host"`
-			port int32  `yaml:"port"`
-		}
+		DiscoverService []ServiceConfig `yaml:"DiscoverService"`
+		RegisterService []ServiceConfig `yaml:"RegisterService"`
+		Register        struct {
+			DefaultWeight int32 `yaml:"DefaultWeight"`
+		} `yaml:"Register"`
 	} `yaml:"global"`
 }
 
