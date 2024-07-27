@@ -69,4 +69,5 @@ SDK也会分为三个部分，每个部分对应一个独立的微服务
 
 - miniRouterProto: sdk和svr通信所使用的grpc协议库
 - sdk: 客户端所使用的sdk
+- register-svr: 服务注册服务器
 

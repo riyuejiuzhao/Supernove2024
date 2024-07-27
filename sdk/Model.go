@@ -1,21 +1,9 @@
-package util
+package sdk
 
 import (
 	config2 "Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 )
-
-type InstanceBaseInfo struct {
-	InstanceID string
-	Host       string
-	Port       int32
-}
-
-type ServiceInfo struct {
-	Instances   []InstanceBaseInfo
-	ServiceName string
-	Revision    int64
-}
 
 type APIContext struct {
 	//配置

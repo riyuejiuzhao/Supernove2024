@@ -9,6 +9,12 @@ message InstanceInfo {
   int32 weight = 4;
 }
 
+message ServiceInfo {
+  string ServiceName = 1;
+  int64 Revision = 2;
+  repeated InstanceInfo Instances = 3;
+}
+
 message RegisterRequest{
   string ServiceName = 1;
   string Host = 2;

@@ -2,7 +2,7 @@ package connMgr
 
 import (
 	"Supernove2024/sdk/config"
-	"Supernove2024/sdk/util"
+	"Supernove2024/util"
 	"errors"
 	"github.com/shimingyah/pool"
 )

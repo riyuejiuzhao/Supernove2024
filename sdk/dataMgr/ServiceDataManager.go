@@ -1,9 +1,9 @@
 package dataMgr
 
-import "Supernove2024/sdk/util"
+import "Supernove2024/miniRouterProto"
 
 type ServiceDataManager interface {
-	GetServiceInstance(serviceName string) util.ServiceInfo
+	GetServiceInstance(serviceName string) miniRouterProto.ServiceInfo
 	GetRevision() int64
 	Flush()
 }

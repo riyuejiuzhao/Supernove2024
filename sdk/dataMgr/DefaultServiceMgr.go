@@ -2,24 +2,26 @@ package dataMgr
 
 import (
 	"Supernove2024/miniRouterProto"
+	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
-	"Supernove2024/sdk/util"
+	"Supernove2024/util"
 	"context"
 )
 
 type DefaultServiceMgr struct {
-	util.APIContext
-	buffer   map[string]util.ServiceInfo
+	sdk.APIContext
+	buffer   map[string]*miniRouterProto.ServiceInfo
 	revision int64
 }
 
 func (m *DefaultServiceMgr) FlushService(serviceName string) {
 	nowService, ok := m.buffer[serviceName]
 	if !ok {
-		nowService = util.ServiceInfo{
-			Instances: make([]util.InstanceBaseInfo, 0),
-			Revision:  0}
+		nowService = &miniRouterProto.ServiceInfo{
+			ServiceName: serviceName,
+			Instances:   make([]*miniRouterProto.InstanceInfo, 0),
+			Revision:    0}
 	}
 	m.buffer[serviceName] = nowService
 	disConn, err := m.ConnManager.GetServiceConn(connMgr.Discovery)
@@ -37,20 +39,20 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 	if err != nil {
 		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", serviceName, err)
 	}
-	instances := make([]util.InstanceBaseInfo, len(reply.Instances))
+	instances := make([]*miniRouterProto.InstanceInfo, len(reply.Instances))
 	for i, v := range reply.Instances {
 		instances[i].Host = v.Host
 		instances[i].Port = v.Port
 		instances[i].InstanceID = v.InstanceID
 	}
-	m.buffer[serviceName] = util.ServiceInfo{
+	m.buffer[serviceName] = &miniRouterProto.ServiceInfo{
 		Instances:   instances,
 		Revision:    reply.Revision,
 		ServiceName: serviceName,
 	}
 }
 
-func (m *DefaultServiceMgr) GetServiceInstance(serviceName string) util.ServiceInfo {
+func (m *DefaultServiceMgr) GetServiceInstance(serviceName string) *miniRouterProto.ServiceInfo {
 	m.FlushService(serviceName)
 	service := m.buffer[serviceName]
 	return service

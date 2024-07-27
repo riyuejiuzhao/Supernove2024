@@ -1,16 +1,16 @@
 package sdk
 
 import (
+	"Supernove2024/miniRouterProto"
 	"Supernove2024/sdk/dataMgr"
-	"Supernove2024/sdk/util"
 )
 
 type GetInstancesResult struct {
-	Instances []util.InstanceBaseInfo
+	Instances []*miniRouterProto.InstanceInfo
 }
 
 type DiscoveryCli struct {
-	util.APIContext
+	APIContext
 	dataMgr dataMgr.ServiceDataManager
 }
 
@@ -25,7 +25,7 @@ type DiscoveryAPI interface {
 }
 
 func NewDiscoveryAPI() (DiscoveryAPI, error) {
-	ctx, err := util.NewAPIContext()
+	ctx, err := NewAPIContext()
 	if err != nil {
 		return nil, err
 	}

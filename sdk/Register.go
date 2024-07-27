@@ -3,12 +3,12 @@ package sdk
 import (
 	"Supernove2024/miniRouterProto"
 	"Supernove2024/sdk/connMgr"
-	"Supernove2024/sdk/util"
+	"Supernove2024/util"
 	"context"
 )
 
 type RegisterCli struct {
-	util.APIContext
+	APIContext
 }
 
 type RegisterArgv struct {
@@ -73,7 +73,7 @@ type RegisterAPI interface {
 }
 
 func NewRegisterAPI() (RegisterAPI, error) {
-	ctx, err := util.NewAPIContext()
+	ctx, err := NewAPIContext()
 	if err != nil {
 		return nil, err
 	}
