@@ -1,4 +1,4 @@
-package sdk
+package util
 
 type ServiceBaseInfo struct {
 	Name string
