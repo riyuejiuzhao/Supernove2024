@@ -33,3 +33,7 @@ func Info(format string, a ...any) {
 func Error(format string, a ...any) {
 	slog.Error(fmt.Sprintf(format, a...))
 }
+
+func Warn(format string, a ...any) {
+	slog.Warn(fmt.Sprintf(format, a...))
+}

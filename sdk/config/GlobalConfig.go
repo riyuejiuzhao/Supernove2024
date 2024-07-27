@@ -7,23 +7,27 @@ import (
 	"os"
 )
 
-type ServiceConfig struct {
+type InstanceConfig struct {
 	Host string `yaml:"Host"`
 	Port int32  `yaml:"Port"`
 }
 
-func (s ServiceConfig) String() string {
+func (s InstanceConfig) String() string {
 	return fmt.Sprintf("%s:%v", s.Host, s.Port)
 }
 
 type Config struct {
 	Global struct {
-		DiscoverService []ServiceConfig `yaml:"DiscoverService"`
-		RegisterService []ServiceConfig `yaml:"RegisterService"`
-		HealthService   []ServiceConfig `yaml:"HealthService"`
+		DiscoverService []InstanceConfig `yaml:"DiscoverService"`
+		RegisterService []InstanceConfig `yaml:"RegisterService"`
+		HealthService   []InstanceConfig `yaml:"HealthService"`
 		Register        struct {
 			DefaultWeight int32 `yaml:"DefaultWeight"`
 		} `yaml:"Register"`
+		Discovery struct {
+			//获取远程服务的时间间隔
+			DefaultTimeout int32 `yaml:"DefaultTimeout"`
+		} `yaml:"Discovery"`
 	} `yaml:"global"`
 }
 
