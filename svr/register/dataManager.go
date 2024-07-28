@@ -11,10 +11,9 @@ import (
 type InstanceMgr struct {
 	ServiceInfo        *miniRouterProto.ServiceInfo
 	InstanceAddressDic map[string]*miniRouterProto.InstanceInfo
-	//InstanceIdDic      map[string]*miniRouterProto.InstanceInfo
 }
 
-type DefaultRegisterDataManager struct {
+type DefaultServiceBuffer struct {
 	rwMutex sync.RWMutex
 	dict    map[string]*InstanceMgr
 }
@@ -23,7 +22,7 @@ func InstanceAddress(host string, port int32) string {
 	return fmt.Sprintf("%v:%v", host, port)
 }
 
-func (m *DefaultRegisterDataManager) FlushService(info *miniRouterProto.ServiceInfo) {
+func (m *DefaultServiceBuffer) FlushService(info *miniRouterProto.ServiceInfo) {
 	m.rwMutex.Lock()
 	defer m.rwMutex.Unlock()
 	nowInfo, ok := m.dict[info.ServiceName]
@@ -43,10 +42,10 @@ func (m *DefaultRegisterDataManager) FlushService(info *miniRouterProto.ServiceI
 	m.dict[info.ServiceName] = instanceMgr
 }
 
-func (m *DefaultRegisterDataManager) TryGetInstanceByAddress(
+func (m *DefaultServiceBuffer) TryGetInstanceByAddress(
 	service string, address string,
 ) (*miniRouterProto.InstanceInfo, bool) {
-	m.rwMutex.RLocker()
+	m.rwMutex.RLock()
 	defer m.rwMutex.RUnlock()
 	instanceMgr, ok := m.dict[service]
 	if !ok {
@@ -56,25 +55,8 @@ func (m *DefaultRegisterDataManager) TryGetInstanceByAddress(
 	return v, ok
 }
 
-/*
-func (m *DefaultRegisterDataManager) TryGetInstanceByID(
-
-	service string, instanceID string,
-
-	) (*miniRouterProto.InstanceInfo, bool) {
-		m.rwMutex.RLocker()
-		defer m.rwMutex.RUnlock()
-		instanceMgr, ok := m.dict[service]
-		if !ok {
-			return nil, false
-		}
-		v, ok := instanceMgr.InstanceIdDic[instanceID]
-		return v, ok
-	}
-*/
-
-func (m *DefaultRegisterDataManager) TryGetServiceInfo(service string) (*miniRouterProto.ServiceInfo, bool) {
-	m.rwMutex.RLocker()
+func (m *DefaultServiceBuffer) TryGetServiceInfo(service string) (*miniRouterProto.ServiceInfo, bool) {
+	m.rwMutex.RLock()
 	defer m.rwMutex.RUnlock()
 
 	ins, ok := m.dict[service]
@@ -84,7 +66,7 @@ func (m *DefaultRegisterDataManager) TryGetServiceInfo(service string) (*miniRou
 	return ins.ServiceInfo, true
 }
 
-func (m *DefaultRegisterDataManager) AddInstance(
+func (m *DefaultServiceBuffer) AddInstance(
 	serviceName string,
 	host string,
 	port int32,
@@ -99,6 +81,7 @@ func (m *DefaultRegisterDataManager) AddInstance(
 			InstanceAddressDic: make(map[string]*miniRouterProto.InstanceInfo),
 			ServiceInfo:        util.NewServiceInfo(serviceName),
 		}
+		m.dict[serviceName] = mgr
 	}
 	mgr.ServiceInfo.Revision += 1
 	info = &miniRouterProto.InstanceInfo{
@@ -112,7 +95,7 @@ func (m *DefaultRegisterDataManager) AddInstance(
 	return
 }
 
-func (m *DefaultRegisterDataManager) RemoveInstance(
+func (m *DefaultServiceBuffer) RemoveInstance(
 	serviceName string, host string, port int32,
 ) {
 	m.rwMutex.Lock()
@@ -140,6 +123,16 @@ func (m *DefaultRegisterDataManager) RemoveInstance(
 		mgr.ServiceInfo.Instances[removeIndex+1:])
 	mgr.ServiceInfo.Instances = mgr.ServiceInfo.Instances[:len(mgr.ServiceInfo.Instances)-1]
 }
+
+func NewDefaultServiceBuffer() ServiceBuffer {
+	return &DefaultServiceBuffer{
+		dict: make(map[string]*InstanceMgr),
+	}
+}
+
+var (
+	NewServiceBuffer = NewDefaultServiceBuffer()
+)
 
 // ServiceBuffer 用来快速查找当前是否存在某个Instance
 // 实现中应当考虑并发

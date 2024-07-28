@@ -1,4 +1,4 @@
-global:
+Global:
   DiscoverService:
   RegisterService:
     - Host: 127.0.0.1

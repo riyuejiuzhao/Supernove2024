@@ -5,12 +5,12 @@ import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/svr/register"
-	"context"
 	"fmt"
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis"
 	"google.golang.org/protobuf/proto"
 	"math/rand"
 	"testing"
+	"time"
 )
 
 // RandomServiceAddress
@@ -39,12 +39,12 @@ func TestRegister(t *testing.T) {
 			ServiceName: serviceName,
 			Host:        RandomIP(),
 			Port:        RandomPort(),
-			Weight:      rand.Int31n(100),
+			Weight:      rand.Int31n(100) + 1, //保证权重不是0
 		})
 	}
 	//链接并清空数据库
 	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
-	err := rdb.FlushDB(context.Background()).Err()
+	err := rdb.FlushDB().Err()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,9 @@ func TestRegister(t *testing.T) {
 	// 从另一个协程启动
 	go register.SetupServer("127.0.0.1:8080", "9.134.93.168:6380", "SDZsdz2000", 0)
 
-	config.DefaultConfigFilePath = "test/register_test.yaml"
+	time.Sleep(10 * time.Second)
+
+	config.DefaultConfigFilePath = "register_test.yaml"
 	api, err := sdk.NewRegisterAPI()
 	if err != nil {
 		t.Fatal(err)
@@ -68,14 +70,14 @@ func TestRegister(t *testing.T) {
 	}
 
 	//检查redis数据库是否全部写入了
-	revision, err := rdb.HGet(context.Background(), register.ServiceHash(serviceName), register.ServiceRevisionFiled).Int64()
+	revision, err := rdb.HGet(register.ServiceHash(serviceName), register.ServiceRevisionFiled).Int64()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if revision != int64(len(testData)) {
 		t.Fatal("服务版本号没有正常更新")
 	}
-	bytes, err := rdb.HGet(context.Background(), register.ServiceHash(serviceName), register.ServiceInfoFiled).Bytes()
+	bytes, err := rdb.HGet(register.ServiceHash(serviceName), register.ServiceInfoFiled).Bytes()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,6 +95,7 @@ func TestRegister(t *testing.T) {
 			dataInTest.Port != v.Port ||
 			dataInTest.Weight != v.Weight {
 			t.Errorf("ID:%v 发送的数据为{Host:%s,Port:%v,Weight:%v}, redis数据为{Host:%s,Port:%v,Weight:%v}",
+				v.InstanceID,
 				dataInTest.Host, dataInTest.Port, dataInTest.Weight,
 				v.Host, v.Port, v.Weight)
 		}

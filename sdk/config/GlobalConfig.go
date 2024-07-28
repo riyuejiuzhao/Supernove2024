@@ -59,7 +59,7 @@ func loadConfig(configFileOpts ...string) (*Config, error) {
 		return nil, err
 	}
 	var config Config
-	err = yaml.Unmarshal(configYaml, config)
+	err = yaml.Unmarshal(configYaml, &config)
 	if err != nil {
 		return nil, err
 	}

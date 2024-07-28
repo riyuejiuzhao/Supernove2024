@@ -24,9 +24,12 @@ func TryUnlock(mutex *redsync.Mutex) {
 }
 
 func RandomDicValue[K comparable, V any](dict map[K]V) V {
+	var rt V
+	if len(dict) == 0 {
+		return rt
+	}
 	index := rand.Intn(len(dict))
 	count := 0
-	var rt V
 	for _, value := range dict {
 		if count < index {
 			count += 1

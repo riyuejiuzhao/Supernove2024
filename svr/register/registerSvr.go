@@ -6,9 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/go-redis/redis"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis"
-	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"log"
@@ -38,8 +38,7 @@ func ServiceInfoLockName(serviceName string) string {
 
 // 如果Revision和Redis不同就刷新
 func (r *Server) flushBuffer(ctx SvrContext) error {
-	redisRevision, err := r.rdb.HGet(ctx.GetContext(),
-		ctx.GetServiceHash(), ServiceRevisionFiled).Int64()
+	redisRevision, err := r.rdb.HGet(ctx.GetServiceHash(), ServiceRevisionFiled).Int64()
 	if errors.Is(err, redis.Nil) {
 		return nil
 	} else if err != nil {
@@ -48,7 +47,7 @@ func (r *Server) flushBuffer(ctx SvrContext) error {
 	serviceInfo, ok := r.mgr.TryGetServiceInfo(ctx.GetServiceName())
 	if !ok || serviceInfo.Revision != redisRevision {
 		//需要更新本地缓存
-		infoBytes, err := r.rdb.HGet(ctx.GetContext(), ctx.GetServiceHash(), ServiceInfoFiled).Bytes()
+		infoBytes, err := r.rdb.HGet(ctx.GetServiceHash(), ServiceInfoFiled).Bytes()
 		if err != nil {
 			return err
 		}
@@ -69,10 +68,9 @@ func (r *Server) sendServiceToRedis(ctx SvrContext, info *miniRouterProto.Servic
 		return err
 	}
 	txPipeline := r.rdb.TxPipeline()
-	txPipeline.HSet(ctx.GetContext(), ctx.GetServiceHash(), ServiceRevisionFiled,
-		info.Revision)
-	txPipeline.HSet(ctx.GetContext(), ctx.GetServiceHash(), ServiceInfoFiled, bytes)
-	_, err = txPipeline.Exec(ctx.GetContext())
+	txPipeline.HSet(ctx.GetServiceHash(), ServiceRevisionFiled, info.Revision)
+	txPipeline.HSet(ctx.GetServiceHash(), ServiceInfoFiled, bytes)
+	_, err = txPipeline.Exec()
 	if err != nil {
 		return err
 	}
@@ -88,7 +86,7 @@ type Server struct {
 
 func NewSvr(rdb *redis.Client, rs *redsync.Redsync) *Server {
 	return &Server{
-		mgr:    &DefaultRegisterDataManager{},
+		mgr:    NewDefaultServiceBuffer(),
 		rdb:    rdb,
 		rMutex: rs,
 	}
@@ -100,9 +98,9 @@ func SetupServer(address string, redisAddress string, redisPassword string, redi
 	pool := goredis.NewPool(rdb)
 	rs := redsync.New(pool)
 
-	_, err := rdb.Ping(context.Background()).Result()
+	_, err := rdb.Ping().Result()
 	if err != nil {
-		log.Fatalln("没有找到redis服务")
+		log.Fatalln(err)
 	} else {
 		util.Info("redis PONG")
 	}
