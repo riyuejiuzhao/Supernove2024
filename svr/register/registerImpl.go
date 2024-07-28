@@ -2,6 +2,7 @@ package register
 
 import (
 	"Supernove2024/miniRouterProto"
+	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
 	"errors"
@@ -9,15 +10,11 @@ import (
 )
 
 type RegisterContext struct {
-	Ctx         context.Context
 	Request     *miniRouterProto.RegisterRequest
 	ServiceHash string
 	Address     string
 }
 
-func (c *RegisterContext) GetContext() context.Context {
-	return c.Ctx
-}
 func (c *RegisterContext) GetServiceName() string {
 	return c.Request.ServiceName
 }
@@ -25,36 +22,33 @@ func (c *RegisterContext) GetServiceHash() string {
 	return c.ServiceHash
 }
 
-func newRegisterContext(ctx context.Context, request *miniRouterProto.RegisterRequest) *RegisterContext {
+func newRegisterContext(request *miniRouterProto.RegisterRequest) *RegisterContext {
 	return &RegisterContext{
-		Ctx:         ctx,
-		ServiceHash: ServiceHash(request.ServiceName),
+		ServiceHash: svrutil.ServiceHash(request.ServiceName),
 		Request:     request,
-		Address:     InstanceAddress(request.Host, request.Port),
+		Address:     svrutil.InstanceAddress(request.Host, request.Port),
 	}
 }
 
 // Register 注册一个新服务实例
 func (r *Server) Register(
-	ctx context.Context,
+	_ context.Context,
 	request *miniRouterProto.RegisterRequest,
 ) (*miniRouterProto.RegisterReply, error) {
-	registerCtx := newRegisterContext(ctx, request)
+	registerCtx := newRegisterContext(request)
 
-	mutex := r.rMutex.NewMutex(ServiceInfoLockName(request.ServiceName))
-	err := mutex.Lock()
+	mutex, err := r.LockRedisService(request.ServiceName)
 	if err != nil {
-		util.Error("err: %v", err)
 		return nil, err
 	}
 	defer util.TryUnlock(mutex)
 
-	err = r.flushBuffer(registerCtx)
+	err = r.FlushBuffer(registerCtx)
 	if err != nil {
 		return nil, err
 	}
 
-	instanceInfo, ok := r.mgr.TryGetInstanceByAddress(request.ServiceName, registerCtx.Address)
+	instanceInfo, ok := r.Mgr.TryGetInstanceByAddress(request.ServiceName, registerCtx.Address)
 	if ok {
 		//如果存在，那么就直接返回
 		return &miniRouterProto.RegisterReply{
@@ -64,16 +58,16 @@ func (r *Server) Register(
 	}
 
 	//如果不存在，那么添加新实例
-	instanceInfo = r.mgr.AddInstance(request.ServiceName, request.Host, request.Port, request.Weight)
+	instanceInfo = r.Mgr.AddInstance(request.ServiceName, request.Host, request.Port, request.Weight)
 	//获取调整后的结果
-	serviceInfo, ok := r.mgr.TryGetServiceInfo(request.ServiceName)
+	serviceInfo, ok := r.Mgr.TryGetServiceInfo(request.ServiceName)
 	if !ok {
 		err = errors.New(fmt.Sprintf("没有成功创建ServiceInfo, name:%s", request.ServiceName))
 		util.Error("err: %v", err)
 		return nil, err
 	}
 	//写入redis
-	err = r.sendServiceToRedis(registerCtx, serviceInfo)
+	err = r.SendServiceToRedis(registerCtx, serviceInfo)
 	if err != nil {
 		return nil, err
 	}

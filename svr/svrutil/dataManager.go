@@ -1,4 +1,4 @@
-package register
+package svrutil
 
 import (
 	"Supernove2024/miniRouterProto"
