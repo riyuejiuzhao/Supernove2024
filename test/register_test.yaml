@@ -1,0 +1,10 @@
+global:
+  DiscoverService:
+  RegisterService:
+    - Host: 127.0.0.1
+      Port: 8080
+  HealthService:
+  Register:
+    DefaultWeight: 10
+  Discovery:
+    DefaultTimeout: 1000

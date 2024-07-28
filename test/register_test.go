@@ -1,0 +1,100 @@
+package test
+
+import (
+	"Supernove2024/miniRouterProto"
+	"Supernove2024/sdk"
+	"Supernove2024/sdk/config"
+	"Supernove2024/svr/register"
+	"context"
+	"fmt"
+	"github.com/redis/go-redis/v9"
+	"google.golang.org/protobuf/proto"
+	"math/rand"
+	"testing"
+)
+
+// RandomServiceAddress
+// 随机生成服务地址
+func RandomIP() string {
+	return fmt.Sprintf("%v.%v.%v.%v",
+		rand.Intn(256),
+		rand.Intn(256),
+		rand.Intn(256),
+		rand.Intn(256))
+}
+
+func RandomPort() int32 {
+	return rand.Int31n(65536)
+}
+
+// TestRegister
+// 测试注册服务，注销服务是否正确
+func TestRegister(t *testing.T) {
+	serviceName := "testService1"
+	instanceNum := 10
+
+	testData := make([]*sdk.RegisterArgv, 0)
+	for i := 0; i < instanceNum; i++ {
+		testData = append(testData, &sdk.RegisterArgv{
+			ServiceName: serviceName,
+			Host:        RandomIP(),
+			Port:        RandomPort(),
+			Weight:      rand.Int31n(100),
+		})
+	}
+	//链接并清空数据库
+	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
+	err := rdb.FlushDB(context.Background()).Err()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 从另一个协程启动
+	go register.SetupServer("127.0.0.1:8080", "9.134.93.168:6380", "SDZsdz2000", 0)
+
+	config.DefaultConfigFilePath = "test/register_test.yaml"
+	api, err := sdk.NewRegisterAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resultData := make(map[string]*sdk.RegisterArgv)
+	for _, v := range testData {
+		result, err := api.Register(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resultData[result.InstanceID] = v
+	}
+
+	//检查redis数据库是否全部写入了
+	revision, err := rdb.HGet(context.Background(), register.ServiceHash(serviceName), register.ServiceRevisionFiled).Int64()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision != int64(len(testData)) {
+		t.Fatal("服务版本号没有正常更新")
+	}
+	bytes, err := rdb.HGet(context.Background(), register.ServiceHash(serviceName), register.ServiceInfoFiled).Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var serviceInfo miniRouterProto.ServiceInfo
+	err = proto.Unmarshal(bytes, &serviceInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range serviceInfo.Instances {
+		dataInTest, ok := resultData[v.InstanceID]
+		if !ok {
+			t.Errorf("服务没有正常写入 ID:%v", v.InstanceID)
+		}
+		if dataInTest.Host != v.Host ||
+			dataInTest.Port != v.Port ||
+			dataInTest.Weight != v.Weight {
+			t.Errorf("ID:%v 发送的数据为{Host:%s,Port:%v,Weight:%v}, redis数据为{Host:%s,Port:%v,Weight:%v}",
+				dataInTest.Host, dataInTest.Port, dataInTest.Weight,
+				v.Host, v.Port, v.Weight)
+		}
+	}
+}
