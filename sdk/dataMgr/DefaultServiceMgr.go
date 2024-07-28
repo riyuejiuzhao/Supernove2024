@@ -2,7 +2,6 @@ package dataMgr
 
 import (
 	"Supernove2024/miniRouterProto"
-	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
@@ -10,9 +9,9 @@ import (
 )
 
 type DefaultServiceMgr struct {
-	sdk.APIContext
-	buffer   map[string]*miniRouterProto.ServiceInfo
-	revision int64
+	config      *config.Config
+	connManager connMgr.ConnManager
+	buffer      map[string]*miniRouterProto.ServiceInfo
 }
 
 func (m *DefaultServiceMgr) FlushService(serviceName string) {
@@ -24,7 +23,7 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 			Revision:    0}
 	}
 	m.buffer[serviceName] = nowService
-	disConn, err := m.ConnManager.GetServiceConn(connMgr.Discovery)
+	disConn, err := m.connManager.GetServiceConn(connMgr.Discovery)
 	if err != nil {
 		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", serviceName, err)
 		return
@@ -33,7 +32,7 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 	cli := miniRouterProto.NewDiscoveryServiceClient(disConn.Value())
 	request := miniRouterProto.GetInstancesRequest{
 		ServiceName: serviceName,
-		Revision:    m.revision,
+		Revision:    nowService.Revision,
 	}
 	reply, err := cli.GetInstances(context.Background(), &request)
 	if err != nil {
@@ -58,10 +57,10 @@ func (m *DefaultServiceMgr) GetServiceInstance(serviceName string) *miniRouterPr
 	return service
 }
 
-func (m *DefaultServiceMgr) GetRevision() int64 {
-	return m.revision
-}
-
-func NewDefaultServiceMgr(config config.Config, manager connMgr.ConnManager) {
-
+func NewDefaultServiceMgr(config *config.Config, manager connMgr.ConnManager) *DefaultServiceMgr {
+	return &DefaultServiceMgr{
+		config:      config,
+		connManager: manager,
+		buffer:      make(map[string]*miniRouterProto.ServiceInfo),
+	}
 }

@@ -15,6 +15,7 @@ type RegisterArgv struct {
 	ServiceName string
 	Host        string
 	Port        int32
+	Weight      int32
 }
 
 type RegisterResult struct {
@@ -22,18 +23,25 @@ type RegisterResult struct {
 	Existed    bool
 }
 
-func (c *RegisterCli) Register(service RegisterArgv) (*RegisterResult, error) {
+func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 	rpcCli := miniRouterProto.NewRegisterServiceClient(conn.Value())
+	var weight int32
+	if service.Weight > 0 {
+		weight = service.Weight
+	} else {
+		weight = c.Config.Global.Register.DefaultWeight
+	}
 	request := miniRouterProto.RegisterRequest{
 		ServiceName: service.ServiceName,
 		Host:        service.Host,
 		Port:        service.Port,
-		Weight:      c.Config.Global.Register.DefaultWeight}
+		Weight:      weight,
+	}
 	reply, err := rpcCli.Register(context.Background(), &request)
 	if err != nil {
 		return nil, err
@@ -44,7 +52,7 @@ func (c *RegisterCli) Register(service RegisterArgv) (*RegisterResult, error) {
 	return &RegisterResult{InstanceID: reply.InstanceID, Existed: reply.Existed}, nil
 }
 
-func (c *RegisterCli) Deregister(service RegisterArgv) error {
+func (c *RegisterCli) Deregister(service *RegisterArgv) error {
 	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
 	if err != nil {
 		return err
@@ -68,8 +76,8 @@ func (c *RegisterCli) Deregister(service RegisterArgv) error {
 // RegisterAPI 功能：
 // 服务注册
 type RegisterAPI interface {
-	Register(service RegisterArgv) (*RegisterResult, error)
-	Deregister(service RegisterArgv) error
+	Register(service *RegisterArgv) (*RegisterResult, error)
+	Deregister(service *RegisterArgv) error
 }
 
 func NewRegisterAPI() (RegisterAPI, error) {

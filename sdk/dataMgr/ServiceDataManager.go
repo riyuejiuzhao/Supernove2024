@@ -1,21 +1,32 @@
 package dataMgr
 
-import "Supernove2024/miniRouterProto"
+import (
+	"Supernove2024/miniRouterProto"
+	"Supernove2024/sdk/config"
+	"Supernove2024/sdk/connMgr"
+)
 
 type ServiceDataManager interface {
-	GetServiceInstance(serviceName string) miniRouterProto.ServiceInfo
-	GetRevision() int64
-	Flush()
+	GetServiceInstance(serviceName string) *miniRouterProto.ServiceInfo
+	FlushService(serviceName string)
 }
 
 var (
-	ServiceDataMgr        ServiceDataManager = nil
+	serviceDataMgr        ServiceDataManager = nil
 	NewServiceDataManager                    = NewDefaultServiceMgr
 )
 
 func Instance() (ServiceDataManager, error) {
-	if ServiceDataMgr == nil {
-
+	if serviceDataMgr == nil {
+		cfg, err := config.GlobalConfig()
+		if err != nil {
+			return nil, err
+		}
+		conn, err := connMgr.Instance()
+		if err != nil {
+			return nil, err
+		}
+		serviceDataMgr = NewServiceDataManager(cfg, conn)
 	}
-	return ServiceDataMgr, nil
+	return serviceDataMgr, nil
 }

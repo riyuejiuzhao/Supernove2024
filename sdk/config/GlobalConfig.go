@@ -28,11 +28,11 @@ type Config struct {
 			//获取远程服务的时间间隔
 			DefaultTimeout int32 `yaml:"DefaultTimeout"`
 		} `yaml:"Discovery"`
-	} `yaml:"global"`
+	} `yaml:"Global"`
 }
 
 var globalConfig *Config = nil
-var defaultConfigFilePath string = ""
+var DefaultConfigFilePath string = ""
 
 func GlobalConfig() (*Config, error) {
 	if globalConfig != nil {
@@ -48,7 +48,7 @@ func GlobalConfig() (*Config, error) {
 
 // 从文件中读取配置
 func loadConfig(configFileOpts ...string) (*Config, error) {
-	configFile := defaultConfigFilePath
+	configFile := DefaultConfigFilePath
 	if len(configFileOpts) == 1 {
 		configFile = configFileOpts[0]
 	} else if len(configFileOpts) > 1 {
