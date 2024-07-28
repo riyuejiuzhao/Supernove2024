@@ -1,20 +1,31 @@
-package main
+package register
 
 import (
 	"Supernove2024/miniRouterProto"
+	"Supernove2024/util"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/go-redsync/redsync/v4"
+	"github.com/go-redsync/redsync/v4/redis/goredis"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+	"log"
+	"net"
+)
+
+const (
+	ServiceKey           = "Service"
+	ServiceInfoFiled     = "Info"
+	ServiceRevisionFiled = "Revision"
 )
 
 func ServiceHash(serviceName string) string {
 	return fmt.Sprintf("%s.%s", ServiceKey, serviceName)
 }
 
-type RegisterSvrContext interface {
+type SvrContext interface {
 	GetContext() context.Context
 	GetServiceName() string
 	GetServiceHash() string
@@ -26,7 +37,7 @@ func ServiceInfoLockName(serviceName string) string {
 }
 
 // 如果Revision和Redis不同就刷新
-func (r *RegisterSvr) flushBuffer(ctx RegisterSvrContext) error {
+func (r *Server) flushBuffer(ctx SvrContext) error {
 	redisRevision, err := r.rdb.HGet(ctx.GetContext(),
 		ctx.GetServiceHash(), ServiceRevisionFiled).Int64()
 	if errors.Is(err, redis.Nil) {
@@ -52,7 +63,7 @@ func (r *RegisterSvr) flushBuffer(ctx RegisterSvrContext) error {
 }
 
 // 将数据发送到Redis
-func (r *RegisterSvr) sendServiceToRedis(ctx RegisterSvrContext, info *miniRouterProto.ServiceInfo) error {
+func (r *Server) sendServiceToRedis(ctx SvrContext, info *miniRouterProto.ServiceInfo) error {
 	bytes, err := proto.Marshal(info)
 	if err != nil {
 		return err
@@ -68,9 +79,42 @@ func (r *RegisterSvr) sendServiceToRedis(ctx RegisterSvrContext, info *miniRoute
 	return nil
 }
 
-type RegisterSvr struct {
-	mgr    RegisterDataManager
+type Server struct {
+	mgr    ServiceBuffer
 	rdb    *redis.Client
 	rMutex *redsync.Redsync
 	miniRouterProto.UnimplementedRegisterServiceServer
+}
+
+func NewSvr(rdb *redis.Client, rs *redsync.Redsync) *Server {
+	return &Server{
+		mgr:    &DefaultRegisterDataManager{},
+		rdb:    rdb,
+		rMutex: rs,
+	}
+}
+
+func SetupServer(address string, redisAddress string, redisPassword string, redisDB int) {
+	//链接redis
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddress, Password: redisPassword, DB: redisDB})
+	pool := goredis.NewPool(rdb)
+	rs := redsync.New(pool)
+
+	_, err := rdb.Ping(context.Background()).Result()
+	if err != nil {
+		log.Fatalln("没有找到redis服务")
+	} else {
+		util.Info("redis PONG")
+	}
+
+	//创建rpc服务器
+	lis, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	grpcServer := grpc.NewServer()
+	miniRouterProto.RegisterRegisterServiceServer(grpcServer, NewSvr(rdb, rs))
+	if err = grpcServer.Serve(lis); err != nil {
+		log.Fatalln(err)
+	}
 }

@@ -1,4 +1,4 @@
-package main
+package register
 
 import (
 	"Supernove2024/miniRouterProto"
@@ -35,7 +35,7 @@ func newRegisterContext(ctx context.Context, request *miniRouterProto.RegisterRe
 }
 
 // Register 注册一个新服务实例
-func (r *RegisterSvr) Register(
+func (r *Server) Register(
 	ctx context.Context,
 	request *miniRouterProto.RegisterRequest,
 ) (*miniRouterProto.RegisterReply, error) {

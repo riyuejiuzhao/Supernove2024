@@ -1,4 +1,4 @@
-package main
+package register
 
 import (
 	"Supernove2024/miniRouterProto"
@@ -26,7 +26,7 @@ func (d *DeregisterContext) GetServiceHash() string {
 	return d.hash
 }
 
-func (r *RegisterSvr) Deregister(ctx context.Context,
+func (r *Server) Deregister(ctx context.Context,
 	request *miniRouterProto.DeregisterRequest,
 ) (*miniRouterProto.DeregisterReply, error) {
 	deregisterCtx := &DeregisterContext{

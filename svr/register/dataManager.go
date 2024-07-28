@@ -1,4 +1,4 @@
-package main
+package register
 
 import (
 	"Supernove2024/miniRouterProto"
@@ -141,9 +141,9 @@ func (m *DefaultRegisterDataManager) RemoveInstance(
 	mgr.ServiceInfo.Instances = mgr.ServiceInfo.Instances[:len(mgr.ServiceInfo.Instances)-1]
 }
 
-// RegisterDataManager 用来快速查找当前是否存在某个Instance
+// ServiceBuffer 用来快速查找当前是否存在某个Instance
 // 实现中应当考虑并发
-type RegisterDataManager interface {
+type ServiceBuffer interface {
 	// TryGetInstanceByAddress 获取对应服务实例
 	TryGetInstanceByAddress(service string, address string) (*miniRouterProto.InstanceInfo, bool)
 	// TryGetServiceInfo 获取服务信息
