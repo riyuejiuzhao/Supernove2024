@@ -23,6 +23,13 @@ type RegisterResult struct {
 	Existed    bool
 }
 
+type DeregisterArgv struct {
+	ServiceName string
+	Host        string
+	Port        int32
+	InstanceID  string
+}
+
 func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
 	if err != nil {
@@ -52,7 +59,7 @@ func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 	return &RegisterResult{InstanceID: reply.InstanceID, Existed: reply.Existed}, nil
 }
 
-func (c *RegisterCli) Deregister(service *RegisterArgv) error {
+func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
 	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
 	if err != nil {
 		return err
@@ -63,13 +70,14 @@ func (c *RegisterCli) Deregister(service *RegisterArgv) error {
 		ServiceName: service.ServiceName,
 		Host:        service.Host,
 		Port:        service.Port,
+		InstanceID:  service.InstanceID,
 	}
 	_, err = rpcCli.Deregister(context.Background(), &request)
 	if err != nil {
 		return err
 	}
-	util.Info("注销服务: ServiceName: %v, Host: %v, Port: %v, InstanceID: %v, Exited: %v",
-		request.ServiceName, request.Host, request.Port)
+	util.Info("注销服务: ServiceName: %s, Host: %s, Port: %v, InstanceID: %s",
+		request.ServiceName, request.Host, request.Port, request.InstanceID)
 	return nil
 }
 
@@ -77,7 +85,7 @@ func (c *RegisterCli) Deregister(service *RegisterArgv) error {
 // 服务注册
 type RegisterAPI interface {
 	Register(service *RegisterArgv) (*RegisterResult, error)
-	Deregister(service *RegisterArgv) error
+	Deregister(service *DeregisterArgv) error
 }
 
 func NewRegisterAPI() (RegisterAPI, error) {

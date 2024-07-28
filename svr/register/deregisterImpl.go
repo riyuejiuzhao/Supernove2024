@@ -50,7 +50,11 @@ func (r *Server) Deregister(ctx context.Context,
 	}
 
 	//删除本地缓存
-	r.mgr.RemoveInstance(request.ServiceName, request.Host, request.Port)
+	err = r.mgr.RemoveInstance(request.ServiceName,
+		request.Host, request.Port, request.InstanceID)
+	if err != nil {
+		return nil, err
+	}
 	serviceInfo, ok := r.mgr.TryGetServiceInfo(request.ServiceName)
 	if !ok {
 		err = errors.New(fmt.Sprintf("ServiceInfo丢失, name:%s", request.ServiceName))

@@ -27,9 +27,7 @@ func RandomPort() int32 {
 	return rand.Int31n(65536)
 }
 
-// TestRegister
-// 测试注册服务，注销服务是否正确
-func TestRegister(t *testing.T) {
+func TestRegisterSvr(t *testing.T) {
 	serviceName := "testService1"
 	instanceNum := 10
 
@@ -52,6 +50,7 @@ func TestRegister(t *testing.T) {
 	// 从另一个协程启动
 	go register.SetupServer("127.0.0.1:8080", "9.134.93.168:6380", "SDZsdz2000", 0)
 
+	//等待服务器启动
 	time.Sleep(10 * time.Second)
 
 	config.DefaultConfigFilePath = "register_test.yaml"
@@ -100,4 +99,38 @@ func TestRegister(t *testing.T) {
 				v.Host, v.Port, v.Weight)
 		}
 	}
+
+	//逐个删除
+	targetRevision := revision + int64(len(serviceInfo.Instances))
+	for _, v := range serviceInfo.Instances {
+		err = api.Deregister(&sdk.DeregisterArgv{
+			ServiceName: serviceName,
+			Host:        v.Host,
+			Port:        v.Port,
+			InstanceID:  v.InstanceID,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	revision, err = rdb.HGet(register.ServiceHash(serviceName), register.ServiceRevisionFiled).Int64()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision != targetRevision {
+		t.Fatal("服务版本号没有正常更新")
+	}
+	bytes, err = rdb.HGet(register.ServiceHash(serviceName), register.ServiceInfoFiled).Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = proto.Unmarshal(bytes, &serviceInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, v := range serviceInfo.Instances {
+		t.Errorf("未删除 id:%s, host:%s, port:%v", v.InstanceID, v.Host, v.Port)
+	}
+
 }

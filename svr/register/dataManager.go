@@ -3,6 +3,7 @@ package register
 import (
 	"Supernove2024/miniRouterProto"
 	"Supernove2024/util"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -96,19 +97,23 @@ func (m *DefaultServiceBuffer) AddInstance(
 }
 
 func (m *DefaultServiceBuffer) RemoveInstance(
-	serviceName string, host string, port int32,
-) {
+	serviceName string, host string, port int32, instanceID string,
+) error {
 	m.rwMutex.Lock()
 	defer m.rwMutex.Unlock()
 
 	mgr, ok := m.dict[serviceName]
 	if !ok {
-		return
+		return nil
 	}
 
 	instance, ok := mgr.InstanceAddressDic[InstanceAddress(host, port)]
 	if !ok {
-		return
+		return nil
+	}
+
+	if instance.InstanceID != instanceID {
+		return errors.New("删除的InstanceID和实际InstanceID不同，终止删除")
 	}
 
 	mgr.ServiceInfo.Revision += 1
@@ -122,6 +127,7 @@ func (m *DefaultServiceBuffer) RemoveInstance(
 	copy(mgr.ServiceInfo.Instances[removeIndex:],
 		mgr.ServiceInfo.Instances[removeIndex+1:])
 	mgr.ServiceInfo.Instances = mgr.ServiceInfo.Instances[:len(mgr.ServiceInfo.Instances)-1]
+	return nil
 }
 
 func NewDefaultServiceBuffer() ServiceBuffer {
@@ -147,5 +153,5 @@ type ServiceBuffer interface {
 	// FlushService 更新或者创建
 	FlushService(info *miniRouterProto.ServiceInfo)
 	// RemoveInstance 删除一个Instance
-	RemoveInstance(serviceName string, host string, port int32)
+	RemoveInstance(serviceName string, host string, port int32, instanceID string) error
 }
