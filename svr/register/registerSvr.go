@@ -20,6 +20,11 @@ type RegisterSvrContext interface {
 	GetServiceHash() string
 }
 
+// ServiceInfoLockName 对一个资源的分布式锁给一个名字
+func ServiceInfoLockName(serviceName string) string {
+	return fmt.Sprintf("Register%s", serviceName)
+}
+
 // 如果Revision和Redis不同就刷新
 func (r *RegisterSvr) flushBuffer(ctx RegisterSvrContext) error {
 	redisRevision, err := r.rdb.HGet(ctx.GetContext(),
@@ -42,6 +47,23 @@ func (r *RegisterSvr) flushBuffer(ctx RegisterSvrContext) error {
 			return err
 		}
 		r.mgr.FlushService(serviceInfo)
+	}
+	return nil
+}
+
+// 将数据发送到Redis
+func (r *RegisterSvr) sendServiceToRedis(ctx RegisterSvrContext, info *miniRouterProto.ServiceInfo) error {
+	bytes, err := proto.Marshal(info)
+	if err != nil {
+		return err
+	}
+	txPipeline := r.rdb.TxPipeline()
+	txPipeline.HSet(ctx.GetContext(), ctx.GetServiceHash(), ServiceRevisionFiled,
+		info.Revision)
+	txPipeline.HSet(ctx.GetContext(), ctx.GetServiceHash(), ServiceInfoFiled, bytes)
+	_, err = txPipeline.Exec(ctx.GetContext())
+	if err != nil {
+		return err
 	}
 	return nil
 }

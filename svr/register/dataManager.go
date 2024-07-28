@@ -11,7 +11,7 @@ import (
 type InstanceMgr struct {
 	ServiceInfo        *miniRouterProto.ServiceInfo
 	InstanceAddressDic map[string]*miniRouterProto.InstanceInfo
-	InstanceIdDic      map[string]*miniRouterProto.InstanceInfo
+	//InstanceIdDic      map[string]*miniRouterProto.InstanceInfo
 }
 
 type DefaultRegisterDataManager struct {
@@ -26,15 +26,19 @@ func InstanceAddress(host string, port int32) string {
 func (m *DefaultRegisterDataManager) FlushService(info *miniRouterProto.ServiceInfo) {
 	m.rwMutex.Lock()
 	defer m.rwMutex.Unlock()
+	nowInfo, ok := m.dict[info.ServiceName]
+	if ok && nowInfo.ServiceInfo.Revision == info.Revision {
+		return
+	}
 	// 直接把过去的删掉重新生成，因为service可能注销
 	instanceMgr := &InstanceMgr{
 		InstanceAddressDic: make(map[string]*miniRouterProto.InstanceInfo),
-		InstanceIdDic:      make(map[string]*miniRouterProto.InstanceInfo),
-		ServiceInfo:        info,
+		//InstanceIdDic:      make(map[string]*miniRouterProto.InstanceInfo),
+		ServiceInfo: info,
 	}
 	for _, v := range info.Instances {
 		instanceMgr.InstanceAddressDic[InstanceAddress(v.Host, v.Port)] = v
-		instanceMgr.InstanceIdDic[v.InstanceID] = v
+		//instanceMgr.InstanceIdDic[v.InstanceID] = v
 	}
 	m.dict[info.ServiceName] = instanceMgr
 }
@@ -52,18 +56,22 @@ func (m *DefaultRegisterDataManager) TryGetInstanceByAddress(
 	return v, ok
 }
 
+/*
 func (m *DefaultRegisterDataManager) TryGetInstanceByID(
+
 	service string, instanceID string,
-) (*miniRouterProto.InstanceInfo, bool) {
-	m.rwMutex.RLocker()
-	defer m.rwMutex.RUnlock()
-	instanceMgr, ok := m.dict[service]
-	if !ok {
-		return nil, false
+
+	) (*miniRouterProto.InstanceInfo, bool) {
+		m.rwMutex.RLocker()
+		defer m.rwMutex.RUnlock()
+		instanceMgr, ok := m.dict[service]
+		if !ok {
+			return nil, false
+		}
+		v, ok := instanceMgr.InstanceIdDic[instanceID]
+		return v, ok
 	}
-	v, ok := instanceMgr.InstanceIdDic[instanceID]
-	return v, ok
-}
+*/
 
 func (m *DefaultRegisterDataManager) TryGetServiceInfo(service string) (*miniRouterProto.ServiceInfo, bool) {
 	m.rwMutex.RLocker()
@@ -76,7 +84,7 @@ func (m *DefaultRegisterDataManager) TryGetServiceInfo(service string) (*miniRou
 	return ins.ServiceInfo, true
 }
 
-func (m *DefaultRegisterDataManager) AddInstances(
+func (m *DefaultRegisterDataManager) AddInstance(
 	serviceName string,
 	host string,
 	port int32,
@@ -89,7 +97,6 @@ func (m *DefaultRegisterDataManager) AddInstances(
 	if !ok {
 		mgr = &InstanceMgr{
 			InstanceAddressDic: make(map[string]*miniRouterProto.InstanceInfo),
-			InstanceIdDic:      make(map[string]*miniRouterProto.InstanceInfo),
 			ServiceInfo:        util.NewServiceInfo(serviceName),
 		}
 	}
@@ -100,10 +107,38 @@ func (m *DefaultRegisterDataManager) AddInstances(
 		Port:       port,
 		Weight:     weight,
 	}
-	mgr.InstanceIdDic[info.InstanceID] = info
 	mgr.InstanceAddressDic[InstanceAddress(info.Host, info.Port)] = info
 	mgr.ServiceInfo.Instances = append(mgr.ServiceInfo.Instances, info)
 	return
+}
+
+func (m *DefaultRegisterDataManager) RemoveInstance(
+	serviceName string, host string, port int32,
+) {
+	m.rwMutex.Lock()
+	defer m.rwMutex.Unlock()
+
+	mgr, ok := m.dict[serviceName]
+	if !ok {
+		return
+	}
+
+	instance, ok := mgr.InstanceAddressDic[InstanceAddress(host, port)]
+	if !ok {
+		return
+	}
+
+	mgr.ServiceInfo.Revision += 1
+	removeIndex := 0
+	for i, v := range mgr.ServiceInfo.Instances {
+		if v.InstanceID == instance.InstanceID {
+			removeIndex = i
+			break
+		}
+	}
+	copy(mgr.ServiceInfo.Instances[removeIndex:],
+		mgr.ServiceInfo.Instances[removeIndex+1:])
+	mgr.ServiceInfo.Instances = mgr.ServiceInfo.Instances[:len(mgr.ServiceInfo.Instances)-1]
 }
 
 // RegisterDataManager 用来快速查找当前是否存在某个Instance
@@ -111,13 +146,13 @@ func (m *DefaultRegisterDataManager) AddInstances(
 type RegisterDataManager interface {
 	// TryGetInstanceByAddress 获取对应服务实例
 	TryGetInstanceByAddress(service string, address string) (*miniRouterProto.InstanceInfo, bool)
-	// TryGetInstanceByID 获取对应服务实例
-	TryGetInstanceByID(service string, instanceID string) (*miniRouterProto.InstanceInfo, bool)
 	// TryGetServiceInfo 获取服务信息
 	TryGetServiceInfo(service string) (*miniRouterProto.ServiceInfo, bool)
 
-	// AddInstances 增加一个Instances
-	AddInstances(serviceName string, host string, port int32, weight int32) *miniRouterProto.InstanceInfo
+	// AddInstance 增加一个Instance
+	AddInstance(serviceName string, host string, port int32, weight int32) *miniRouterProto.InstanceInfo
 	// FlushService 更新或者创建
 	FlushService(info *miniRouterProto.ServiceInfo)
+	// RemoveInstance 删除一个Instance
+	RemoveInstance(serviceName string, host string, port int32)
 }

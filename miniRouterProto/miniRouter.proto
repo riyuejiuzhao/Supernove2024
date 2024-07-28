@@ -29,8 +29,9 @@ message RegisterReply{
 
 message DeregisterRequest{
   string ServiceName =1;
-  string Host = 2;
-  int32 Port = 3;
+  string InstanceID = 2;
+  string Host = 3;
+  int32 Port = 4;
 }
 
 message DeregisterReply{
