@@ -130,14 +130,14 @@ func (m *DefaultServiceBuffer) RemoveInstance(
 	return nil
 }
 
-func NewDefaultServiceBuffer() ServiceBuffer {
+func newDefaultServiceBuffer() ServiceBuffer {
 	return &DefaultServiceBuffer{
 		dict: make(map[string]*InstanceMgr),
 	}
 }
 
 var (
-	NewServiceBuffer = NewDefaultServiceBuffer()
+	NewServiceBuffer = newDefaultServiceBuffer
 )
 
 // ServiceBuffer 用来快速查找当前是否存在某个Instance

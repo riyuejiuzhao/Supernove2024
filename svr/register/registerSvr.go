@@ -86,7 +86,7 @@ type Server struct {
 
 func NewSvr(rdb *redis.Client, rs *redsync.Redsync) *Server {
 	return &Server{
-		mgr:    NewDefaultServiceBuffer(),
+		mgr:    NewServiceBuffer(),
 		rdb:    rdb,
 		rMutex: rs,
 	}
