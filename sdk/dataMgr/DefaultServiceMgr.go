@@ -9,19 +9,20 @@ import (
 )
 
 type DefaultServiceMgr struct {
-	config      *config.Config
-	connManager connMgr.ConnManager
-	buffer      map[string]*miniRouterProto.ServiceInfo
+	config        *config.Config
+	connManager   connMgr.ConnManager
+	serviceBuffer map[string]*miniRouterProto.ServiceInfo
+	healthBuffer  map[string]map[string]*miniRouterProto.InstanceHealthInfo
 }
 
 func (m *DefaultServiceMgr) FlushService(serviceName string) {
-	nowService, ok := m.buffer[serviceName]
+	nowService, ok := m.serviceBuffer[serviceName]
 	if !ok {
 		nowService = &miniRouterProto.ServiceInfo{
 			ServiceName: serviceName,
 			Instances:   make([]*miniRouterProto.InstanceInfo, 0),
 			Revision:    0}
-		m.buffer[serviceName] = nowService
+		m.serviceBuffer[serviceName] = nowService
 	}
 	disConn, err := m.connManager.GetServiceConn(connMgr.Discovery)
 	if err != nil {
@@ -46,7 +47,7 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 	for i, v := range reply.Instances {
 		instances[i] = v
 	}
-	m.buffer[serviceName] = &miniRouterProto.ServiceInfo{
+	m.serviceBuffer[serviceName] = &miniRouterProto.ServiceInfo{
 		Instances:   instances,
 		Revision:    reply.Revision,
 		ServiceName: serviceName,
@@ -56,14 +57,27 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 
 func (m *DefaultServiceMgr) GetServiceInstance(serviceName string) *miniRouterProto.ServiceInfo {
 	m.FlushService(serviceName)
-	service := m.buffer[serviceName]
+	service := m.serviceBuffer[serviceName]
 	return service
+}
+
+func (m *DefaultServiceMgr) GetHealthInfo(serviceName string, instanceID string) (*miniRouterProto.InstanceHealthInfo, bool) {
+	serviceDic, ok := m.healthBuffer[serviceName]
+	if !ok {
+		return nil, false
+	}
+	instance, ok := serviceDic[instanceID]
+	if !ok {
+		return nil, false
+	}
+
+	return instance, true
 }
 
 func NewDefaultServiceMgr(config *config.Config, manager connMgr.ConnManager) *DefaultServiceMgr {
 	return &DefaultServiceMgr{
-		config:      config,
-		connManager: manager,
-		buffer:      make(map[string]*miniRouterProto.ServiceInfo),
+		config:        config,
+		connManager:   manager,
+		serviceBuffer: make(map[string]*miniRouterProto.ServiceInfo),
 	}
 }

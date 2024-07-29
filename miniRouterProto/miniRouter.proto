@@ -68,9 +68,15 @@ message HeartBeatRequest{
 message HeartBeatReply{
 }
 
-message HealthInfo{
-  int64 TTL = 1;
-  int64 LastHeartBeat = 2;
+message InstanceHealthInfo{
+  string InstanceID = 1;
+  int64 TTL = 2;
+  int64 LastHeartBeat = 3;
+}
+
+message ServiceHealthInfo {
+  string  ServiceName = 1;
+  repeated InstanceHealthInfo healthInfos = 2;
 }
 
 message GetHealthInfoRequest{
@@ -78,7 +84,7 @@ message GetHealthInfoRequest{
 }
 
 message GetHealthInfoReply{
-  repeated HealthInfo HealthInfos = 1;
+  repeated InstanceHealthInfo HealthInfos = 1;
 }
 
 service HealthService{
