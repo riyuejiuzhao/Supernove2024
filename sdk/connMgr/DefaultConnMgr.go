@@ -48,6 +48,9 @@ func (m *DefaultConnManager) GetServiceConn(service ServiceType) (pool.Conn, err
 	}
 	servicesDic := m.poolDic[service]
 	p := util.RandomDicValue(servicesDic)
+	if p == nil {
+		return nil, errors.New("指定的服务不存在")
+	}
 	return p.Get()
 }
 
