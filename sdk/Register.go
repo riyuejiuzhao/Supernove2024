@@ -15,7 +15,10 @@ type RegisterArgv struct {
 	ServiceName string
 	Host        string
 	Port        int32
-	Weight      int32
+
+	//optional
+	Weight *int32
+	TTL    *int32
 }
 
 type RegisterResult struct {
@@ -38,8 +41,8 @@ func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 	defer conn.Close()
 	rpcCli := miniRouterProto.NewRegisterServiceClient(conn.Value())
 	var weight int32
-	if service.Weight > 0 {
-		weight = service.Weight
+	if service.Weight != nil {
+		weight = *service.Weight
 	} else {
 		weight = c.Config.Global.Register.DefaultWeight
 	}

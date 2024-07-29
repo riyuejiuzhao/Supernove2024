@@ -225,3 +225,125 @@ var DiscoveryService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "miniRouter.proto",
 }
+
+// HealthServiceClient is the client API for HealthService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type HealthServiceClient interface {
+	HeartBeat(ctx context.Context, in *HeartBeatRequest, opts ...grpc.CallOption) (*HeartBeatReply, error)
+	GetHealthInfo(ctx context.Context, in *GetHealthInfoRequest, opts ...grpc.CallOption) (*GetHealthInfoReply, error)
+}
+
+type healthServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewHealthServiceClient(cc grpc.ClientConnInterface) HealthServiceClient {
+	return &healthServiceClient{cc}
+}
+
+func (c *healthServiceClient) HeartBeat(ctx context.Context, in *HeartBeatRequest, opts ...grpc.CallOption) (*HeartBeatReply, error) {
+	out := new(HeartBeatReply)
+	err := c.cc.Invoke(ctx, "/HealthService/HeartBeat", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *healthServiceClient) GetHealthInfo(ctx context.Context, in *GetHealthInfoRequest, opts ...grpc.CallOption) (*GetHealthInfoReply, error) {
+	out := new(GetHealthInfoReply)
+	err := c.cc.Invoke(ctx, "/HealthService/GetHealthInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// HealthServiceServer is the server API for HealthService service.
+// All implementations must embed UnimplementedHealthServiceServer
+// for forward compatibility
+type HealthServiceServer interface {
+	HeartBeat(context.Context, *HeartBeatRequest) (*HeartBeatReply, error)
+	GetHealthInfo(context.Context, *GetHealthInfoRequest) (*GetHealthInfoReply, error)
+	mustEmbedUnimplementedHealthServiceServer()
+}
+
+// UnimplementedHealthServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedHealthServiceServer struct {
+}
+
+func (UnimplementedHealthServiceServer) HeartBeat(context.Context, *HeartBeatRequest) (*HeartBeatReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HeartBeat not implemented")
+}
+func (UnimplementedHealthServiceServer) GetHealthInfo(context.Context, *GetHealthInfoRequest) (*GetHealthInfoReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetHealthInfo not implemented")
+}
+func (UnimplementedHealthServiceServer) mustEmbedUnimplementedHealthServiceServer() {}
+
+// UnsafeHealthServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to HealthServiceServer will
+// result in compilation errors.
+type UnsafeHealthServiceServer interface {
+	mustEmbedUnimplementedHealthServiceServer()
+}
+
+func RegisterHealthServiceServer(s grpc.ServiceRegistrar, srv HealthServiceServer) {
+	s.RegisterService(&HealthService_ServiceDesc, srv)
+}
+
+func _HealthService_HeartBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartBeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HealthServiceServer).HeartBeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/HealthService/HeartBeat",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HealthServiceServer).HeartBeat(ctx, req.(*HeartBeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HealthService_GetHealthInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHealthInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HealthServiceServer).GetHealthInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/HealthService/GetHealthInfo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HealthServiceServer).GetHealthInfo(ctx, req.(*GetHealthInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// HealthService_ServiceDesc is the grpc.ServiceDesc for HealthService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var HealthService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "HealthService",
+	HandlerType: (*HealthServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "HeartBeat",
+			Handler:    _HealthService_HeartBeat_Handler,
+		},
+		{
+			MethodName: "GetHealthInfo",
+			Handler:    _HealthService_GetHealthInfo_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "miniRouter.proto",
+}

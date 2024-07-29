@@ -39,11 +39,12 @@ func RandomRegisterArgv(serviceName string, instanceNum int) map[string]*sdk.Reg
 		if ok {
 			continue
 		}
+		weight := rand.Int31n(100) + 1
 		testData[address] = &sdk.RegisterArgv{
 			ServiceName: serviceName,
 			Host:        host,
 			Port:        port,
-			Weight:      rand.Int31n(100) + 1, //保证权重不是0
+			Weight:      &weight, //保证权重不是0
 		}
 	}
 	return testData
@@ -66,7 +67,7 @@ func TestDiscoverSvr(t *testing.T) {
 	go discovery.SetupServer("127.0.0.1:9090", "9.134.93.168:6380", "SDZsdz2000", 0)
 
 	//等待服务器启动
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	config.DefaultConfigFilePath = "register_test.yaml"
 	registerAPI, err := sdk.NewRegisterAPI()
@@ -103,7 +104,7 @@ func TestDiscoverSvr(t *testing.T) {
 		if !ok {
 			t.Errorf("discovery中缺少 Address:%s", addr)
 		}
-		if disV.Weight != v.Weight ||
+		if disV.Weight != *v.Weight ||
 			disV.Host != v.Host ||
 			disV.Port != v.Port {
 			t.Errorf("数据不匹配，发送数据为host:%s, port:%v, weight:%v, 发现数据为host:%s, port:%v, weight:%v",
@@ -123,7 +124,7 @@ func TestDiscoverSvr(t *testing.T) {
 		if !ok {
 			t.Errorf("discovery中多出了Address:%s", addr)
 		}
-		if testV.Weight != v.Weight ||
+		if *testV.Weight != v.Weight ||
 			testV.Host != v.Host ||
 			testV.Port != v.Port {
 			t.Errorf("数据不匹配，发送数据为host:%s, port:%v, weight:%v, 发现数据为host:%s, port:%v, weight:%v",
@@ -149,7 +150,7 @@ func TestRegisterSvr(t *testing.T) {
 	go register.SetupServer("127.0.0.1:8080", "9.134.93.168:6380", "SDZsdz2000", 0)
 
 	//等待服务器启动
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	config.DefaultConfigFilePath = "register_test.yaml"
 	api, err := sdk.NewRegisterAPI()
@@ -190,7 +191,7 @@ func TestRegisterSvr(t *testing.T) {
 		}
 		if dataInTest.Host != v.Host ||
 			dataInTest.Port != v.Port ||
-			dataInTest.Weight != v.Weight {
+			*dataInTest.Weight != v.Weight {
 			t.Errorf("ID:%v 发送的数据为{Host:%s,Port:%v,Weight:%v}, redis数据为{Host:%s,Port:%v,Weight:%v}",
 				v.InstanceID,
 				dataInTest.Host, dataInTest.Port, dataInTest.Weight,

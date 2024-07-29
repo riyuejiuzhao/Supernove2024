@@ -6,7 +6,7 @@ message InstanceInfo {
   string InstanceID = 1;
   string Host = 2;
   int32 Port = 3;
-  int32 weight = 4;
+  int32 Weight = 4;
 }
 
 message ServiceInfo {
@@ -19,7 +19,9 @@ message RegisterRequest{
   string ServiceName = 1;
   string Host = 2;
   int32 Port = 3;
-  int32 weight = 4;
+  int32 Weight = 4; // 权重
+
+  int64 TTL = 5; //上报时间间隔
 }
 
 message RegisterReply{
@@ -44,14 +46,43 @@ service RegisterService{
 
 message GetInstancesRequest{
   string ServiceName = 1;
-  int64 revision = 2;
+  int64 Revision = 2;
+
+  bool CheckHealth =3;
 }
 
 message GetInstancesReply{
-  int64 revision = 1;
+  int64 Revision = 1;
   repeated InstanceInfo Instances = 2;
 }
 
 service DiscoveryService{
   rpc GetInstances(GetInstancesRequest) returns (GetInstancesReply){}
 }
+
+message HeartBeatRequest{
+  string ServiceName =1;
+  string InstanceID = 2;
+}
+
+message HeartBeatReply{
+}
+
+message HealthInfo{
+  int64 TTL = 1;
+  int64 LastHeartBeat = 2;
+}
+
+message GetHealthInfoRequest{
+  string ServiceName = 1;
+}
+
+message GetHealthInfoReply{
+  repeated HealthInfo HealthInfos = 1;
+}
+
+service HealthService{
+  rpc HeartBeat(HeartBeatRequest) returns (HeartBeatReply) {}
+  rpc GetHealthInfo(GetHealthInfoRequest) returns (GetHealthInfoReply){}
+}
+

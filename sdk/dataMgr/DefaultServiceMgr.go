@@ -21,8 +21,8 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 			ServiceName: serviceName,
 			Instances:   make([]*miniRouterProto.InstanceInfo, 0),
 			Revision:    0}
+		m.buffer[serviceName] = nowService
 	}
-	m.buffer[serviceName] = nowService
 	disConn, err := m.connManager.GetServiceConn(connMgr.Discovery)
 	if err != nil {
 		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", serviceName, err)
@@ -38,6 +38,10 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 	if err != nil {
 		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", serviceName, err)
 	}
+	if reply.Revision == nowService.Revision {
+		util.Info("无需更新本地缓存 %v", nowService.Revision)
+		return
+	}
 	instances := make([]*miniRouterProto.InstanceInfo, len(reply.Instances))
 	for i, v := range reply.Instances {
 		instances[i] = v
@@ -47,6 +51,7 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 		Revision:    reply.Revision,
 		ServiceName: serviceName,
 	}
+	util.Info("更新本地缓存 %v->%v", nowService.Revision, reply.Revision)
 }
 
 func (m *DefaultServiceMgr) GetServiceInstance(serviceName string) *miniRouterProto.ServiceInfo {

@@ -9,12 +9,12 @@ import (
 )
 
 type Server struct {
-	*svrutil.BaseServer
+	*svrutil.BufferServer
 	miniRouterProto.UnimplementedRegisterServiceServer
 }
 
 func SetupServer(address string, redisAddress string, redisPassword string, redisDB int) {
-	baseSvr := svrutil.NewBaseSvr(redisAddress, redisPassword, redisDB)
+	baseSvr := svrutil.NewBufferSvr(redisAddress, redisPassword, redisDB)
 	//创建rpc服务器
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
@@ -22,7 +22,7 @@ func SetupServer(address string, redisAddress string, redisPassword string, redi
 	}
 	grpcServer := grpc.NewServer()
 	miniRouterProto.RegisterRegisterServiceServer(grpcServer,
-		&Server{BaseServer: baseSvr})
+		&Server{BufferServer: baseSvr})
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Fatalln(err)
 	}

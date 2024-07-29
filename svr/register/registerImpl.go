@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/protobuf/proto"
+	"time"
 )
 
 type RegisterContext struct {
@@ -66,11 +68,26 @@ func (r *Server) Register(
 		util.Error("err: %v", err)
 		return nil, err
 	}
-	//写入redis
-	err = r.SendServiceToRedis(registerCtx, serviceInfo)
+
+	//写入redis 数据和第一次的健康信息
+	healthKey := svrutil.HealthHash(serviceInfo.ServiceName, instanceInfo.InstanceID)
+	serviceSetName := svrutil.ServiceSetKey(serviceInfo.ServiceName)
+	bytes, err := proto.Marshal(serviceInfo)
 	if err != nil {
 		return nil, err
 	}
+	txPipeline := r.Rdb.TxPipeline()
+	txPipeline.HSet(registerCtx.ServiceHash, svrutil.ServiceRevisionFiled, serviceInfo.Revision)
+	txPipeline.HSet(registerCtx.ServiceHash, svrutil.ServiceInfoFiled, bytes)
+	// 健康信息
+	txPipeline.SAdd(serviceSetName, instanceInfo.InstanceID)
+	txPipeline.HSet(healthKey, svrutil.HealthLastHeartBeatField, time.Now().Unix())
+	txPipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
+	_, err = txPipeline.Exec()
+	if err != nil {
+		return nil, err
+	}
+	util.Info("更新redis: %s, %v", serviceInfo.ServiceName, serviceInfo.Revision)
 
 	return &miniRouterProto.RegisterReply{InstanceID: instanceInfo.InstanceID, Existed: false}, nil
 }

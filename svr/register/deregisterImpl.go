@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/protobuf/proto"
 )
 
 type DeregisterContext struct {
@@ -30,10 +31,8 @@ func (r *Server) Deregister(_ context.Context,
 		hash:    svrutil.ServiceHash(request.ServiceName),
 	}
 
-	mutex := r.RedMutex.NewMutex(svrutil.ServiceInfoLockName(request.ServiceName))
-	err := mutex.Lock()
+	mutex, err := r.LockRedisService(svrutil.ServiceInfoLockName(request.ServiceName))
 	if err != nil {
-		util.Error("err: %v", err)
 		return nil, err
 	}
 	defer util.TryUnlock(mutex)
@@ -58,10 +57,23 @@ func (r *Server) Deregister(_ context.Context,
 	}
 
 	//写入redis
-	err = r.SendServiceToRedis(deregisterCtx, serviceInfo)
+	healthKey := svrutil.HealthHash(serviceInfo.ServiceName, request.InstanceID)
+	serviceSetName := svrutil.ServiceSetKey(serviceInfo.ServiceName)
+	bytes, err := proto.Marshal(serviceInfo)
 	if err != nil {
 		return nil, err
 	}
+	txPipeline := r.Rdb.TxPipeline()
+	txPipeline.HSet(deregisterCtx.GetServiceHash(), svrutil.ServiceRevisionFiled, serviceInfo.Revision)
+	txPipeline.HSet(deregisterCtx.GetServiceHash(), svrutil.ServiceInfoFiled, bytes)
+	// 健康信息
+	txPipeline.SRem(serviceSetName, request.InstanceID)
+	txPipeline.Del(healthKey)
+	_, err = txPipeline.Exec()
+	if err != nil {
+		return nil, err
+	}
+	util.Info("更新redis: %s, %v", serviceInfo.ServiceName, serviceInfo.Revision)
 
 	return &miniRouterProto.DeregisterReply{}, nil
 }

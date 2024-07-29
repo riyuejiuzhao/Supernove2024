@@ -9,28 +9,44 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis"
 	"google.golang.org/protobuf/proto"
-	"log"
 )
 
 const (
-	ServiceKey           = "Service"
-	ServiceInfoFiled     = "Info"
-	ServiceRevisionFiled = "Revision"
+	HealthKey                = "Health"
+	ServiceKey               = "Service"
+	ServiceInfoFiled         = "Info"
+	ServiceRevisionFiled     = "Revision"
+	HealthTtlFiled           = "TTL"
+	HealthLastHeartBeatField = "LastHeartBeat"
 )
 
+// BaseServer 基本服务器，保持和Redis链接的能力
 type BaseServer struct {
-	Mgr      ServiceBuffer
 	Rdb      *redis.Client
 	RedMutex *redsync.Redsync
+}
+
+// BufferServer 带数据缓存的服务器
+type BufferServer struct {
+	*BaseServer
+	Mgr ServiceBuffer
 }
 
 func ServiceHash(serviceName string) string {
 	return fmt.Sprintf("%s.%s", ServiceKey, serviceName)
 }
 
+func HealthHash(serviceName string, instanceID string) string {
+	return fmt.Sprintf("%s.%s.%s", HealthKey, serviceName, instanceID)
+}
+
+func ServiceSetKey(serviceName string) string {
+	return serviceName
+}
+
 // ServiceInfoLockName 对一个资源的分布式锁给一个名字
 func ServiceInfoLockName(serviceName string) string {
-	return fmt.Sprintf("Register%s", serviceName)
+	return fmt.Sprintf("Service.%s", serviceName)
 }
 
 func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseServer {
@@ -38,18 +54,16 @@ func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseSer
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddress, Password: redisPassword, DB: redisDB})
 	pool := goredis.NewPool(rdb)
 	rs := redsync.New(pool)
-
-	_, err := rdb.Ping().Result()
-	if err != nil {
-		log.Fatalln(err)
-	} else {
-		util.Info("redis PONG")
-	}
-
 	return &BaseServer{
-		Mgr:      NewServiceBuffer(),
 		Rdb:      rdb,
 		RedMutex: rs,
+	}
+}
+
+func NewBufferSvr(redisAddress string, redisPassword string, redisDB int) *BufferServer {
+	return &BufferServer{
+		BaseServer: NewBaseSvr(redisAddress, redisPassword, redisDB),
+		Mgr:        NewServiceBuffer(),
 	}
 }
 
@@ -59,7 +73,7 @@ type SvrContext interface {
 }
 
 // FlushBuffer 如果Revision和Redis不同就刷新
-func (r *BaseServer) FlushBuffer(ctx SvrContext) error {
+func (r *BufferServer) FlushBuffer(ctx SvrContext) error {
 	redisRevision, err := r.Rdb.HGet(ctx.GetServiceHash(), ServiceRevisionFiled).Int64()
 	if errors.Is(err, redis.Nil) {
 		return nil
@@ -85,24 +99,7 @@ func (r *BaseServer) FlushBuffer(ctx SvrContext) error {
 	return nil
 }
 
-// SendServiceToRedis 将数据发送到Redis
-func (r *BaseServer) SendServiceToRedis(ctx SvrContext, info *miniRouterProto.ServiceInfo) error {
-	bytes, err := proto.Marshal(info)
-	if err != nil {
-		return err
-	}
-	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(ctx.GetServiceHash(), ServiceRevisionFiled, info.Revision)
-	txPipeline.HSet(ctx.GetServiceHash(), ServiceInfoFiled, bytes)
-	_, err = txPipeline.Exec()
-	if err != nil {
-		return err
-	}
-	util.Info("更新redis: %s, %v", info.ServiceName, info.Revision)
-	return nil
-}
-
-func (r *BaseServer) LockRedisService(serviceName string) (*redsync.Mutex, error) {
+func (r *BufferServer) LockRedisService(serviceName string) (*redsync.Mutex, error) {
 	mutex := r.RedMutex.NewMutex(ServiceInfoLockName(serviceName))
 	err := mutex.Lock()
 	if err != nil {
