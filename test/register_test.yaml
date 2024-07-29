@@ -1,5 +1,7 @@
 Global:
   DiscoverService:
+    - Host: 127.0.0.1
+      Port: 9090
   RegisterService:
     - Host: 127.0.0.1
       Port: 8080
