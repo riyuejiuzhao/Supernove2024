@@ -79,6 +79,7 @@ func (r *BaseServer) FlushBuffer(ctx SvrContext) error {
 			return err
 		}
 		r.Mgr.FlushService(serviceInfo)
+		util.Info("刷新%s缓存,%v->%v", serviceInfo.ServiceName, serviceInfo.Revision, redisRevision)
 	}
 	return nil
 }
@@ -96,6 +97,7 @@ func (r *BaseServer) SendServiceToRedis(ctx SvrContext, info *miniRouterProto.Se
 	if err != nil {
 		return err
 	}
+	util.Info("更新redis: %s, %v", info.ServiceName, info.Revision)
 	return nil
 }
 
