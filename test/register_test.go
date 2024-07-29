@@ -5,6 +5,7 @@ import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/svr/register"
+	"Supernove2024/svr/svrutil"
 	"fmt"
 	"github.com/go-redis/redis"
 	"google.golang.org/protobuf/proto"
@@ -69,14 +70,14 @@ func TestRegisterSvr(t *testing.T) {
 	}
 
 	//检查redis数据库是否全部写入了
-	revision, err := rdb.HGet(register.ServiceHash(serviceName), register.ServiceRevisionFiled).Int64()
+	revision, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.ServiceRevisionFiled).Int64()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if revision != int64(len(testData)) {
 		t.Fatal("服务版本号没有正常更新")
 	}
-	bytes, err := rdb.HGet(register.ServiceHash(serviceName), register.ServiceInfoFiled).Bytes()
+	bytes, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.ServiceInfoFiled).Bytes()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,14 +114,14 @@ func TestRegisterSvr(t *testing.T) {
 			t.Error(err)
 		}
 	}
-	revision, err = rdb.HGet(register.ServiceHash(serviceName), register.ServiceRevisionFiled).Int64()
+	revision, err = rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.ServiceRevisionFiled).Int64()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if revision != targetRevision {
 		t.Fatal("服务版本号没有正常更新")
 	}
-	bytes, err = rdb.HGet(register.ServiceHash(serviceName), register.ServiceInfoFiled).Bytes()
+	bytes, err = rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.ServiceInfoFiled).Bytes()
 	if err != nil {
 		t.Fatal(err)
 	}
