@@ -40,9 +40,7 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 	}
 	instances := make([]*miniRouterProto.InstanceInfo, len(reply.Instances))
 	for i, v := range reply.Instances {
-		instances[i].Host = v.Host
-		instances[i].Port = v.Port
-		instances[i].InstanceID = v.InstanceID
+		instances[i] = v
 	}
 	m.buffer[serviceName] = &miniRouterProto.ServiceInfo{
 		Instances:   instances,
