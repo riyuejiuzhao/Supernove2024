@@ -68,6 +68,7 @@ func (r *BaseServer) FlushBuffer(ctx SvrContext) error {
 	}
 	serviceInfo, ok := r.Mgr.TryGetServiceInfo(ctx.GetServiceName())
 	if !ok || serviceInfo.Revision != redisRevision {
+		originRevision := serviceInfo.Revision
 		//需要更新本地缓存
 		infoBytes, err := r.Rdb.HGet(ctx.GetServiceHash(), ServiceInfoFiled).Bytes()
 		if err != nil {
@@ -79,7 +80,7 @@ func (r *BaseServer) FlushBuffer(ctx SvrContext) error {
 			return err
 		}
 		r.Mgr.FlushService(serviceInfo)
-		util.Info("刷新%s缓存,%v->%v", serviceInfo.ServiceName, serviceInfo.Revision, redisRevision)
+		util.Info("刷新%s缓存,%v->%v", serviceInfo.ServiceName, originRevision, redisRevision)
 	}
 	return nil
 }
