@@ -12,8 +12,11 @@ import (
 )
 
 const (
-	HealthKey                = "Health"
-	ServiceKey               = "Service"
+	HealthKey      = "Health"
+	ServiceKey     = "Service"
+	ServiceLockKey = "ServiceLock"
+	SetKey         = "Set"
+
 	ServiceInfoFiled         = "Info"
 	ServiceRevisionFiled     = "Revision"
 	HealthTtlFiled           = "TTL"
@@ -41,12 +44,12 @@ func HealthHash(serviceName string, instanceID string) string {
 }
 
 func ServiceSetKey(serviceName string) string {
-	return serviceName
+	return fmt.Sprintf("%s.%s", SetKey, serviceName)
 }
 
 // ServiceInfoLockName 对一个资源的分布式锁给一个名字
 func ServiceInfoLockName(serviceName string) string {
-	return fmt.Sprintf("Service.%s", serviceName)
+	return fmt.Sprintf("%s.%s", ServiceLockKey, serviceName)
 }
 
 func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseServer {
@@ -82,7 +85,10 @@ func (r *BufferServer) FlushBuffer(ctx SvrContext) error {
 	}
 	serviceInfo, ok := r.Mgr.TryGetServiceInfo(ctx.GetServiceName())
 	if !ok || serviceInfo.Revision != redisRevision {
-		originRevision := serviceInfo.Revision
+		originRevision := int64(0)
+		if ok {
+			originRevision = serviceInfo.Revision
+		}
 		//需要更新本地缓存
 		infoBytes, err := r.Rdb.HGet(ctx.GetServiceHash(), ServiceInfoFiled).Bytes()
 		if err != nil {
@@ -94,7 +100,7 @@ func (r *BufferServer) FlushBuffer(ctx SvrContext) error {
 			return err
 		}
 		r.Mgr.FlushService(serviceInfo)
-		util.Info("刷新%s缓存,%v->%v", serviceInfo.ServiceName, originRevision, redisRevision)
+		util.Info("刷新服务器缓存: %s,%v->%v", serviceInfo.ServiceName, originRevision, redisRevision)
 	}
 	return nil
 }

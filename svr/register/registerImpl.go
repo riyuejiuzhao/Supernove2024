@@ -41,12 +41,14 @@ func (r *Server) Register(
 
 	mutex, err := r.LockRedisService(request.ServiceName)
 	if err != nil {
+		util.Error("lock redis failed err:%v", err)
 		return nil, err
 	}
 	defer util.TryUnlock(mutex)
 
 	err = r.FlushBuffer(registerCtx)
 	if err != nil {
+		util.Error("flush buffer failed err:%v", err)
 		return nil, err
 	}
 
