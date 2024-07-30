@@ -34,6 +34,10 @@ func RandomDicValue[K comparable, V any](dict map[K]V) V {
 }
 
 func RandomItem[T any](items []T) T {
+	var rt T
+	if len(items) == 0 {
+		return rt
+	}
 	index := rand.Intn(len(items))
 	return items[index]
 }
