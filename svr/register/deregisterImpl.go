@@ -35,7 +35,7 @@ func (r *Server) Deregister(_ context.Context,
 	if err != nil {
 		return nil, err
 	}
-	defer util.TryUnlock(mutex)
+	defer svrutil.TryUnlock(mutex)
 
 	//更新缓存
 	err = r.FlushBuffer(deregisterCtx)
@@ -69,7 +69,7 @@ func (r *Server) Deregister(_ context.Context,
 		util.Error("create lock err:%v", err)
 		return nil, err
 	}
-	defer util.TryUnlock(healthMutex)
+	defer svrutil.TryUnlock(healthMutex)
 	txPipeline := r.Rdb.TxPipeline()
 	txPipeline.HSet(deregisterCtx.GetServiceHash(), svrutil.ServiceRevisionFiled, serviceInfo.Revision)
 	txPipeline.HSet(deregisterCtx.GetServiceHash(), svrutil.ServiceInfoFiled, bytes)

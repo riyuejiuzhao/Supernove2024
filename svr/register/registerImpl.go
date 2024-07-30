@@ -44,7 +44,7 @@ func (r *Server) Register(
 		util.Error("lock redis failed err:%v", err)
 		return nil, err
 	}
-	defer util.TryUnlock(mutex)
+	defer svrutil.TryUnlock(mutex)
 
 	err = r.FlushBuffer(registerCtx)
 	if err != nil {
@@ -54,7 +54,8 @@ func (r *Server) Register(
 
 	instanceInfo, ok := r.Mgr.TryGetInstanceByAddress(request.ServiceName, registerCtx.Address)
 	if ok {
-		//如果存在，那么就直接返回
+		//如果存在，更新数据，然后返回
+		instanceInfo.Weight = request.Weight
 		return &miniRouterProto.RegisterReply{
 			InstanceID: instanceInfo.InstanceID,
 			Existed:    true,
@@ -85,7 +86,7 @@ func (r *Server) Register(
 		util.Error("create lock err:%v", err)
 		return nil, err
 	}
-	defer util.TryUnlock(healthMutex)
+	defer svrutil.TryUnlock(healthMutex)
 	txPipeline := r.Rdb.TxPipeline()
 	txPipeline.HSet(registerCtx.ServiceHash, svrutil.ServiceRevisionFiled, serviceInfo.Revision)
 	txPipeline.HSet(registerCtx.ServiceHash, svrutil.ServiceInfoFiled, bytes)

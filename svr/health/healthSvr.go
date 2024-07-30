@@ -31,7 +31,7 @@ func (s *Server) GetHealthInfo(_ context.Context,
 			continue
 		}
 		lockedServices = append(lockedServices, name)
-		defer util.TryUnlock(mutex)
+		defer svrutil.TryUnlock(mutex)
 	}
 
 	//批量获取ID

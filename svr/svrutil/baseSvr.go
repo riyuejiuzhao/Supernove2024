@@ -24,6 +24,13 @@ const (
 	HealthLastHeartBeatField = "LastHeartBeat"
 )
 
+func TryUnlock(mutex *redsync.Mutex) {
+	_, err := mutex.Unlock()
+	if err != nil {
+		util.Error("释放redis锁失败, Name:%s, err:%v", mutex.Name(), err)
+	}
+}
+
 // BaseServer 基本服务器，保持和Redis链接的能力
 type BaseServer struct {
 	Rdb      *redis.Client

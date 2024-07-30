@@ -3,7 +3,6 @@ package discovery
 import (
 	"Supernove2024/miniRouterProto"
 	"Supernove2024/svr/svrutil"
-	"Supernove2024/util"
 	"context"
 	"google.golang.org/grpc"
 	"log"
@@ -36,11 +35,11 @@ func (s *Server) GetInstances(_ context.Context,
 		request: request,
 	}
 
-	mutex, err := s.LockRedisService(&request.ServiceName)
+	mutex, err := s.LockRedisService(request.ServiceName)
 	if err != nil {
 		return nil, err
 	}
-	defer util.TryUnlock(mutex)
+	defer svrutil.TryUnlock(mutex)
 
 	err = s.FlushBuffer(disCtx)
 	if err != nil {
