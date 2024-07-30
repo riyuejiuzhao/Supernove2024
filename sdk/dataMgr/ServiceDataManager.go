@@ -9,7 +9,7 @@ import (
 type ServiceDataManager interface {
 	GetHealthInfo(serviceName string, instanceID string) (*miniRouterProto.InstanceHealthInfo, bool)
 	GetServiceInstance(serviceName string) *miniRouterProto.ServiceInfo
-	FlushService(serviceName string)
+	//tryFlushService(serviceName string)
 }
 
 var (
