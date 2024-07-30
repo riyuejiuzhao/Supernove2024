@@ -36,7 +36,7 @@ func (s *Server) GetInstances(_ context.Context,
 		request: request,
 	}
 
-	mutex, err := s.LockRedisService(request.ServiceName)
+	mutex, err := s.LockRedisService(&request.ServiceName)
 	if err != nil {
 		return nil, err
 	}

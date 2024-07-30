@@ -6,13 +6,17 @@ import (
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
 	"context"
+	"sync"
+	"time"
 )
 
 type DefaultServiceMgr struct {
 	config        *config.Config
 	connManager   connMgr.ConnManager
 	serviceBuffer map[string]*miniRouterProto.ServiceInfo
-	healthBuffer  map[string]map[string]*miniRouterProto.InstanceHealthInfo
+
+	healthBufferLock sync.RWMutex
+	healthBuffer     map[string]map[string]*miniRouterProto.InstanceHealthInfo
 }
 
 func (m *DefaultServiceMgr) FlushService(serviceName string) {
@@ -23,6 +27,7 @@ func (m *DefaultServiceMgr) FlushService(serviceName string) {
 			Instances:   make([]*miniRouterProto.InstanceInfo, 0),
 			Revision:    0}
 		m.serviceBuffer[serviceName] = nowService
+		m.healthBuffer[serviceName] = make(map[string]*miniRouterProto.InstanceHealthInfo)
 	}
 	disConn, err := m.connManager.GetServiceConn(connMgr.Discovery)
 	if err != nil {
@@ -62,6 +67,8 @@ func (m *DefaultServiceMgr) GetServiceInstance(serviceName string) *miniRouterPr
 }
 
 func (m *DefaultServiceMgr) GetHealthInfo(serviceName string, instanceID string) (*miniRouterProto.InstanceHealthInfo, bool) {
+	m.healthBufferLock.RLock()
+	defer m.healthBufferLock.RUnlock()
 	serviceDic, ok := m.healthBuffer[serviceName]
 	if !ok {
 		return nil, false
@@ -74,10 +81,55 @@ func (m *DefaultServiceMgr) GetHealthInfo(serviceName string, instanceID string)
 	return instance, true
 }
 
+func (m *DefaultServiceMgr) flushHealthInfo() {
+	conn, err := m.connManager.GetServiceConn(connMgr.HealthCheck)
+	if err != nil {
+		util.Error("更新健康信息连接获取失败 err:%v", err)
+		return
+	}
+	defer conn.Close()
+
+	m.healthBufferLock.Lock()
+	defer m.healthBufferLock.Unlock()
+
+	cli := miniRouterProto.NewHealthServiceClient(conn.Value())
+	serviceList := make([]string, 0, len(m.healthBuffer))
+	for k, _ := range m.healthBuffer {
+		serviceList = append(serviceList, k)
+	}
+	reply, err := cli.GetHealthInfo(context.Background(), &miniRouterProto.GetHealthInfoRequest{
+		ServiceNames: serviceList,
+	})
+	if err != nil {
+		util.Error("更新健康信息rpc失败 err:%v", err)
+		return
+	}
+	newDic := make(map[string]map[string]*miniRouterProto.InstanceHealthInfo)
+	for _, v := range reply.HealthInfos {
+		serviceHealthInfo := make(map[string]*miniRouterProto.InstanceHealthInfo)
+		for _, ins := range v.InstanceHealthInfo {
+			serviceHealthInfo[ins.InstanceID] = ins
+		}
+		newDic[v.ServiceName] = serviceHealthInfo
+	}
+	m.healthBuffer = newDic
+}
+
+func (m *DefaultServiceMgr) startFlushHealthInfo() {
+	go func() {
+		for {
+			m.flushHealthInfo()
+			time.Sleep(5 * time.Second)
+		}
+	}()
+}
+
 func NewDefaultServiceMgr(config *config.Config, manager connMgr.ConnManager) *DefaultServiceMgr {
-	return &DefaultServiceMgr{
+	mgr := &DefaultServiceMgr{
 		config:        config,
 		connManager:   manager,
 		serviceBuffer: make(map[string]*miniRouterProto.ServiceInfo),
 	}
+	mgr.startFlushHealthInfo()
+	return mgr
 }

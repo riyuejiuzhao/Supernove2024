@@ -63,6 +63,13 @@ func (r *Server) Deregister(_ context.Context,
 	if err != nil {
 		return nil, err
 	}
+	//这里需要给健康信息也上锁
+	healthMutex, err := r.LockRedisService(svrutil.ServiceHealthInfoLockName(request.ServiceName))
+	if err != nil {
+		util.Error("create lock err:%v", err)
+		return nil, err
+	}
+	defer util.TryUnlock(healthMutex)
 	txPipeline := r.Rdb.TxPipeline()
 	txPipeline.HSet(deregisterCtx.GetServiceHash(), svrutil.ServiceRevisionFiled, serviceInfo.Revision)
 	txPipeline.HSet(deregisterCtx.GetServiceHash(), svrutil.ServiceInfoFiled, bytes)

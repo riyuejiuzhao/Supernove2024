@@ -76,8 +76,16 @@ func (r *Server) Register(
 	serviceSetName := svrutil.ServiceSetKey(serviceInfo.ServiceName)
 	bytes, err := proto.Marshal(serviceInfo)
 	if err != nil {
+		util.Error("err: %v", err)
 		return nil, err
 	}
+	//这里需要给健康信息也上锁
+	healthMutex, err := r.LockRedisService(svrutil.ServiceHealthInfoLockName(request.ServiceName))
+	if err != nil {
+		util.Error("create lock err:%v", err)
+		return nil, err
+	}
+	defer util.TryUnlock(healthMutex)
 	txPipeline := r.Rdb.TxPipeline()
 	txPipeline.HSet(registerCtx.ServiceHash, svrutil.ServiceRevisionFiled, serviceInfo.Revision)
 	txPipeline.HSet(registerCtx.ServiceHash, svrutil.ServiceInfoFiled, bytes)

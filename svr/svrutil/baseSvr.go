@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	HealthKey      = "Health"
-	ServiceKey     = "Service"
-	ServiceLockKey = "ServiceLock"
-	SetKey         = "Set"
+	HealthKey            = "Health"
+	ServiceKey           = "Service"
+	ServiceLockKey       = "ServiceLock"
+	ServiceHealthLockKey = "ServiceHealthLockKey"
+	SetKey               = "Set"
 
 	ServiceInfoFiled         = "Info"
 	ServiceRevisionFiled     = "Revision"
@@ -50,6 +51,11 @@ func ServiceSetKey(serviceName string) string {
 // ServiceInfoLockName 对一个资源的分布式锁给一个名字
 func ServiceInfoLockName(serviceName string) string {
 	return fmt.Sprintf("%s.%s", ServiceLockKey, serviceName)
+}
+
+// ServiceHealthInfoLockName 对一个资源的分布式锁命名
+func ServiceHealthInfoLockName(serviceName string) string {
+	return fmt.Sprintf("%s.%s", ServiceHealthLockKey, serviceName)
 }
 
 func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseServer {
@@ -105,7 +111,7 @@ func (r *BufferServer) FlushBuffer(ctx SvrContext) error {
 	return nil
 }
 
-func (r *BufferServer) LockRedisService(serviceName string) (*redsync.Mutex, error) {
+func (r *BaseServer) LockRedisService(serviceName string) (*redsync.Mutex, error) {
 	mutex := r.RedMutex.NewMutex(ServiceInfoLockName(serviceName))
 	err := mutex.Lock()
 	if err != nil {

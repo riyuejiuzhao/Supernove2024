@@ -76,15 +76,15 @@ message InstanceHealthInfo{
 
 message ServiceHealthInfo {
   string  ServiceName = 1;
-  repeated InstanceHealthInfo healthInfos = 2;
+  repeated InstanceHealthInfo InstanceHealthInfo = 2;
 }
 
 message GetHealthInfoRequest{
-  string ServiceName = 1;
+  repeated string ServiceNames = 1;
 }
 
 message GetHealthInfoReply{
-  repeated InstanceHealthInfo HealthInfos = 1;
+  repeated ServiceHealthInfo HealthInfos = 1;
 }
 
 service HealthService{
