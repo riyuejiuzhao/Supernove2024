@@ -1,7 +1,7 @@
 package health
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
@@ -14,13 +14,13 @@ import (
 
 type Server struct {
 	*svrutil.BaseServer
-	miniRouterProto.UnimplementedHealthServiceServer
+	pb.UnimplementedHealthServiceServer
 }
 
 // GetHealthInfo 同步健康数据
 func (s *Server) GetHealthInfo(_ context.Context,
-	req *miniRouterProto.GetHealthInfoRequest,
-) (*miniRouterProto.GetHealthInfoReply, error) {
+	req *pb.GetHealthInfoRequest,
+) (*pb.GetHealthInfoReply, error) {
 	lockedServices := make([]string, 0, len(req.ServiceNames))
 	//给所有需要的上锁
 	for _, name := range req.ServiceNames {
@@ -49,7 +49,7 @@ func (s *Server) GetHealthInfo(_ context.Context,
 
 	ttlSlice := make([][]*redis.StringCmd, 0, len(smembers))
 	heatBeatSlice := make([][]*redis.StringCmd, 0, len(smembers))
-	healthInfos := make([]*miniRouterProto.ServiceHealthInfo, 0, len(smembers))
+	healthInfos := make([]*pb.ServiceHealthInfo, 0, len(smembers))
 	txPipeline = s.Rdb.TxPipeline()
 	for idx, mem := range smembers {
 		ids, err := mem.Result()
@@ -58,16 +58,16 @@ func (s *Server) GetHealthInfo(_ context.Context,
 			util.Error("get instances for %s failed", nowServiceName)
 			continue
 		}
-		instanceInfos := make([]*miniRouterProto.InstanceHealthInfo, 0, len(ids))
+		instanceInfos := make([]*pb.InstanceHealthInfo, 0, len(ids))
 		nowTtlSlice := make([]*redis.StringCmd, 0, len(ids))
 		nowHeatBeatSlice := make([]*redis.StringCmd, 0, len(ids))
 		for _, id := range ids {
 			hash := svrutil.HealthHash(lockedServices[idx], id)
 			nowTtlSlice = append(nowTtlSlice, txPipeline.HGet(hash, svrutil.HealthTtlFiled))
 			nowHeatBeatSlice = append(nowHeatBeatSlice, txPipeline.HGet(hash, svrutil.HealthLastHeartBeatField))
-			instanceInfos = append(instanceInfos, &miniRouterProto.InstanceHealthInfo{InstanceID: id})
+			instanceInfos = append(instanceInfos, &pb.InstanceHealthInfo{InstanceID: id})
 		}
-		healthInfos = append(healthInfos, &miniRouterProto.ServiceHealthInfo{
+		healthInfos = append(healthInfos, &pb.ServiceHealthInfo{
 			ServiceName:        nowServiceName,
 			InstanceHealthInfo: instanceInfos,
 		})
@@ -81,7 +81,7 @@ func (s *Server) GetHealthInfo(_ context.Context,
 	}
 
 	for i, healthInfo := range healthInfos {
-		nowInstances := make([]*miniRouterProto.InstanceHealthInfo, 0, len(healthInfo.InstanceHealthInfo))
+		nowInstances := make([]*pb.InstanceHealthInfo, 0, len(healthInfo.InstanceHealthInfo))
 		for j, instanceHealthInfo := range healthInfo.InstanceHealthInfo {
 			ttl, err := ttlSlice[i][j].Int64()
 			if err != nil {
@@ -100,14 +100,14 @@ func (s *Server) GetHealthInfo(_ context.Context,
 		healthInfo.InstanceHealthInfo = nowInstances
 	}
 
-	return &miniRouterProto.GetHealthInfoReply{HealthInfos: healthInfos}, err
+	return &pb.GetHealthInfoReply{HealthInfos: healthInfos}, err
 }
 
-func (s *Server) HeartBeat(_ context.Context, req *miniRouterProto.HeartBeatRequest) (*miniRouterProto.HeartBeatReply, error) {
+func (s *Server) HeartBeat(_ context.Context, req *pb.HeartBeatRequest) (*pb.HeartBeatReply, error) {
 	lastHeartBeat := time.Now().Unix()
 	key := svrutil.HealthHash(req.ServiceName, req.InstanceID)
 	s.Rdb.HSet(key, svrutil.HealthLastHeartBeatField, lastHeartBeat)
-	return &miniRouterProto.HeartBeatReply{}, nil
+	return &pb.HeartBeatReply{}, nil
 }
 
 func SetupServer(address string, redisAddress string, redisPassword string, redisDB int) {
@@ -118,7 +118,7 @@ func SetupServer(address string, redisAddress string, redisPassword string, redi
 	}
 
 	grpcServer := grpc.NewServer()
-	miniRouterProto.RegisterHealthServiceServer(grpcServer,
+	pb.RegisterHealthServiceServer(grpcServer,
 		&Server{BaseServer: svrutil.NewBaseSvr(redisAddress, redisPassword, redisDB)})
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Fatalln(err)

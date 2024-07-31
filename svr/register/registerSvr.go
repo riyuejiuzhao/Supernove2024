@@ -1,7 +1,7 @@
 package register
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/svr/svrutil"
 	"google.golang.org/grpc"
 	"log"
@@ -10,7 +10,7 @@ import (
 
 type Server struct {
 	*svrutil.BufferServer
-	miniRouterProto.UnimplementedRegisterServiceServer
+	pb.UnimplementedRegisterServiceServer
 }
 
 func SetupServer(address string, redisAddress string, redisPassword string, redisDB int) {
@@ -21,7 +21,7 @@ func SetupServer(address string, redisAddress string, redisPassword string, redi
 		log.Fatalln(err)
 	}
 	grpcServer := grpc.NewServer()
-	miniRouterProto.RegisterRegisterServiceServer(grpcServer,
+	pb.RegisterRegisterServiceServer(grpcServer,
 		&Server{BufferServer: baseSvr})
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Fatalln(err)

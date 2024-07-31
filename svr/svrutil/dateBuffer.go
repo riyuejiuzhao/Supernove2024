@@ -1,7 +1,7 @@
 package svrutil
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/util"
 	"errors"
 	"fmt"
@@ -10,8 +10,8 @@ import (
 )
 
 type InstanceMgr struct {
-	ServiceInfo        *miniRouterProto.ServiceInfo
-	InstanceAddressDic map[string]*miniRouterProto.InstanceInfo
+	ServiceInfo        *pb.ServiceInfo
+	InstanceAddressDic map[string]*pb.InstanceInfo
 }
 
 type DefaultServiceBuffer struct {
@@ -23,7 +23,7 @@ func InstanceAddress(host string, port int32) string {
 	return fmt.Sprintf("%v:%v", host, port)
 }
 
-func (m *DefaultServiceBuffer) FlushService(info *miniRouterProto.ServiceInfo) {
+func (m *DefaultServiceBuffer) FlushService(info *pb.ServiceInfo) {
 	m.rwMutex.Lock()
 	defer m.rwMutex.Unlock()
 	nowInfo, ok := m.dict[info.ServiceName]
@@ -32,20 +32,18 @@ func (m *DefaultServiceBuffer) FlushService(info *miniRouterProto.ServiceInfo) {
 	}
 	// 直接把过去的删掉重新生成，因为service可能注销
 	instanceMgr := &InstanceMgr{
-		InstanceAddressDic: make(map[string]*miniRouterProto.InstanceInfo),
-		//InstanceIdDic:      make(map[string]*miniRouterProto.InstanceInfo),
-		ServiceInfo: info,
+		InstanceAddressDic: make(map[string]*pb.InstanceInfo),
+		ServiceInfo:        info,
 	}
 	for _, v := range info.Instances {
 		instanceMgr.InstanceAddressDic[InstanceAddress(v.Host, v.Port)] = v
-		//instanceMgr.InstanceIdDic[v.InstanceID] = v
 	}
 	m.dict[info.ServiceName] = instanceMgr
 }
 
 func (m *DefaultServiceBuffer) TryGetInstanceByAddress(
 	service string, address string,
-) (*miniRouterProto.InstanceInfo, bool) {
+) (*pb.InstanceInfo, bool) {
 	m.rwMutex.RLock()
 	defer m.rwMutex.RUnlock()
 	instanceMgr, ok := m.dict[service]
@@ -56,7 +54,7 @@ func (m *DefaultServiceBuffer) TryGetInstanceByAddress(
 	return v, ok
 }
 
-func (m *DefaultServiceBuffer) TryGetServiceInfo(service string) (*miniRouterProto.ServiceInfo, bool) {
+func (m *DefaultServiceBuffer) TryGetServiceInfo(service string) (*pb.ServiceInfo, bool) {
 	m.rwMutex.RLock()
 	defer m.rwMutex.RUnlock()
 
@@ -72,20 +70,20 @@ func (m *DefaultServiceBuffer) AddInstance(
 	host string,
 	port int32,
 	weight int32,
-) (info *miniRouterProto.InstanceInfo) {
+) (info *pb.InstanceInfo) {
 	m.rwMutex.Lock()
 	defer m.rwMutex.Unlock()
 
 	mgr, ok := m.dict[serviceName]
 	if !ok {
 		mgr = &InstanceMgr{
-			InstanceAddressDic: make(map[string]*miniRouterProto.InstanceInfo),
+			InstanceAddressDic: make(map[string]*pb.InstanceInfo),
 			ServiceInfo:        util.NewServiceInfo(serviceName),
 		}
 		m.dict[serviceName] = mgr
 	}
 	mgr.ServiceInfo.Revision += 1
-	info = &miniRouterProto.InstanceInfo{
+	info = &pb.InstanceInfo{
 		InstanceID: strconv.FormatInt(mgr.ServiceInfo.Revision, 10),
 		Host:       host,
 		Port:       port,
@@ -144,14 +142,14 @@ var (
 // 实现中应当考虑并发
 type ServiceBuffer interface {
 	// TryGetInstanceByAddress 获取对应服务实例
-	TryGetInstanceByAddress(service string, address string) (*miniRouterProto.InstanceInfo, bool)
+	TryGetInstanceByAddress(service string, address string) (*pb.InstanceInfo, bool)
 	// TryGetServiceInfo 获取服务信息
-	TryGetServiceInfo(service string) (*miniRouterProto.ServiceInfo, bool)
+	TryGetServiceInfo(service string) (*pb.ServiceInfo, bool)
 
 	// AddInstance 增加一个Instance
-	AddInstance(serviceName string, host string, port int32, weight int32) *miniRouterProto.InstanceInfo
+	AddInstance(serviceName string, host string, port int32, weight int32) *pb.InstanceInfo
 	// FlushService 更新或者创建
-	FlushService(info *miniRouterProto.ServiceInfo)
+	FlushService(info *pb.ServiceInfo)
 	// RemoveInstance 删除一个Instance
 	RemoveInstance(serviceName string, host string, port int32, instanceID string) error
 }

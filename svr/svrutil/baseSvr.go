@@ -1,7 +1,7 @@
 package svrutil
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/util"
 	"errors"
 	"fmt"
@@ -107,7 +107,7 @@ func (r *BufferServer) FlushBuffer(ctx SvrContext) error {
 		if err != nil {
 			return err
 		}
-		serviceInfo = &miniRouterProto.ServiceInfo{}
+		serviceInfo = &pb.ServiceInfo{}
 		err = proto.Unmarshal(infoBytes, serviceInfo)
 		if err != nil {
 			return err

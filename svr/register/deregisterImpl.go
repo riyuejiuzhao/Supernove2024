@@ -1,7 +1,7 @@
 package register
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
@@ -12,7 +12,7 @@ import (
 
 type DeregisterContext struct {
 	hash    string
-	request *miniRouterProto.DeregisterRequest
+	request *pb.DeregisterRequest
 }
 
 func (d *DeregisterContext) GetServiceName() string {
@@ -24,8 +24,8 @@ func (d *DeregisterContext) GetServiceHash() string {
 }
 
 func (r *Server) Deregister(_ context.Context,
-	request *miniRouterProto.DeregisterRequest,
-) (*miniRouterProto.DeregisterReply, error) {
+	request *pb.DeregisterRequest,
+) (*pb.DeregisterReply, error) {
 	deregisterCtx := &DeregisterContext{
 		request: request,
 		hash:    svrutil.ServiceHash(request.ServiceName),
@@ -82,5 +82,5 @@ func (r *Server) Deregister(_ context.Context,
 	}
 	util.Info("更新redis: %s, %v", serviceInfo.ServiceName, serviceInfo.Revision)
 
-	return &miniRouterProto.DeregisterReply{}, nil
+	return &pb.DeregisterReply{}, nil
 }

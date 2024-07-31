@@ -1,7 +1,7 @@
 package discovery
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/svr/svrutil"
 	"context"
 	"google.golang.org/grpc"
@@ -11,12 +11,12 @@ import (
 
 type Server struct {
 	*svrutil.BufferServer
-	miniRouterProto.UnimplementedDiscoveryServiceServer
+	pb.UnimplementedDiscoveryServiceServer
 }
 
 type DiscoveryContext struct {
 	hash    string
-	request *miniRouterProto.GetInstancesRequest
+	request *pb.GetInstancesRequest
 }
 
 func (c *DiscoveryContext) GetServiceName() string {
@@ -27,9 +27,7 @@ func (c *DiscoveryContext) GetServiceHash() string {
 	return c.hash
 }
 
-func (s *Server) GetInstances(_ context.Context,
-	request *miniRouterProto.GetInstancesRequest,
-) (*miniRouterProto.GetInstancesReply, error) {
+func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (*pb.GetInstancesReply, error) {
 	disCtx := &DiscoveryContext{
 		hash:    svrutil.ServiceHash(request.ServiceName),
 		request: request,
@@ -48,20 +46,20 @@ func (s *Server) GetInstances(_ context.Context,
 
 	serviceInfo, ok := s.Mgr.TryGetServiceInfo(request.ServiceName)
 	if !ok {
-		return &miniRouterProto.GetInstancesReply{
-			Instances: make([]*miniRouterProto.InstanceInfo, 0),
+		return &pb.GetInstancesReply{
+			Instances: make([]*pb.InstanceInfo, 0),
 			Revision:  int64(0),
 		}, nil
 	}
 
 	if serviceInfo.Revision == request.Revision {
-		return &miniRouterProto.GetInstancesReply{
-			Instances: make([]*miniRouterProto.InstanceInfo, 0),
+		return &pb.GetInstancesReply{
+			Instances: make([]*pb.InstanceInfo, 0),
 			Revision:  serviceInfo.Revision,
 		}, nil
 	}
 
-	return &miniRouterProto.GetInstancesReply{
+	return &pb.GetInstancesReply{
 		Instances: serviceInfo.Instances,
 		Revision:  serviceInfo.Revision}, nil
 
@@ -76,7 +74,7 @@ func SetupServer(address string, redisAddress string, redisPassword string, redi
 		log.Fatalln(err)
 	}
 	grpcServer := grpc.NewServer()
-	miniRouterProto.RegisterDiscoveryServiceServer(grpcServer,
+	pb.RegisterDiscoveryServiceServer(grpcServer,
 		&Server{BufferServer: baseSvr})
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Fatalln(err)

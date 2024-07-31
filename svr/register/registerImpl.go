@@ -1,7 +1,7 @@
 package register
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 type RegisterContext struct {
-	Request     *miniRouterProto.RegisterRequest
+	Request     *pb.RegisterRequest
 	ServiceHash string
 	Address     string
 }
@@ -24,7 +24,7 @@ func (c *RegisterContext) GetServiceHash() string {
 	return c.ServiceHash
 }
 
-func newRegisterContext(request *miniRouterProto.RegisterRequest) *RegisterContext {
+func newRegisterContext(request *pb.RegisterRequest) *RegisterContext {
 	return &RegisterContext{
 		ServiceHash: svrutil.ServiceHash(request.ServiceName),
 		Request:     request,
@@ -35,8 +35,8 @@ func newRegisterContext(request *miniRouterProto.RegisterRequest) *RegisterConte
 // Register 注册一个新服务实例
 func (r *Server) Register(
 	_ context.Context,
-	request *miniRouterProto.RegisterRequest,
-) (*miniRouterProto.RegisterReply, error) {
+	request *pb.RegisterRequest,
+) (*pb.RegisterReply, error) {
 	registerCtx := newRegisterContext(request)
 
 	mutex, err := r.LockRedisService(request.ServiceName)
@@ -56,7 +56,7 @@ func (r *Server) Register(
 	if ok {
 		//如果存在，更新数据，然后返回
 		instanceInfo.Weight = request.Weight
-		return &miniRouterProto.RegisterReply{
+		return &pb.RegisterReply{
 			InstanceID: instanceInfo.InstanceID,
 			Existed:    true,
 		}, nil
@@ -100,5 +100,5 @@ func (r *Server) Register(
 	}
 	util.Info("更新redis: %s, %v", serviceInfo.ServiceName, serviceInfo.Revision)
 
-	return &miniRouterProto.RegisterReply{InstanceID: instanceInfo.InstanceID, Existed: false}, nil
+	return &pb.RegisterReply{InstanceID: instanceInfo.InstanceID, Existed: false}, nil
 }
