@@ -34,19 +34,23 @@ SDK必备接口：
 3. 健康检查svr
 
 ### redis数据设计
-对于一个Service，我们在proto中定义了一个ServiceInfo，在redis中储存他的protobuf形式和Revision
+
+1. 对于一个Service，我们在proto中定义了一个ServiceInfo，在redis中储存他的protobuf形式和Revision
 
 | 资源   | redis类型 | key              | filed                | value   | 数据类型        |
 |------|---------|------------------|----------------------|---------|-------------|
 | 服务版本 | hash    | Hash.Service.服务名 | ServiceRevisionFiled | 版本号     | int64       |
 | 服务信息 | hash    | Hash.Service.服务名 | ServiceInfoFiled     | 服务和实例数据 | ServiceInfo |
 
-对于健康信息，我们采用另一种redis储存方式
+2. 健康信息的redis储存方式如下
 
 | 资源     | redis类型 | key                  | filed         | value           |
 |--------|---------|----------------------|---------------|-----------------|
 | 健康数据   | hash    | Hash.Health.服务名.实例ID | TTL           | 超时上报间隔          |
 | 健康数据   | hash    | Hash.Health.服务名.实例ID | LastHeartBeat | 最后一次上报的时间       |
+
+3. 路由信息的redis储存方式
+
 
 
 ### 配置设计

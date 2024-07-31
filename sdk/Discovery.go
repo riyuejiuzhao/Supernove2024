@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math/rand"
 	"stathat.com/c/consistent"
+	"time"
 )
 
 const (
@@ -22,16 +23,22 @@ const (
 	KeyValue
 )
 
+type GetInstancesArgv struct {
+	ServiceName      string
+	SkipHealthFilter bool
+}
+
 type GetInstancesResult struct {
-	serviceInfo *pb.ServiceInfo
+	ServiceName string
+	Instances   []*pb.InstanceInfo
 }
 
 func (r *GetInstancesResult) GetServiceName() string {
-	return r.serviceInfo.ServiceName
+	return r.ServiceName
 }
 
 func (r *GetInstancesResult) GetInstance() []*pb.InstanceInfo {
-	return r.serviceInfo.Instances
+	return r.Instances
 }
 
 type DiscoveryCli struct {
@@ -39,13 +46,32 @@ type DiscoveryCli struct {
 	dataMgr dataMgr.ServiceDataManager
 }
 
-func (c *DiscoveryCli) GetInstances(serviceName string) (*GetInstancesResult, error) {
+func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (*GetInstancesResult, error) {
 	//在缓存数据中查找
-	service, ok := c.dataMgr.GetServiceInstance(serviceName)
+	service, ok := c.dataMgr.GetServiceInfo(argv.ServiceName)
+	nowTime := time.Now().Unix()
+	result := &GetInstancesResult{ServiceName: argv.ServiceName,
+		Instances: make([]*pb.InstanceInfo, 0, len(service.Instances))}
+	//健康信息过滤
+	if argv.SkipHealthFilter {
+		result.Instances = service.Instances
+	} else {
+		for _, instance := range service.Instances {
+			healthInfo, ok := c.dataMgr.GetHealthInfo(argv.ServiceName, instance.InstanceID)
+			if !ok {
+				continue
+			}
+			if healthInfo.LastHeartBeat+3*healthInfo.TTL < nowTime {
+				continue
+			}
+			result.Instances = append(result.Instances, instance)
+		}
+	}
+
 	if !ok {
 		return nil, errors.New("不存在该服务")
 	}
-	return &GetInstancesResult{serviceInfo: service}, nil
+	return result, nil
 }
 
 func (c *DiscoveryCli) processConsistentRouter(srcInstanceID string, dstInstances []*pb.InstanceInfo) (*ProcessRouterResult, error) {
@@ -83,16 +109,34 @@ func (c *DiscoveryCli) processWeightRouter(dstInstances []*pb.InstanceInfo) (*Pr
 }
 
 func (c *DiscoveryCli) processTargetRouter(srcInstanceID string, dstService string) (*ProcessRouterResult, error) {
+	target, ok := c.dataMgr.GetTargetRouter(dstService, srcInstanceID)
+	if !ok {
+		return nil, errors.New("没有目标路由")
+	}
+	instance, ok := c.dataMgr.GetInstanceInfo(dstService, target.DstInstanceID)
+	if !ok {
+		return nil, errors.New("没有目标实例")
+	}
+	return &ProcessRouterResult{DstInstance: instance}, nil
 }
 
-func (c *DiscoveryCli) processKeyValueRouter(srcInstanceID string, dstService string) (*ProcessRouterResult, error) {
+func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string) (*ProcessRouterResult, error) {
+	v, ok := c.dataMgr.GetKVRouter(dstService, key)
+	if !ok {
+		return nil, errors.New("没有目标路由")
+	}
+	instance, ok := c.dataMgr.GetInstanceInfo(dstService, v.DstInstanceID)
+	if !ok {
+		return nil, errors.New("没有目标实例")
+	}
+	return &ProcessRouterResult{DstInstance: instance}, nil
 }
 
 // ProcessRouter 如果没有提供可选的Instance，那么自动从缓冲中获取
 func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterResult, error) {
 	instances := argv.DstService.GetInstance()
 	if instances != nil || len(instances) == 0 {
-		service, ok := c.dataMgr.GetServiceInstance(argv.DstService.GetServiceName())
+		service, ok := c.dataMgr.GetServiceInfo(argv.DstService.GetServiceName())
 		if !ok {
 			return nil, errors.New("不存在目标服务")
 		}
@@ -103,8 +147,10 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterRes
 	case Target:
 		return c.processTargetRouter(argv.SrcInstanceID, argv.DstService.GetServiceName())
 	case KeyValue:
-		//TODO
-		//return c.processKeyValueRouter(argv)
+		if argv.Key == nil {
+			return nil, errors.New("使用键值对路由但是缺少Key")
+		}
+		return c.processKeyValueRouter(*argv.Key, argv.DstService.GetServiceName())
 	case Consistent:
 		return c.processConsistentRouter(argv.SrcInstanceID, instances)
 	case Random:
@@ -116,7 +162,11 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterRes
 }
 
 func (c *DiscoveryCli) AddTargetRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error) {
+	return nil, errors.New("未实现")
+}
 
+func (c *DiscoveryCli) AddKVRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error) {
+	return nil, errors.New("未实现")
 }
 
 type DefaultDstService struct {
@@ -140,6 +190,8 @@ type ProcessRouterArgv struct {
 	Method        int32
 	SrcInstanceID string
 	DstService    DstService
+
+	Key *string
 }
 
 type ProcessRouterResult struct {
@@ -153,9 +205,10 @@ type AddTargetRouterResult struct {
 }
 
 type DiscoveryAPI interface {
-	GetInstances(serviceName string) (*GetInstancesResult, error)
+	GetInstances(argv *GetInstancesArgv) (*GetInstancesResult, error)
 	ProcessRouter(*ProcessRouterArgv) (*ProcessRouterResult, error)
 	AddTargetRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error)
+	AddKVRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error)
 }
 
 func NewDiscoveryAPI() (DiscoveryAPI, error) {

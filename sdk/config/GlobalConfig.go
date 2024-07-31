@@ -28,16 +28,14 @@ type Config struct {
 		Discovery struct {
 			//获取远程服务的时间间隔
 			DefaultTimeout int32 `yaml:"DefaultTimeout"`
-		} `yaml:"Discovery"`
-		DataBuffer struct {
 			//Service
 			DstService []string `yaml:"DstService"`
-		} `yaml:"DataBuffer"`
+		} `yaml:"Discovery"`
 	} `yaml:"Global"`
 }
 
 var globalConfig *Config = nil
-var DefaultConfigFilePath string = ""
+var GlobalConfigFilePath = ""
 
 func GlobalConfig() (*Config, error) {
 	if globalConfig != nil {
@@ -53,7 +51,7 @@ func GlobalConfig() (*Config, error) {
 
 // 从文件中读取配置
 func loadConfig(configFileOpts ...string) (*Config, error) {
-	configFile := DefaultConfigFilePath
+	configFile := GlobalConfigFilePath
 	if len(configFileOpts) == 1 {
 		configFile = configFileOpts[0]
 	} else if len(configFileOpts) > 1 {

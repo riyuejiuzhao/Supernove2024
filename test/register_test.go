@@ -5,6 +5,7 @@ import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/svr/discovery"
+	"Supernove2024/svr/health"
 	"Supernove2024/svr/register"
 	"Supernove2024/svr/svrutil"
 	"fmt"
@@ -50,6 +51,114 @@ func RandomRegisterArgv(serviceName string, instanceNum int) map[string]*sdk.Reg
 	return testData
 }
 
+func SetupSvr() {
+	go register.SetupServer("127.0.0.1:8001", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go discovery.SetupServer("127.0.0.1:8002", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go health.SetupServer("127.0.0.1:8003", "9.134.93.168:6380", "SDZsdz2000", 0)
+	//等待服务器启动
+	time.Sleep(1 * time.Second)
+}
+
+func TestHealthSvr(t *testing.T) {
+	serviceName := "testDiscovery"
+	instanceNum := 10
+	testData := RandomRegisterArgv(serviceName, instanceNum)
+	//连接数据库
+	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
+	//清空
+	err := rdb.FlushDB().Err()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	SetupSvr()
+
+	config.GlobalConfigFilePath = "register_test.yaml"
+	registerAPI, err := sdk.NewRegisterAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultList := make([]*sdk.RegisterResult, 0)
+	for _, v := range testData {
+		result, err := registerAPI.Register(&sdk.RegisterArgv{
+			ServiceName: v.ServiceName,
+			Host:        v.Host,
+			Port:        v.Port})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resultList = append(resultList, result)
+	}
+
+	config, err := config.GlobalConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 检测redis健康信息 是否创建
+	for _, v := range resultList {
+		hash := svrutil.HealthHash(serviceName, v.InstanceID)
+		ttl, err := rdb.HGet(hash, svrutil.HealthTtlFiled).Int64()
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		if ttl != config.Global.Register.DefaultTTL {
+			t.Errorf("%s ttl %v != %v", v.InstanceID, ttl, config.Global.Register.DefaultTTL)
+			continue
+		}
+		_, err = rdb.HGet(hash, svrutil.HealthLastHeartBeatField).Int64()
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+	}
+
+	discoveryAPI, err := sdk.NewDiscoveryAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	//睡一秒等更新
+	getInstanceArgv := &sdk.GetInstancesArgv{ServiceName: serviceName}
+	time.Sleep(1 * time.Second)
+	getInstanceResult, err := discoveryAPI.GetInstances(getInstanceArgv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(getInstanceResult.GetInstance()) != len(testData) {
+		t.Fatal("没有获得全部的服务")
+	}
+	//等待6秒让所有的服务都过期
+	time.Sleep(6 * time.Second)
+	getInstanceResult, err = discoveryAPI.GetInstances(getInstanceArgv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(getInstanceResult.GetInstance()) != 0 {
+		t.Fatal("服务健康信息不正确")
+	}
+	//通过心跳再次激活所有的服务
+	healthCli, err := sdk.NewHealthAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range resultList {
+		err = healthCli.HeartBeat(&sdk.HeartBeatArgv{ServiceName: serviceName, InstanceID: v.InstanceID})
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	//等待同步
+	time.Sleep(1 * time.Second)
+	getInstanceResult, err = discoveryAPI.GetInstances(getInstanceArgv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(getInstanceResult.GetInstance()) != len(resultList) {
+		t.Fatal("有服务没有唤醒")
+	}
+
+}
+
 func TestDiscoverSvr(t *testing.T) {
 	serviceName := "testDiscovery"
 	instanceNum := 10
@@ -63,18 +172,10 @@ func TestDiscoverSvr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	go register.SetupServer("127.0.0.1:8080", "9.134.93.168:6380", "SDZsdz2000", 0)
-	go discovery.SetupServer("127.0.0.1:9090", "9.134.93.168:6380", "SDZsdz2000", 0)
+	SetupSvr()
 
-	//等待服务器启动
-	time.Sleep(1 * time.Second)
-
-	config.DefaultConfigFilePath = "register_test.yaml"
+	config.GlobalConfigFilePath = "register_test.yaml"
 	registerAPI, err := sdk.NewRegisterAPI()
-	if err != nil {
-		t.Fatal(err)
-	}
-	discoveryAPI, err := sdk.NewDiscoveryAPI()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,13 +189,18 @@ func TestDiscoverSvr(t *testing.T) {
 		resultData[result.InstanceID] = v
 	}
 
-	disRt, err := discoveryAPI.GetInstances(serviceName)
+	discoveryAPI, err := sdk.NewDiscoveryAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	getInstanceArgv := &sdk.GetInstancesArgv{ServiceName: serviceName}
+	disRt, err := discoveryAPI.GetInstances(getInstanceArgv)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	disDic := make(map[string]*pb.InstanceInfo)
-	for _, v := range disRt.Instances {
+	for _, v := range disRt.GetInstance() {
 		addrV := fmt.Sprintf("%s:%v", v.Host, v.Port)
 		disDic[addrV] = v
 	}
@@ -115,7 +221,7 @@ func TestDiscoverSvr(t *testing.T) {
 
 	// 上面已经确定testData <= disRt
 	// 如果相同那么就一定一样
-	if len(disRt.Instances) == len(testData) {
+	if len(disRt.GetInstance()) == len(testData) {
 		return
 	}
 
@@ -147,12 +253,9 @@ func TestRegisterSvr(t *testing.T) {
 	}
 
 	// 从另一个协程启动
-	go register.SetupServer("127.0.0.1:8080", "9.134.93.168:6380", "SDZsdz2000", 0)
+	SetupSvr()
 
-	//等待服务器启动
-	time.Sleep(1 * time.Second)
-
-	config.DefaultConfigFilePath = "register_test.yaml"
+	config.GlobalConfigFilePath = "register_test.yaml"
 	api, err := sdk.NewRegisterAPI()
 	if err != nil {
 		t.Fatal(err)

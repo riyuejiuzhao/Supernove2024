@@ -35,11 +35,28 @@ type SyncContainer[T any] struct {
 	Value T
 }
 
+type ServiceInfoBuffer struct {
+	*pb.ServiceInfo
+	Mutex       sync.RWMutex
+	InstanceDic map[string]*pb.InstanceInfo
+}
+
+func (b *ServiceInfoBuffer) SetServiceInfo(info *pb.ServiceInfo) {
+	b.ServiceInfo = info
+	b.InstanceDic = make(map[string]*pb.InstanceInfo)
+	if info.Instances == nil {
+		return
+	}
+	for _, i := range info.Instances {
+		b.InstanceDic[i.InstanceID] = i
+	}
+}
+
 type DefaultServiceMgr struct {
 	config      *config.Config
 	connManager connMgr.ConnManager
 
-	serviceBuffer *SyncContainer[map[string]*SyncContainer[*pb.ServiceInfo]]
+	serviceBuffer *SyncContainer[map[string]*ServiceInfoBuffer]
 
 	healthBuffer *SyncContainer[map[string]*SyncContainer[map[string]*pb.InstanceHealthInfo]]
 
@@ -48,26 +65,25 @@ type DefaultServiceMgr struct {
 }
 
 func (m *DefaultServiceMgr) flushAllHealthInfoLocked() {
-	for _, serviceName := range m.config.Global.DataBuffer.DstService {
+	for _, serviceName := range m.config.Global.Discovery.DstService {
 		m.healthBuffer.Mutex.Lock()
 		service, ok := m.healthBuffer.Value[serviceName]
 		if !ok {
 			service = &SyncContainer[map[string]*pb.InstanceHealthInfo]{}
 			m.healthBuffer.Value[serviceName] = service
 		}
-		m.serviceBuffer.Mutex.Unlock()
+		m.healthBuffer.Mutex.Unlock()
 		m.flushHealthInfoLocked(serviceName, service)
 	}
 }
 
 func (m *DefaultServiceMgr) flushAllServiceLocked() {
-	for _, serviceName := range m.config.Global.DataBuffer.DstService {
+	for _, serviceName := range m.config.Global.Discovery.DstService {
 		m.serviceBuffer.Mutex.Lock()
 		service, ok := m.serviceBuffer.Value[serviceName]
 		if !ok {
-			service = &SyncContainer[*pb.ServiceInfo]{
-				Value: &pb.ServiceInfo{ServiceName: serviceName, Revision: 0},
-			}
+			service = &ServiceInfoBuffer{}
+			service.SetServiceInfo(&pb.ServiceInfo{ServiceName: serviceName, Revision: 0})
 			m.serviceBuffer.Value[serviceName] = service
 		}
 		m.serviceBuffer.Mutex.Unlock()
@@ -75,41 +91,40 @@ func (m *DefaultServiceMgr) flushAllServiceLocked() {
 	}
 }
 
-func (m *DefaultServiceMgr) flushServiceLocked(service *SyncContainer[*pb.ServiceInfo]) {
+func (m *DefaultServiceMgr) flushServiceLocked(service *ServiceInfoBuffer) {
 	service.Mutex.Lock()
 	defer service.Mutex.Unlock()
 	disConn, err := m.connManager.GetServiceConn(connMgr.Discovery)
 	if err != nil {
-		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", service.Value.ServiceName, err)
+		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", service.ServiceName, err)
 		return
 	}
 	defer disConn.Close()
 	cli := pb.NewDiscoveryServiceClient(disConn.Value())
 
 	request := &pb.GetInstancesRequest{
-		ServiceName: service.Value.ServiceName,
-		Revision:    service.Value.Revision,
+		ServiceName: service.ServiceName,
+		Revision:    service.Revision,
 	}
 
 	reply, err := cli.GetInstances(context.Background(), request)
 	if err != nil {
-		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", service.Value.ServiceName, err)
+		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", service.ServiceName, err)
 	}
 	if reply.Revision == request.Revision {
 		util.Info("无需更新本地缓存 %v", request.Revision)
 		return
 	}
 
-	service.Value = &pb.ServiceInfo{
+	service.SetServiceInfo(&pb.ServiceInfo{
 		Instances:   reply.Instances,
 		Revision:    reply.Revision,
 		ServiceName: request.ServiceName,
-	}
+	})
 	util.Info("更新本地缓存 %v->%v", request.Revision, reply.Revision)
 }
 
-// GetServiceInstance
-func (m *DefaultServiceMgr) GetServiceInstance(serviceName string) (*pb.ServiceInfo, bool) {
+func (m *DefaultServiceMgr) GetServiceInfo(serviceName string) (*pb.ServiceInfo, bool) {
 	m.serviceBuffer.Mutex.RLock()
 	defer m.serviceBuffer.Mutex.RUnlock()
 	service, ok := m.serviceBuffer.Value[serviceName]
@@ -118,7 +133,23 @@ func (m *DefaultServiceMgr) GetServiceInstance(serviceName string) (*pb.ServiceI
 	}
 	service.Mutex.RLock()
 	defer service.Mutex.RUnlock()
-	return service.Value, true
+	return service.ServiceInfo, true
+}
+
+func (m *DefaultServiceMgr) GetInstanceInfo(serviceName string, instanceID string) (*pb.InstanceInfo, bool) {
+	m.serviceBuffer.Mutex.RUnlock()
+	defer m.serviceBuffer.Mutex.RUnlock()
+	service, ok := m.serviceBuffer.Value[serviceName]
+	if !ok {
+		return nil, false
+	}
+	service.Mutex.RLock()
+	defer service.Mutex.RUnlock()
+	instance, ok := service.InstanceDic[instanceID]
+	if !ok {
+		return nil, false
+	}
+	return instance, true
 }
 
 func (m *DefaultServiceMgr) GetHealthInfo(serviceName string, instanceID string) (*pb.InstanceHealthInfo, bool) {
@@ -188,13 +219,8 @@ func (m *DefaultServiceMgr) startFlushInfo() {
 	m.flushAllHealthInfoLocked()
 	go func() {
 		for {
-			time.Sleep(5 * time.Second)
+			time.Sleep(time.Duration(m.config.Global.Discovery.DefaultTimeout) * time.Second)
 			m.flushAllHealthInfoLocked()
-		}
-	}()
-	go func() {
-		for {
-			time.Sleep(5 * time.Second)
 			m.flushAllServiceLocked()
 		}
 	}()
@@ -204,8 +230,11 @@ func NewDefaultServiceMgr(config *config.Config, manager connMgr.ConnManager) *D
 	mgr := &DefaultServiceMgr{
 		config:      config,
 		connManager: manager,
-		serviceBuffer: &SyncContainer[map[string]*SyncContainer[*pb.ServiceInfo]]{
-			Value: make(map[string]*SyncContainer[*pb.ServiceInfo]),
+		serviceBuffer: &SyncContainer[map[string]*ServiceInfoBuffer]{
+			Value: make(map[string]*ServiceInfoBuffer),
+		},
+		healthBuffer: &SyncContainer[map[string]*SyncContainer[map[string]*pb.InstanceHealthInfo]]{
+			Value: make(map[string]*SyncContainer[map[string]*pb.InstanceHealthInfo]),
 		},
 	}
 	mgr.startFlushInfo()

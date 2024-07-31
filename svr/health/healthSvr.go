@@ -47,7 +47,7 @@ func (s *Server) GetHealthInfo(_ context.Context,
 		util.Error("%v", err)
 		return nil, err
 	}
-	for j := 0; j < len(serviceInfo.Instances); j++ {
+	for j, ins := range serviceInfo.Instances {
 		ttl, err := nowTtlSlice[j].Int64()
 		if err != nil {
 			util.Error("get ttl err: %v", err)
@@ -58,7 +58,8 @@ func (s *Server) GetHealthInfo(_ context.Context,
 			util.Error("get lastHeartBeat err: %v", err)
 			continue
 		}
-		instanceInfos = append(instanceInfos, &pb.InstanceHealthInfo{TTL: ttl, LastHeartBeat: heartBeat})
+		instanceInfos = append(instanceInfos, &pb.InstanceHealthInfo{InstanceID: ins.InstanceID,
+			TTL: ttl, LastHeartBeat: heartBeat})
 	}
 	return &pb.GetHealthInfoReply{HealthInfo: &pb.ServiceHealthInfo{ServiceName: req.ServiceName, InstanceHealthInfo: instanceInfos}}, err
 }
