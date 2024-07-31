@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package=".;miniRouterProto";
+option go_package=".;pb";
 
 message InstanceInfo {
   string InstanceID = 1;
@@ -92,3 +92,18 @@ service HealthService{
   rpc GetHealthInfo(GetHealthInfoRequest) returns (GetHealthInfoReply){}
 }
 
+message TargetRouterInfo{
+  string ScrInstanceID = 1;
+  string DstInstanceID = 2;
+}
+
+message KVRouterInfo{
+  string Key = 1;
+  string DstInstanceID = 2;
+}
+
+message ServiceRouterInfo{
+  string ServiceName = 1;
+  repeated TargetRouterInfo TargetRouters = 2;
+  repeated KVRouterInfo KVRouters = 3;
+}

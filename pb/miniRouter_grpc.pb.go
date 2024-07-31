@@ -4,7 +4,7 @@
 // - protoc             v5.27.0
 // source: miniRouter.proto
 
-package miniRouterProto
+package pb
 
 import (
 	context "context"
