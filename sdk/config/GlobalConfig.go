@@ -23,11 +23,16 @@ type Config struct {
 		HealthService   []InstanceConfig `yaml:"HealthService"`
 		Register        struct {
 			DefaultWeight int32 `yaml:"DefaultWeight"`
+			DefaultTTL    int64 `yaml:"DefaultTTL"`
 		} `yaml:"Register"`
 		Discovery struct {
 			//获取远程服务的时间间隔
 			DefaultTimeout int32 `yaml:"DefaultTimeout"`
 		} `yaml:"Discovery"`
+		DataBuffer struct {
+			//Service
+			DstService []string `yaml:"DstService"`
+		} `yaml:"DataBuffer"`
 	} `yaml:"Global"`
 }
 

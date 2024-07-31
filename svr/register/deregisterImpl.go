@@ -26,10 +26,7 @@ func (d *DeregisterContext) GetServiceHash() string {
 func (r *Server) Deregister(_ context.Context,
 	request *pb.DeregisterRequest,
 ) (*pb.DeregisterReply, error) {
-	deregisterCtx := &DeregisterContext{
-		request: request,
-		hash:    svrutil.ServiceHash(request.ServiceName),
-	}
+	hash := svrutil.ServiceHash(request.ServiceName)
 
 	mutex, err := r.LockRedisService(svrutil.ServiceInfoLockName(request.ServiceName))
 	if err != nil {
@@ -38,7 +35,7 @@ func (r *Server) Deregister(_ context.Context,
 	defer svrutil.TryUnlock(mutex)
 
 	//更新缓存
-	err = r.FlushBuffer(deregisterCtx)
+	err = r.FlushBuffer(hash, request.ServiceName)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +55,6 @@ func (r *Server) Deregister(_ context.Context,
 
 	//写入redis
 	healthKey := svrutil.HealthHash(serviceInfo.ServiceName, request.InstanceID)
-	serviceSetName := svrutil.ServiceSetKey(serviceInfo.ServiceName)
 	bytes, err := proto.Marshal(serviceInfo)
 	if err != nil {
 		return nil, err
@@ -71,10 +67,9 @@ func (r *Server) Deregister(_ context.Context,
 	}
 	defer svrutil.TryUnlock(healthMutex)
 	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(deregisterCtx.GetServiceHash(), svrutil.ServiceRevisionFiled, serviceInfo.Revision)
-	txPipeline.HSet(deregisterCtx.GetServiceHash(), svrutil.ServiceInfoFiled, bytes)
+	txPipeline.HSet(hash, svrutil.ServiceRevisionFiled, serviceInfo.Revision)
+	txPipeline.HSet(hash, svrutil.ServiceInfoFiled, bytes)
 	// 健康信息
-	txPipeline.SRem(serviceSetName, request.InstanceID)
 	txPipeline.Del(healthKey)
 	_, err = txPipeline.Exec()
 	if err != nil {

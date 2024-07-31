@@ -9,14 +9,17 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis"
 	"google.golang.org/protobuf/proto"
+	"strings"
 )
 
 const (
-	HealthKey            = "Health"
-	ServiceKey           = "Service"
-	ServiceLockKey       = "ServiceLock"
+	//健康信息 redis key
+	HealthHashKey        = "Hash.Health"
 	ServiceHealthLockKey = "ServiceHealthLockKey"
-	SetKey               = "Set"
+
+	//服务信息 redis key
+	ServiceHashKey = "Hash.Service"
+	ServiceLockKey = "ServiceLock"
 
 	ServiceInfoFiled         = "Info"
 	ServiceRevisionFiled     = "Revision"
@@ -44,16 +47,22 @@ type BufferServer struct {
 }
 
 func ServiceHash(serviceName string) string {
-	return fmt.Sprintf("%s.%s", ServiceKey, serviceName)
+	return fmt.Sprintf("%s.%s", ServiceHashKey, serviceName)
+}
+
+func ServiceHashToServiceName(hash string) string {
+	return strings.TrimPrefix(hash, ServiceHashKey)
 }
 
 func HealthHash(serviceName string, instanceID string) string {
-	return fmt.Sprintf("%s.%s.%s", HealthKey, serviceName, instanceID)
+	return fmt.Sprintf("%s.%s.%s", HealthHashKey, serviceName, instanceID)
 }
 
-func ServiceSetKey(serviceName string) string {
-	return fmt.Sprintf("%s.%s", SetKey, serviceName)
+/*
+func HealthSet(serviceName string) string {
+	return fmt.Sprintf("%s.%s", HealthSetKey, serviceName)
 }
+*/
 
 // ServiceInfoLockName 对一个资源的分布式锁给一个名字
 func ServiceInfoLockName(serviceName string) string {
@@ -88,22 +97,35 @@ type SvrContext interface {
 	GetServiceHash() string
 }
 
+func (r *BufferServer) FlushBufferLocked(hash string, service string) error {
+	mutex, err := r.LockRedisService(service)
+	if err != nil {
+		return err
+	}
+	defer TryUnlock(mutex)
+	err = r.FlushBuffer(hash, service)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // FlushBuffer 如果Revision和Redis不同就刷新
-func (r *BufferServer) FlushBuffer(ctx SvrContext) error {
-	redisRevision, err := r.Rdb.HGet(ctx.GetServiceHash(), ServiceRevisionFiled).Int64()
+func (r *BufferServer) FlushBuffer(hash string, service string) error {
+	redisRevision, err := r.Rdb.HGet(hash, ServiceRevisionFiled).Int64()
 	if errors.Is(err, redis.Nil) {
 		return nil
 	} else if err != nil {
 		return err
 	}
-	serviceInfo, ok := r.Mgr.TryGetServiceInfo(ctx.GetServiceName())
+	serviceInfo, ok := r.Mgr.TryGetServiceInfo(service)
 	if !ok || serviceInfo.Revision != redisRevision {
 		originRevision := int64(0)
 		if ok {
 			originRevision = serviceInfo.Revision
 		}
 		//需要更新本地缓存
-		infoBytes, err := r.Rdb.HGet(ctx.GetServiceHash(), ServiceInfoFiled).Bytes()
+		infoBytes, err := r.Rdb.HGet(hash, ServiceInfoFiled).Bytes()
 		if err != nil {
 			return err
 		}

@@ -1,7 +1,7 @@
 package sdk
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/sdk/connMgr"
 	"context"
 )
@@ -21,9 +21,9 @@ func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) error {
 		return err
 	}
 	defer conn.Close()
-	rpcCli := miniRouterProto.NewHealthServiceClient(conn.Value())
+	rpcCli := pb.NewHealthServiceClient(conn.Value())
 	_, err = rpcCli.HeartBeat(context.Background(),
-		&miniRouterProto.HeartBeatRequest{
+		&pb.HeartBeatRequest{
 			ServiceName: argv.ServiceName,
 			InstanceID:  argv.InstanceID,
 		})

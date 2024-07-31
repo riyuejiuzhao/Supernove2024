@@ -1,7 +1,7 @@
 package sdk
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
 	"context"
@@ -18,7 +18,7 @@ type RegisterArgv struct {
 
 	//optional
 	Weight *int32
-	TTL    *int32
+	TTL    *int64
 }
 
 type RegisterResult struct {
@@ -39,18 +39,25 @@ func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 		return nil, err
 	}
 	defer conn.Close()
-	rpcCli := miniRouterProto.NewRegisterServiceClient(conn.Value())
+	rpcCli := pb.NewRegisterServiceClient(conn.Value())
 	var weight int32
+	var ttl int64
 	if service.Weight != nil {
 		weight = *service.Weight
 	} else {
 		weight = c.Config.Global.Register.DefaultWeight
 	}
-	request := miniRouterProto.RegisterRequest{
+	if service.TTL != nil {
+		ttl = *service.TTL
+	} else {
+		ttl = c.Config.Global.Register.DefaultTTL
+	}
+	request := pb.RegisterRequest{
 		ServiceName: service.ServiceName,
 		Host:        service.Host,
 		Port:        service.Port,
 		Weight:      weight,
+		TTL:         ttl,
 	}
 	reply, err := rpcCli.Register(context.Background(), &request)
 	if err != nil {
@@ -68,8 +75,8 @@ func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
 		return err
 	}
 	defer conn.Close()
-	rpcCli := miniRouterProto.NewRegisterServiceClient(conn.Value())
-	request := miniRouterProto.DeregisterRequest{
+	rpcCli := pb.NewRegisterServiceClient(conn.Value())
+	request := pb.DeregisterRequest{
 		ServiceName: service.ServiceName,
 		Host:        service.Host,
 		Port:        service.Port,

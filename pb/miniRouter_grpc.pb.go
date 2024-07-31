@@ -144,6 +144,7 @@ var RegisterService_ServiceDesc = grpc.ServiceDesc{
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DiscoveryServiceClient interface {
+	GetServices(ctx context.Context, in *GetServicesRequest, opts ...grpc.CallOption) (*GetServicesReply, error)
 	GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (*GetInstancesReply, error)
 }
 
@@ -153,6 +154,15 @@ type discoveryServiceClient struct {
 
 func NewDiscoveryServiceClient(cc grpc.ClientConnInterface) DiscoveryServiceClient {
 	return &discoveryServiceClient{cc}
+}
+
+func (c *discoveryServiceClient) GetServices(ctx context.Context, in *GetServicesRequest, opts ...grpc.CallOption) (*GetServicesReply, error) {
+	out := new(GetServicesReply)
+	err := c.cc.Invoke(ctx, "/DiscoveryService/GetServices", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *discoveryServiceClient) GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (*GetInstancesReply, error) {
@@ -168,6 +178,7 @@ func (c *discoveryServiceClient) GetInstances(ctx context.Context, in *GetInstan
 // All implementations must embed UnimplementedDiscoveryServiceServer
 // for forward compatibility
 type DiscoveryServiceServer interface {
+	GetServices(context.Context, *GetServicesRequest) (*GetServicesReply, error)
 	GetInstances(context.Context, *GetInstancesRequest) (*GetInstancesReply, error)
 	mustEmbedUnimplementedDiscoveryServiceServer()
 }
@@ -176,6 +187,9 @@ type DiscoveryServiceServer interface {
 type UnimplementedDiscoveryServiceServer struct {
 }
 
+func (UnimplementedDiscoveryServiceServer) GetServices(context.Context, *GetServicesRequest) (*GetServicesReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetServices not implemented")
+}
 func (UnimplementedDiscoveryServiceServer) GetInstances(context.Context, *GetInstancesRequest) (*GetInstancesReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetInstances not implemented")
 }
@@ -190,6 +204,24 @@ type UnsafeDiscoveryServiceServer interface {
 
 func RegisterDiscoveryServiceServer(s grpc.ServiceRegistrar, srv DiscoveryServiceServer) {
 	s.RegisterService(&DiscoveryService_ServiceDesc, srv)
+}
+
+func _DiscoveryService_GetServices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetServicesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiscoveryServiceServer).GetServices(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/DiscoveryService/GetServices",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DiscoveryServiceServer).GetServices(ctx, req.(*GetServicesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _DiscoveryService_GetInstances_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -217,6 +249,10 @@ var DiscoveryService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "DiscoveryService",
 	HandlerType: (*DiscoveryServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetServices",
+			Handler:    _DiscoveryService_GetServices_Handler,
+		},
 		{
 			MethodName: "GetInstances",
 			Handler:    _DiscoveryService_GetInstances_Handler,

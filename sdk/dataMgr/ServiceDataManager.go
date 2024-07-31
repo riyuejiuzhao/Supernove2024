@@ -1,15 +1,16 @@
 package dataMgr
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 )
 
 type ServiceDataManager interface {
-	GetHealthInfo(serviceName string, instanceID string) (*miniRouterProto.InstanceHealthInfo, bool)
-	GetServiceInstance(serviceName string) *miniRouterProto.ServiceInfo
-	//tryFlushService(serviceName string)
+	GetHealthInfo(serviceName string, instanceID string) (*pb.InstanceHealthInfo, bool)
+	GetServiceInstance(serviceName string) (*pb.ServiceInfo, bool)
+	GetTargetRouter(ServiceName string, SrcInstanceID string) (*pb.TargetRouterInfo, bool)
+	GetKVRouter(ServiceName string, Key string) (*pb.KVRouterInfo, bool)
 }
 
 var (

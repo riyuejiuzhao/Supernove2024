@@ -1,7 +1,7 @@
 package test
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/svr/discovery"
@@ -93,7 +93,7 @@ func TestDiscoverSvr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	disDic := make(map[string]*miniRouterProto.InstanceInfo)
+	disDic := make(map[string]*pb.InstanceInfo)
 	for _, v := range disRt.Instances {
 		addrV := fmt.Sprintf("%s:%v", v.Host, v.Port)
 		disDic[addrV] = v
@@ -179,7 +179,7 @@ func TestRegisterSvr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var serviceInfo miniRouterProto.ServiceInfo
+	var serviceInfo pb.ServiceInfo
 	err = proto.Unmarshal(bytes, &serviceInfo)
 	if err != nil {
 		t.Fatal(err)

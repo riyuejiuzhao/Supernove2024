@@ -3,6 +3,7 @@ package discovery
 import (
 	"Supernove2024/pb"
 	"Supernove2024/svr/svrutil"
+	"Supernove2024/util"
 	"context"
 	"google.golang.org/grpc"
 	"log"
@@ -14,32 +15,23 @@ type Server struct {
 	pb.UnimplementedDiscoveryServiceServer
 }
 
-type DiscoveryContext struct {
-	hash    string
-	request *pb.GetInstancesRequest
-}
-
-func (c *DiscoveryContext) GetServiceName() string {
-	return c.request.ServiceName
-}
-
-func (c *DiscoveryContext) GetServiceHash() string {
-	return c.hash
-}
-
-func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (*pb.GetInstancesReply, error) {
-	disCtx := &DiscoveryContext{
-		hash:    svrutil.ServiceHash(request.ServiceName),
-		request: request,
-	}
-
-	mutex, err := s.LockRedisService(request.ServiceName)
+func (s *Server) GetServices(_ context.Context, _ *pb.GetServicesRequest) (*pb.GetServicesReply, error) {
+	nowKeys, c, err := s.Rdb.Scan(0, svrutil.ServiceHash("*"), 1000).Result()
 	if err != nil {
 		return nil, err
 	}
-	defer svrutil.TryUnlock(mutex)
+	keys := util.Map(nowKeys, svrutil.ServiceHashToServiceName)
+	for c != 0 {
+		nowKeys, c, err = s.Rdb.Scan(0, svrutil.ServiceHash("*"), 1000).Result()
+		keys = append(keys, util.Map(nowKeys, svrutil.ServiceHashToServiceName)...)
+	}
+	return &pb.GetServicesReply{ServiceName: keys}, nil
+}
 
-	err = s.FlushBuffer(disCtx)
+func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (*pb.GetInstancesReply, error) {
+	hash := svrutil.ServiceHash(request.ServiceName)
+
+	err := s.FlushBufferLocked(hash, request.ServiceName)
 	if err != nil {
 		return nil, err
 	}

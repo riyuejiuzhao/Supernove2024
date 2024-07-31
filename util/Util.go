@@ -1,18 +1,26 @@
 package util
 
 import (
-	"Supernove2024/miniRouterProto"
+	"Supernove2024/pb"
 	"fmt"
 	"log/slog"
 	"math/rand"
 )
 
-func NewServiceInfo(serviceName string) *miniRouterProto.ServiceInfo {
-	return &miniRouterProto.ServiceInfo{
+func NewServiceInfo(serviceName string) *pb.ServiceInfo {
+	return &pb.ServiceInfo{
 		ServiceName: serviceName,
 		Revision:    0,
-		Instances:   make([]*miniRouterProto.InstanceInfo, 0),
+		Instances:   make([]*pb.InstanceInfo, 0),
 	}
+}
+
+func Map[T any, V any](list []T, fun func(T) V) []V {
+	rt := make([]V, 0, len(list))
+	for _, v := range list {
+		rt = append(rt, fun(v))
+	}
+	return rt
 }
 
 func RandomDicValue[K comparable, V any](dict map[K]V) V {

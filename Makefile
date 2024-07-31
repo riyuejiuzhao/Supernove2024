@@ -1,9 +1,9 @@
-all: miniRouterProto
+all: pb
 
-miniRouterProto:
+pb:
 	$(MAKE) -C $@
 
 clean:
 	$(MAKE) -C proto $@
 
-.PHONY: miniRouterProto
+.PHONY: pb
