@@ -51,6 +51,10 @@ SDK必备接口：
 
 3. 路由信息的redis储存方式
 
+| 资源   | redis类型 | key             | filed               | value | 数据类型              |
+|------|---------|-----------------|---------------------|-------|-------------------|
+| 路由版本 | hash    | Hash.Router.服务名 | RouterRevisionFiled | 版本号   | int64             |
+| 路由信息 | hash    | Hash.Router.服务名 | RouterInfoFiled     | 路由数据  | ServiceRouterInfo |
 
 
 ### 配置设计

@@ -32,33 +32,35 @@ func (r *Server) Register(
 	address := svrutil.InstanceAddress(request.Host, request.Port)
 	hash := svrutil.ServiceHash(request.ServiceName)
 
-	mutex, err := r.LockRedisService(request.ServiceName)
+	mutex, err := r.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
 	if err != nil {
 		util.Error("lock redis failed err:%v", err)
 		return nil, err
 	}
 	defer svrutil.TryUnlock(mutex)
 
-	err = r.FlushBuffer(hash, address)
+	err = r.FlushServiceBuffer(hash, request.ServiceName)
 	if err != nil {
 		util.Error("flush buffer failed err:%v", err)
 		return nil, err
 	}
 
-	instanceInfo, ok := r.Mgr.TryGetInstanceByAddress(request.ServiceName, address)
+	instanceInfo, ok := r.InstanceBuffer.GetInstanceByAddress(request.ServiceName, address)
 	if ok {
-		//如果存在，更新数据，然后返回
-		instanceInfo.Weight = request.Weight
-		return &pb.RegisterReply{
-			InstanceID: instanceInfo.InstanceID,
-			Existed:    true,
-		}, nil
+		//如果存在那么直接返回数据，不进行修改
+		return nil, errors.New("该地址已经被注册了")
+	}
+	if request.InstanceID != nil {
+		instanceInfo, ok = r.InstanceBuffer.GetInstanceByID(request.ServiceName, *request.InstanceID)
+		if ok {
+			return nil, errors.New("该ID已经被注册了")
+		}
 	}
 
 	//如果不存在，那么添加新实例
-	instanceInfo = r.Mgr.AddInstance(request.ServiceName, request.Host, request.Port, request.Weight)
+	instanceInfo = r.InstanceBuffer.AddInstance(request.ServiceName, request.Host, request.Port, request.Weight, request.InstanceID)
 	//获取调整后的结果
-	serviceInfo, ok := r.Mgr.TryGetServiceInfo(request.ServiceName)
+	serviceInfo, ok := r.InstanceBuffer.GetServiceInfo(request.ServiceName)
 	if !ok {
 		err = errors.New(fmt.Sprintf("没有成功创建ServiceInfo, name:%s", request.ServiceName))
 		util.Error("err: %v", err)
@@ -73,15 +75,15 @@ func (r *Server) Register(
 		return nil, err
 	}
 	//这里需要给健康信息也上锁
-	healthMutex, err := r.LockRedisService(svrutil.ServiceHealthInfoLockName(request.ServiceName))
+	healthMutex, err := r.LockRedis(svrutil.HealthInfoLockName(request.ServiceName))
 	if err != nil {
 		util.Error("create lock err:%v", err)
 		return nil, err
 	}
 	defer svrutil.TryUnlock(healthMutex)
 	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(hash, svrutil.ServiceRevisionFiled, serviceInfo.Revision)
-	txPipeline.HSet(hash, svrutil.ServiceInfoFiled, bytes)
+	txPipeline.HSet(hash, svrutil.RevisionFiled, serviceInfo.Revision)
+	txPipeline.HSet(hash, svrutil.InfoFiled, bytes)
 	// 健康信息
 	txPipeline.HSet(healthKey, svrutil.HealthLastHeartBeatField, time.Now().Unix())
 	txPipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
@@ -91,5 +93,5 @@ func (r *Server) Register(
 	}
 	util.Info("更新redis: %s, %v", serviceInfo.ServiceName, serviceInfo.Revision)
 
-	return &pb.RegisterReply{InstanceID: instanceInfo.InstanceID, Existed: false}, nil
+	return &pb.RegisterReply{InstanceID: instanceInfo.InstanceID}, nil
 }

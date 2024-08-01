@@ -32,7 +32,7 @@ func RandomPort() int32 {
 
 func RandomRegisterArgv(serviceName string, instanceNum int) map[string]*sdk.RegisterArgv {
 	testData := make(map[string]*sdk.RegisterArgv)
-	for i := 0; i < instanceNum; i++ {
+	for len(testData) < instanceNum {
 		host := RandomIP()
 		port := RandomPort()
 		address := fmt.Sprintf("%s:%v", host, port)
@@ -57,6 +57,10 @@ func SetupSvr() {
 	go health.SetupServer("127.0.0.1:8003", "9.134.93.168:6380", "SDZsdz2000", 0)
 	//等待服务器启动
 	time.Sleep(1 * time.Second)
+}
+
+func TestRouter(t *testing.T) {
+
 }
 
 func TestHealthSvr(t *testing.T) {
@@ -240,6 +244,97 @@ func TestDiscoverSvr(t *testing.T) {
 	}
 }
 
+func doTestRegisterSvr(t *testing.T,
+	serviceName string,
+	rdb *redis.Client,
+	testData map[string]*sdk.RegisterArgv,
+	api sdk.RegisterAPI,
+	revisionInit int64,
+) {
+	resultData := make(map[string]*sdk.RegisterArgv)
+	for address, v := range testData {
+		result, err := api.Register(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v.InstanceID == nil {
+			if result.InstanceID != address {
+				t.Errorf("%s的InstanceID为%s", address, result.InstanceID)
+			}
+		} else {
+			if result.InstanceID != *v.InstanceID {
+				t.Errorf("%s的InstanceID为%s", *v.InstanceID, result.InstanceID)
+			}
+		}
+		resultData[result.InstanceID] = v
+	}
+
+	//检查redis数据库是否全部写入了
+	revision, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.RevisionFiled).Int64()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision != revisionInit+int64(len(testData)) {
+		t.Fatal("服务版本号没有正常更新")
+	}
+	bytes, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.InfoFiled).Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var serviceInfo pb.ServiceInfo
+	err = proto.Unmarshal(bytes, &serviceInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range serviceInfo.Instances {
+		dataInTest, ok := resultData[v.InstanceID]
+		if !ok {
+			t.Errorf("服务没有正常写入 ID:%v", v.InstanceID)
+		}
+		if dataInTest.Host != v.Host ||
+			dataInTest.Port != v.Port ||
+			*dataInTest.Weight != v.Weight {
+			t.Errorf("ID:%v 发送的数据为{Host:%s,Port:%v,Weight:%v}, redis数据为{Host:%s,Port:%v,Weight:%v}",
+				v.InstanceID,
+				dataInTest.Host, dataInTest.Port, *dataInTest.Weight,
+				v.Host, v.Port, v.Weight)
+		}
+	}
+
+	//逐个删除
+	targetRevision := revision + int64(len(serviceInfo.Instances))
+	for _, v := range serviceInfo.Instances {
+		err = api.Deregister(&sdk.DeregisterArgv{
+			ServiceName: serviceName,
+			Host:        v.Host,
+			Port:        v.Port,
+			InstanceID:  v.InstanceID,
+		})
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	revision, err = rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.RevisionFiled).Int64()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revision != targetRevision {
+		t.Fatal("服务版本号没有正常更新")
+	}
+	bytes, err = rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.InfoFiled).Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = proto.Unmarshal(bytes, &serviceInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, v := range serviceInfo.Instances {
+		t.Errorf("未删除 id:%s, host:%s, port:%v", v.InstanceID, v.Host, v.Port)
+	}
+}
+
 func TestRegisterSvr(t *testing.T) {
 	serviceName := "testRegister"
 	instanceNum := 10
@@ -261,78 +356,14 @@ func TestRegisterSvr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resultData := make(map[string]*sdk.RegisterArgv)
+	doTestRegisterSvr(t, serviceName, rdb, testData, api, 0)
+
+	//赋予名字
+	count := 0
 	for _, v := range testData {
-		result, err := api.Register(v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resultData[result.InstanceID] = v
+		id := fmt.Sprintf("testInstance%v", count)
+		v.InstanceID = &id
+		count += 1
 	}
-
-	//检查redis数据库是否全部写入了
-	revision, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.ServiceRevisionFiled).Int64()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if revision != int64(len(testData)) {
-		t.Fatal("服务版本号没有正常更新")
-	}
-	bytes, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.ServiceInfoFiled).Bytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var serviceInfo pb.ServiceInfo
-	err = proto.Unmarshal(bytes, &serviceInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, v := range serviceInfo.Instances {
-		dataInTest, ok := resultData[v.InstanceID]
-		if !ok {
-			t.Errorf("服务没有正常写入 ID:%v", v.InstanceID)
-		}
-		if dataInTest.Host != v.Host ||
-			dataInTest.Port != v.Port ||
-			*dataInTest.Weight != v.Weight {
-			t.Errorf("ID:%v 发送的数据为{Host:%s,Port:%v,Weight:%v}, redis数据为{Host:%s,Port:%v,Weight:%v}",
-				v.InstanceID,
-				dataInTest.Host, dataInTest.Port, dataInTest.Weight,
-				v.Host, v.Port, v.Weight)
-		}
-	}
-
-	//逐个删除
-	targetRevision := revision + int64(len(serviceInfo.Instances))
-	for _, v := range serviceInfo.Instances {
-		err = api.Deregister(&sdk.DeregisterArgv{
-			ServiceName: serviceName,
-			Host:        v.Host,
-			Port:        v.Port,
-			InstanceID:  v.InstanceID,
-		})
-		if err != nil {
-			t.Error(err)
-		}
-	}
-	revision, err = rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.ServiceRevisionFiled).Int64()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if revision != targetRevision {
-		t.Fatal("服务版本号没有正常更新")
-	}
-	bytes, err = rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.ServiceInfoFiled).Bytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = proto.Unmarshal(bytes, &serviceInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, v := range serviceInfo.Instances {
-		t.Errorf("未删除 id:%s, host:%s, port:%v", v.InstanceID, v.Host, v.Port)
-	}
-
+	doTestRegisterSvr(t, serviceName, rdb, testData, api, int64(2*len(testData)))
 }

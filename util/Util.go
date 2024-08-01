@@ -7,6 +7,12 @@ import (
 	"math/rand"
 )
 
+// 路由类型
+const (
+	TargetRouterType = int32(iota)
+	KVRouterType
+)
+
 func NewServiceInfo(serviceName string) *pb.ServiceInfo {
 	return &pb.ServiceInfo{
 		ServiceName: serviceName,

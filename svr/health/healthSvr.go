@@ -23,12 +23,12 @@ func (s *Server) GetHealthInfo(_ context.Context,
 ) (*pb.GetHealthInfoReply, error) {
 	//批量获取ID
 	hash := svrutil.ServiceHash(req.ServiceName)
-	err := s.FlushBufferLocked(hash, req.ServiceName)
+	err := s.FlushServiceBufferLocked(hash, req.ServiceName)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceInfo, ok := s.Mgr.TryGetServiceInfo(req.ServiceName)
+	serviceInfo, ok := s.InstanceBuffer.GetServiceInfo(req.ServiceName)
 	if !ok {
 		return nil, err
 	}

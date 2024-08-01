@@ -17,13 +17,13 @@ type RegisterArgv struct {
 	Port        int32
 
 	//optional
-	Weight *int32
-	TTL    *int64
+	Weight     *int32
+	TTL        *int64
+	InstanceID *string
 }
 
 type RegisterResult struct {
 	InstanceID string
-	Existed    bool
 }
 
 type DeregisterArgv struct {
@@ -58,15 +58,15 @@ func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 		Port:        service.Port,
 		Weight:      weight,
 		TTL:         ttl,
+		InstanceID:  service.InstanceID,
 	}
 	reply, err := rpcCli.Register(context.Background(), &request)
 	if err != nil {
 		return nil, err
 	}
-	util.Info("注册服务: ServiceName: %v, Host: %v, Port: %v, Weight: %v, InstanceID: %v, Exited: %v",
-		request.ServiceName, request.Host, request.Port, request.Weight,
-		reply.InstanceID, reply.Existed)
-	return &RegisterResult{InstanceID: reply.InstanceID, Existed: reply.Existed}, nil
+	util.Info("注册服务: ServiceName: %v, Host: %v, Port: %v, Weight: %v, InstanceID: %v",
+		request.ServiceName, request.Host, request.Port, request.Weight, reply.InstanceID)
+	return &RegisterResult{InstanceID: reply.InstanceID}, nil
 }
 
 func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
@@ -91,11 +91,35 @@ func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
 	return nil
 }
 
+type AddTargetRouterArgv struct {
+	SrcInstanceID  string
+	DstServiceName string
+
+	//可以提供DstInstanceID
+	DstInstanceID string
+	//也可以提供DstHost 和 DstPort
+	DstHost string
+	DstPort int32
+}
+
+type AddTargetRouterResult struct {
+	Key            string
+	DstServiceName string
+
+	//可以提供DstInstanceID
+	DstInstanceID string
+	//也可以提供DstHost 和 DstPort
+	DstHost string
+	DstPort int32
+}
+
 // RegisterAPI 功能：
 // 服务注册
 type RegisterAPI interface {
 	Register(service *RegisterArgv) (*RegisterResult, error)
 	Deregister(service *DeregisterArgv) error
+	//AddTargetRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error)
+	//AddKVRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error)
 }
 
 func NewRegisterAPI() (RegisterAPI, error) {

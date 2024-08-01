@@ -31,12 +31,12 @@ func (s *Server) GetServices(_ context.Context, _ *pb.GetServicesRequest) (*pb.G
 func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (*pb.GetInstancesReply, error) {
 	hash := svrutil.ServiceHash(request.ServiceName)
 
-	err := s.FlushBufferLocked(hash, request.ServiceName)
+	err := s.FlushServiceBufferLocked(hash, request.ServiceName)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceInfo, ok := s.Mgr.TryGetServiceInfo(request.ServiceName)
+	serviceInfo, ok := s.InstanceBuffer.GetServiceInfo(request.ServiceName)
 	if !ok {
 		return &pb.GetInstancesReply{
 			Instances: make([]*pb.InstanceInfo, 0),

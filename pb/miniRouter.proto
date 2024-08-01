@@ -20,13 +20,14 @@ message RegisterRequest{
   string Host = 2;
   int32 Port = 3;
   int32 Weight = 4; // 权重
-
   int64 TTL = 5; //上报时间间隔
+
+  //可选，如果不设置那么服务器将其设置为IP:Port
+  optional string InstanceID = 6;
 }
 
 message RegisterReply{
   string InstanceID = 1;
-  bool Existed = 2;
 }
 
 message DeregisterRequest{
@@ -39,23 +40,8 @@ message DeregisterRequest{
 message DeregisterReply{
 }
 
-service RegisterService{
-  rpc Register(RegisterRequest) returns (RegisterReply){}
-  rpc Deregister(DeregisterRequest) returns (DeregisterReply){}
-}
-
-message GetInstancesRequest{
-  string ServiceName = 1;
-  int64 Revision = 2;
-}
-
-message GetInstancesReply{
-  int64 Revision = 1;
-  repeated InstanceInfo Instances = 2;
-}
-
 message TargetRouterInfo{
-  string ScrInstanceID = 1;
+  string SrcInstanceID = 1;
   string DstInstanceID = 2;
 }
 
@@ -66,8 +52,49 @@ message KVRouterInfo{
 
 message ServiceRouterInfo{
   string ServiceName = 1;
-  repeated TargetRouterInfo TargetRouters = 2;
-  repeated KVRouterInfo KVRouters = 3;
+  int64 Revision = 2;
+  repeated TargetRouterInfo TargetRouters = 3;
+  repeated KVRouterInfo KVRouters = 4;
+}
+
+message AddRouterRequest {
+  int32 RouterType = 1;
+  string ServiceName = 2;
+
+  optional KVRouterInfo KvRouterInfo = 3;
+  optional TargetRouterInfo targetRouterInfo = 4;
+}
+
+message AddRouterReply {
+}
+
+message RemoveRouterRequest{
+  int32 RouterType = 1;
+  string ServiceName = 2;
+
+  optional KVRouterInfo KvRouterInfo = 3;
+  optional TargetRouterInfo targetRouterInfo = 4;
+}
+
+message RemoveRouterReply {
+}
+
+service RegisterService{
+  rpc Register(RegisterRequest) returns (RegisterReply){}
+  rpc Deregister(DeregisterRequest) returns (DeregisterReply){}
+
+  rpc AddRouter(AddRouterRequest) returns (AddRouterReply){}
+  rpc RemoveRouter(RemoveRouterRequest) returns (RemoveRouterReply){}
+}
+
+message GetInstancesRequest{
+  string ServiceName = 1;
+  int64 Revision = 2;
+}
+
+message GetInstancesReply{
+  int64 Revision = 1;
+  repeated InstanceInfo Instances = 2;
 }
 
 message GetServicesRequest{

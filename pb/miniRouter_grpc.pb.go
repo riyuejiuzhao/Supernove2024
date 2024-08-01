@@ -24,6 +24,8 @@ const _ = grpc.SupportPackageIsVersion7
 type RegisterServiceClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterReply, error)
 	Deregister(ctx context.Context, in *DeregisterRequest, opts ...grpc.CallOption) (*DeregisterReply, error)
+	AddRouter(ctx context.Context, in *AddRouterRequest, opts ...grpc.CallOption) (*AddRouterReply, error)
+	RemoveRouter(ctx context.Context, in *RemoveRouterRequest, opts ...grpc.CallOption) (*RemoveRouterReply, error)
 }
 
 type registerServiceClient struct {
@@ -52,12 +54,32 @@ func (c *registerServiceClient) Deregister(ctx context.Context, in *DeregisterRe
 	return out, nil
 }
 
+func (c *registerServiceClient) AddRouter(ctx context.Context, in *AddRouterRequest, opts ...grpc.CallOption) (*AddRouterReply, error) {
+	out := new(AddRouterReply)
+	err := c.cc.Invoke(ctx, "/RegisterService/AddRouter", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *registerServiceClient) RemoveRouter(ctx context.Context, in *RemoveRouterRequest, opts ...grpc.CallOption) (*RemoveRouterReply, error) {
+	out := new(RemoveRouterReply)
+	err := c.cc.Invoke(ctx, "/RegisterService/RemoveRouter", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RegisterServiceServer is the server API for RegisterService service.
 // All implementations must embed UnimplementedRegisterServiceServer
 // for forward compatibility
 type RegisterServiceServer interface {
 	Register(context.Context, *RegisterRequest) (*RegisterReply, error)
 	Deregister(context.Context, *DeregisterRequest) (*DeregisterReply, error)
+	AddRouter(context.Context, *AddRouterRequest) (*AddRouterReply, error)
+	RemoveRouter(context.Context, *RemoveRouterRequest) (*RemoveRouterReply, error)
 	mustEmbedUnimplementedRegisterServiceServer()
 }
 
@@ -70,6 +92,12 @@ func (UnimplementedRegisterServiceServer) Register(context.Context, *RegisterReq
 }
 func (UnimplementedRegisterServiceServer) Deregister(context.Context, *DeregisterRequest) (*DeregisterReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Deregister not implemented")
+}
+func (UnimplementedRegisterServiceServer) AddRouter(context.Context, *AddRouterRequest) (*AddRouterReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddRouter not implemented")
+}
+func (UnimplementedRegisterServiceServer) RemoveRouter(context.Context, *RemoveRouterRequest) (*RemoveRouterReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveRouter not implemented")
 }
 func (UnimplementedRegisterServiceServer) mustEmbedUnimplementedRegisterServiceServer() {}
 
@@ -120,6 +148,42 @@ func _RegisterService_Deregister_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RegisterService_AddRouter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddRouterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RegisterServiceServer).AddRouter(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/RegisterService/AddRouter",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RegisterServiceServer).AddRouter(ctx, req.(*AddRouterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RegisterService_RemoveRouter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveRouterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RegisterServiceServer).RemoveRouter(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/RegisterService/RemoveRouter",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RegisterServiceServer).RemoveRouter(ctx, req.(*RemoveRouterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RegisterService_ServiceDesc is the grpc.ServiceDesc for RegisterService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -134,6 +198,14 @@ var RegisterService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Deregister",
 			Handler:    _RegisterService_Deregister_Handler,
+		},
+		{
+			MethodName: "AddRouter",
+			Handler:    _RegisterService_AddRouter_Handler,
+		},
+		{
+			MethodName: "RemoveRouter",
+			Handler:    _RegisterService_RemoveRouter_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -28,25 +28,25 @@ func (r *Server) Deregister(_ context.Context,
 ) (*pb.DeregisterReply, error) {
 	hash := svrutil.ServiceHash(request.ServiceName)
 
-	mutex, err := r.LockRedisService(svrutil.ServiceInfoLockName(request.ServiceName))
+	mutex, err := r.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
 	if err != nil {
 		return nil, err
 	}
 	defer svrutil.TryUnlock(mutex)
 
 	//更新缓存
-	err = r.FlushBuffer(hash, request.ServiceName)
+	err = r.FlushServiceBuffer(hash, request.ServiceName)
 	if err != nil {
 		return nil, err
 	}
 
 	//删除本地缓存
-	err = r.Mgr.RemoveInstance(request.ServiceName,
+	err = r.InstanceBuffer.RemoveInstance(request.ServiceName,
 		request.Host, request.Port, request.InstanceID)
 	if err != nil {
 		return nil, err
 	}
-	serviceInfo, ok := r.Mgr.TryGetServiceInfo(request.ServiceName)
+	serviceInfo, ok := r.InstanceBuffer.GetServiceInfo(request.ServiceName)
 	if !ok {
 		err = errors.New(fmt.Sprintf("ServiceInfo丢失, name:%s", request.ServiceName))
 		util.Error("err: %v", err)
@@ -60,15 +60,15 @@ func (r *Server) Deregister(_ context.Context,
 		return nil, err
 	}
 	//这里需要给健康信息也上锁
-	healthMutex, err := r.LockRedisService(svrutil.ServiceHealthInfoLockName(request.ServiceName))
+	healthMutex, err := r.LockRedis(svrutil.HealthInfoLockName(request.ServiceName))
 	if err != nil {
 		util.Error("create lock err:%v", err)
 		return nil, err
 	}
 	defer svrutil.TryUnlock(healthMutex)
 	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(hash, svrutil.ServiceRevisionFiled, serviceInfo.Revision)
-	txPipeline.HSet(hash, svrutil.ServiceInfoFiled, bytes)
+	txPipeline.HSet(hash, svrutil.RevisionFiled, serviceInfo.Revision)
+	txPipeline.HSet(hash, svrutil.InfoFiled, bytes)
 	// 健康信息
 	txPipeline.Del(healthKey)
 	_, err = txPipeline.Exec()

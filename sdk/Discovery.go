@@ -147,10 +147,10 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterRes
 	case Target:
 		return c.processTargetRouter(argv.SrcInstanceID, argv.DstService.GetServiceName())
 	case KeyValue:
-		if argv.Key == nil {
+		if argv.Key == "" {
 			return nil, errors.New("使用键值对路由但是缺少Key")
 		}
-		return c.processKeyValueRouter(*argv.Key, argv.DstService.GetServiceName())
+		return c.processKeyValueRouter(argv.Key, argv.DstService.GetServiceName())
 	case Consistent:
 		return c.processConsistentRouter(argv.SrcInstanceID, instances)
 	case Random:
@@ -159,14 +159,6 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterRes
 		return c.processWeightRouter(instances)
 	}
 	return nil, errors.New("不支持的路由算法类型")
-}
-
-func (c *DiscoveryCli) AddTargetRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error) {
-	return nil, errors.New("未实现")
-}
-
-func (c *DiscoveryCli) AddKVRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error) {
-	return nil, errors.New("未实现")
 }
 
 type DefaultDstService struct {
@@ -191,24 +183,16 @@ type ProcessRouterArgv struct {
 	SrcInstanceID string
 	DstService    DstService
 
-	Key *string
+	Key string
 }
 
 type ProcessRouterResult struct {
 	DstInstance *pb.InstanceInfo
 }
 
-type AddTargetRouterArgv struct {
-}
-
-type AddTargetRouterResult struct {
-}
-
 type DiscoveryAPI interface {
 	GetInstances(argv *GetInstancesArgv) (*GetInstancesResult, error)
 	ProcessRouter(*ProcessRouterArgv) (*ProcessRouterResult, error)
-	AddTargetRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error)
-	AddKVRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error)
 }
 
 func NewDiscoveryAPI() (DiscoveryAPI, error) {
