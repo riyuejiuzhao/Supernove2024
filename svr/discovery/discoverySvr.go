@@ -95,7 +95,7 @@ func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (*
 		return &pb.GetRoutersReply{
 			Router: &pb.ServiceRouterInfo{
 				ServiceName:   request.ServiceName,
-				Revision:      int64(0),
+				Revision:      request.Revision,
 				TargetRouters: make([]*pb.TargetRouterInfo, 0),
 				KVRouters:     make([]*pb.KVRouterInfo, 0),
 			},

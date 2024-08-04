@@ -98,8 +98,9 @@ func (r *Server) AddRouter(_ context.Context, request *pb.AddRouterRequest) (*pb
 		return r.AddKVRouter(hash, request)
 	case util.TargetRouterType:
 		return r.AddTargetRouter(hash, request)
+	default:
+		return nil, errors.New("不支持的路由类型")
 	}
-	return nil, errors.New("不识别的路由类型")
 }
 
 func (r *Server) RemoveTargetRouter(hash string, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
@@ -182,6 +183,7 @@ func (r *Server) RemoveRouter(_ context.Context, request *pb.RemoveRouterRequest
 		return r.RemoveKVRouter(hash, request)
 	case util.TargetRouterType:
 		return r.RemoveTargetRouter(hash, request)
+	default:
+		return nil, errors.New("不能识别的路由类型")
 	}
-	return nil, errors.New("不能识别的路由类型")
 }
