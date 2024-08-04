@@ -8,6 +8,8 @@ import (
 	"Supernove2024/svr/health"
 	"Supernove2024/svr/register"
 	"Supernove2024/svr/svrutil"
+	"Supernove2024/util"
+	"context"
 	"fmt"
 	"github.com/go-redis/redis"
 	"google.golang.org/protobuf/proto"
@@ -51,16 +53,158 @@ func RandomRegisterArgv(serviceName string, instanceNum int) map[string]*sdk.Reg
 	return testData
 }
 
-func SetupSvr() {
-	go register.SetupServer("127.0.0.1:8001", "9.134.93.168:6380", "SDZsdz2000", 0)
-	go discovery.SetupServer("127.0.0.1:8002", "9.134.93.168:6380", "SDZsdz2000", 0)
-	go health.SetupServer("127.0.0.1:8003", "9.134.93.168:6380", "SDZsdz2000", 0)
+func SetupSvr() context.CancelFunc {
+	ctx, cancel := context.WithCancel(context.Background())
+	go register.SetupServer(ctx, "127.0.0.1:8001", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go discovery.SetupServer(ctx, "127.0.0.1:8002", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go health.SetupServer(ctx, "127.0.0.1:8003", "9.134.93.168:6380", "SDZsdz2000", 0)
 	//等待服务器启动
 	time.Sleep(1 * time.Second)
+	return cancel
 }
 
 func TestRouter(t *testing.T) {
+	srcService := "srcService"
+	dstService := "dstService"
+	instanceNum := 10
 
+	srcData := RandomRegisterArgv(srcService, instanceNum)
+	count := 0
+	for _, v := range srcData {
+		name := fmt.Sprintf("src%v", count)
+		v.InstanceID = &name
+		count += 1
+	}
+	dstData := RandomRegisterArgv(dstService, instanceNum)
+	count = 0
+	for _, v := range dstData {
+		name := fmt.Sprintf("dst%v", count)
+		v.InstanceID = &name
+		count += 1
+	}
+	//链接并清空数据库
+	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
+	err := rdb.FlushDB().Err()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 从另一个协程启动
+	cancel := SetupSvr()
+	defer cancel()
+
+	config.GlobalConfigFilePath = "router_test.yaml"
+	// 注册
+	registerapi, err := sdk.NewRegisterAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range srcData {
+		_, err := registerapi.Register(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, v := range dstData {
+		_, err := registerapi.Register(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	//获取
+	discoveryapi, err := sdk.NewDiscoveryAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = discoveryapi.GetInstances(&sdk.GetInstancesArgv{
+		ServiceName: srcService,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dstServices, err := discoveryapi.GetInstances(&sdk.GetInstancesArgv{
+		ServiceName: dstService,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	//先检测其他三种路由正不正常
+	processResult, err := discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:        util.ConsistentRouterType,
+		SrcInstanceID: "src0",
+		DstService:    dstServices,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("一致性哈希:%s", processResult.DstInstance)
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:        util.RandomRouterType,
+		SrcInstanceID: "src0",
+		DstService:    dstServices,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("随机:%s", processResult.DstInstance)
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:        util.WeightedRouterType,
+		SrcInstanceID: "src0",
+		DstService:    dstServices,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxInstance := dstServices.Instances[0]
+	for _, v := range dstServices.Instances {
+		if v.Weight > maxInstance.Weight {
+			maxInstance = v
+		}
+	}
+	if maxInstance.InstanceID != processResult.DstInstance.InstanceID {
+		t.Fatal("权重不是最大的那个")
+	}
+	t.Logf("权重:%s", processResult.DstInstance)
+
+	//注册路由
+	// src0 -> dst1
+	// key:key0 -> dst2
+	err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{SrcInstanceID: "src0", DstServiceName: dstService, DstInstanceID: "dst1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{Key: "key0", DstServiceName: dstService, DstInstanceID: "dst2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:        util.TargetRouterType,
+		SrcInstanceID: "src0",
+		DstService:    dstServices,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if processResult.DstInstance.InstanceID != "dst1" {
+		t.Fatalf("路由错误")
+	}
+
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:        util.KVRouterType,
+		SrcInstanceID: "src2",
+		DstService:    dstServices,
+		Key:           "key0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if processResult.DstInstance.InstanceID != "dst2" {
+		t.Fatalf("路由错误")
+	}
 }
 
 func TestHealthSvr(t *testing.T) {
@@ -75,10 +219,14 @@ func TestHealthSvr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	SetupSvr()
+	cancel := SetupSvr()
+	defer cancel()
 
 	config.GlobalConfigFilePath = "register_test.yaml"
 	registerAPI, err := sdk.NewRegisterAPI()
+	//等待一下更新
+	time.Sleep(1 * time.Second)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,6 +288,16 @@ func TestHealthSvr(t *testing.T) {
 	if len(getInstanceResult.GetInstance()) != 0 {
 		t.Fatal("服务健康信息不正确")
 	}
+	//假设不进行健康过滤
+	getInstanceArgv.SkipHealthFilter = true
+	getInstanceResult, err = discoveryAPI.GetInstances(getInstanceArgv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(getInstanceResult.GetInstance()) != len(testData) {
+		t.Fatal("要求不进行健康过滤但是健康过滤依然发生了")
+	}
+	getInstanceArgv.SkipHealthFilter = false
 	//通过心跳再次激活所有的服务
 	healthCli, err := sdk.NewHealthAPI()
 	if err != nil {
@@ -176,7 +334,8 @@ func TestDiscoverSvr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	SetupSvr()
+	cancel := SetupSvr()
+	defer cancel()
 
 	config.GlobalConfigFilePath = "register_test.yaml"
 	registerAPI, err := sdk.NewRegisterAPI()
@@ -348,7 +507,8 @@ func TestRegisterSvr(t *testing.T) {
 	}
 
 	// 从另一个协程启动
-	SetupSvr()
+	cancel := SetupSvr()
+	defer cancel()
 
 	config.GlobalConfigFilePath = "register_test.yaml"
 	api, err := sdk.NewRegisterAPI()

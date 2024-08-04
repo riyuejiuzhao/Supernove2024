@@ -94,23 +94,45 @@ func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
 type AddTargetRouterArgv struct {
 	SrcInstanceID  string
 	DstServiceName string
-
-	//可以提供DstInstanceID
-	DstInstanceID string
-	//也可以提供DstHost 和 DstPort
-	DstHost string
-	DstPort int32
+	DstInstanceID  string
 }
 
-type AddTargetRouterResult struct {
+type AddKVRouterArgv struct {
 	Key            string
 	DstServiceName string
+	DstInstanceID  string
+}
 
-	//可以提供DstInstanceID
-	DstInstanceID string
-	//也可以提供DstHost 和 DstPort
-	DstHost string
-	DstPort int32
+func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
+	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	rpcCli := pb.NewRegisterServiceClient(conn.Value())
+	_, err = rpcCli.AddRouter(context.Background(), &pb.AddRouterRequest{
+		RouterType: util.TargetRouterType, ServiceName: argv.DstServiceName, TargetRouterInfo: &pb.TargetRouterInfo{
+			SrcInstanceID: argv.SrcInstanceID, DstInstanceID: argv.DstInstanceID}})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) error {
+	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	rpcCli := pb.NewRegisterServiceClient(conn.Value())
+	_, err = rpcCli.AddRouter(context.Background(), &pb.AddRouterRequest{
+		RouterType: util.KVRouterType, ServiceName: argv.DstServiceName, KvRouterInfo: &pb.KVRouterInfo{
+			Key: argv.Key, DstInstanceID: argv.DstInstanceID}})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // RegisterAPI 功能：
@@ -118,8 +140,8 @@ type AddTargetRouterResult struct {
 type RegisterAPI interface {
 	Register(service *RegisterArgv) (*RegisterResult, error)
 	Deregister(service *DeregisterArgv) error
-	//AddTargetRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error)
-	//AddKVRouter(*AddTargetRouterArgv) (*AddTargetRouterResult, error)
+	AddTargetRouter(*AddTargetRouterArgv) error
+	AddKVRouter(argv *AddKVRouterArgv) error
 }
 
 func NewRegisterAPI() (RegisterAPI, error) {

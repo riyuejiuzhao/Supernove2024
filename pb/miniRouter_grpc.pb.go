@@ -218,6 +218,7 @@ var RegisterService_ServiceDesc = grpc.ServiceDesc{
 type DiscoveryServiceClient interface {
 	GetServices(ctx context.Context, in *GetServicesRequest, opts ...grpc.CallOption) (*GetServicesReply, error)
 	GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (*GetInstancesReply, error)
+	GetRouters(ctx context.Context, in *GetRoutersRequest, opts ...grpc.CallOption) (*GetRoutersReply, error)
 }
 
 type discoveryServiceClient struct {
@@ -246,12 +247,22 @@ func (c *discoveryServiceClient) GetInstances(ctx context.Context, in *GetInstan
 	return out, nil
 }
 
+func (c *discoveryServiceClient) GetRouters(ctx context.Context, in *GetRoutersRequest, opts ...grpc.CallOption) (*GetRoutersReply, error) {
+	out := new(GetRoutersReply)
+	err := c.cc.Invoke(ctx, "/DiscoveryService/GetRouters", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DiscoveryServiceServer is the server API for DiscoveryService service.
 // All implementations must embed UnimplementedDiscoveryServiceServer
 // for forward compatibility
 type DiscoveryServiceServer interface {
 	GetServices(context.Context, *GetServicesRequest) (*GetServicesReply, error)
 	GetInstances(context.Context, *GetInstancesRequest) (*GetInstancesReply, error)
+	GetRouters(context.Context, *GetRoutersRequest) (*GetRoutersReply, error)
 	mustEmbedUnimplementedDiscoveryServiceServer()
 }
 
@@ -264,6 +275,9 @@ func (UnimplementedDiscoveryServiceServer) GetServices(context.Context, *GetServ
 }
 func (UnimplementedDiscoveryServiceServer) GetInstances(context.Context, *GetInstancesRequest) (*GetInstancesReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetInstances not implemented")
+}
+func (UnimplementedDiscoveryServiceServer) GetRouters(context.Context, *GetRoutersRequest) (*GetRoutersReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRouters not implemented")
 }
 func (UnimplementedDiscoveryServiceServer) mustEmbedUnimplementedDiscoveryServiceServer() {}
 
@@ -314,6 +328,24 @@ func _DiscoveryService_GetInstances_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DiscoveryService_GetRouters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRoutersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiscoveryServiceServer).GetRouters(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/DiscoveryService/GetRouters",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DiscoveryServiceServer).GetRouters(ctx, req.(*GetRoutersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DiscoveryService_ServiceDesc is the grpc.ServiceDesc for DiscoveryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -328,6 +360,10 @@ var DiscoveryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetInstances",
 			Handler:    _DiscoveryService_GetInstances_Handler,
+		},
+		{
+			MethodName: "GetRouters",
+			Handler:    _DiscoveryService_GetRouters_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

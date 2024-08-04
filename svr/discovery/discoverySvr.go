@@ -28,36 +28,87 @@ func (s *Server) GetServices(_ context.Context, _ *pb.GetServicesRequest) (*pb.G
 	return &pb.GetServicesReply{ServiceName: keys}, nil
 }
 
-func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (*pb.GetInstancesReply, error) {
+func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (reply *pb.GetInstancesReply, err error) {
 	hash := svrutil.ServiceHash(request.ServiceName)
 
-	err := s.FlushServiceBufferLocked(hash, request.ServiceName)
+	reply = nil
+	err = s.FlushServiceBufferLocked(hash, request.ServiceName)
+	if err != nil {
+		return
+	}
+	//汇报报文
+	defer func() { util.Info("GetInstancesReply:%v", reply) }()
+
+	serviceInfo, ok := s.InstanceBuffer.GetServiceInfo(request.ServiceName)
+	if !ok {
+		reply = &pb.GetInstancesReply{
+			Service: &pb.ServiceInfo{
+				ServiceName: request.ServiceName,
+				Revision:    int64(0),
+				Instances:   make([]*pb.InstanceInfo, 0),
+			},
+		}
+		err = nil
+		return
+	}
+
+	if serviceInfo.Revision == request.Revision {
+		err = nil
+		reply = &pb.GetInstancesReply{
+			Service: &pb.ServiceInfo{
+				ServiceName: request.ServiceName,
+				Revision:    request.Revision,
+				Instances:   make([]*pb.InstanceInfo, 0),
+			},
+		}
+		return
+	}
+
+	err = nil
+	reply = &pb.GetInstancesReply{
+		Service: serviceInfo,
+	}
+	return
+}
+
+func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (*pb.GetRoutersReply, error) {
+	hash := svrutil.RouterHash(request.ServiceName)
+
+	err := s.FlushRouterBufferLocked(hash, request.ServiceName)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceInfo, ok := s.InstanceBuffer.GetServiceInfo(request.ServiceName)
+	serviceInfo, ok := s.RouterBuffer.GetServiceRouter(request.ServiceName)
 	if !ok {
-		return &pb.GetInstancesReply{
-			Instances: make([]*pb.InstanceInfo, 0),
-			Revision:  int64(0),
+		return &pb.GetRoutersReply{
+			Router: &pb.ServiceRouterInfo{
+				ServiceName:   request.ServiceName,
+				Revision:      int64(0),
+				TargetRouters: make([]*pb.TargetRouterInfo, 0),
+				KVRouters:     make([]*pb.KVRouterInfo, 0),
+			},
 		}, nil
 	}
 
 	if serviceInfo.Revision == request.Revision {
-		return &pb.GetInstancesReply{
-			Instances: make([]*pb.InstanceInfo, 0),
-			Revision:  serviceInfo.Revision,
+		return &pb.GetRoutersReply{
+			Router: &pb.ServiceRouterInfo{
+				ServiceName:   request.ServiceName,
+				Revision:      int64(0),
+				TargetRouters: make([]*pb.TargetRouterInfo, 0),
+				KVRouters:     make([]*pb.KVRouterInfo, 0),
+			},
 		}, nil
 	}
 
-	return &pb.GetInstancesReply{
-		Instances: serviceInfo.Instances,
-		Revision:  serviceInfo.Revision}, nil
+	return &pb.GetRoutersReply{
+		Router: serviceInfo,
+	}, nil
 
 }
 
-func SetupServer(address string, redisAddress string, redisPassword string, redisDB int) {
+func SetupServer(ctx context.Context, address string, redisAddress string, redisPassword string, redisDB int) {
 	baseSvr := svrutil.NewBufferSvr(redisAddress, redisPassword, redisDB)
 
 	//创建rpc服务器
@@ -68,6 +119,13 @@ func SetupServer(address string, redisAddress string, redisPassword string, redi
 	grpcServer := grpc.NewServer()
 	pb.RegisterDiscoveryServiceServer(grpcServer,
 		&Server{BufferServer: baseSvr})
+
+	go func() {
+		<-ctx.Done()
+		grpcServer.GracefulStop()
+		util.Info("Stop grpc ser")
+	}()
+
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Fatalln(err)
 	}

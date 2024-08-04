@@ -8,7 +8,7 @@ import (
 type ServiceRouterBuffer struct {
 	*pb.ServiceRouterInfo
 
-	rwMutex         *sync.RWMutex
+	rwMutex         sync.RWMutex
 	KVRouterDic     map[string]*pb.KVRouterInfo
 	TargetRouterDic map[string]*pb.TargetRouterInfo
 }
@@ -35,7 +35,7 @@ func (b *ServiceRouterBuffer) Reset(info *pb.ServiceRouterInfo) {
 }
 
 type DefaultRouterBuffer struct {
-	rwMutex *sync.RWMutex
+	rwMutex sync.RWMutex
 	buffer  map[string]*ServiceRouterBuffer
 }
 
@@ -146,9 +146,10 @@ func (m *DefaultRouterBuffer) GetServiceRouter(service string) (*pb.ServiceRoute
 	m.rwMutex.RLock()
 	defer m.rwMutex.RUnlock()
 	serviceInfo, ok := m.buffer[service]
-	serviceInfo.rwMutex.RLock()
-	defer serviceInfo.rwMutex.RUnlock()
-	return serviceInfo.ServiceRouterInfo, ok
+	if !ok {
+		return nil, false
+	}
+	return serviceInfo.ServiceRouterInfo, true
 }
 
 func (m *DefaultRouterBuffer) RemoveKVRouter(serviceName string, Key string) error {

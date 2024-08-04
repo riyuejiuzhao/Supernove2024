@@ -7,9 +7,16 @@ import (
 	"math/rand"
 )
 
-// 路由类型
 const (
-	TargetRouterType = int32(iota)
+	// ConsistentRouterType 一致性哈希
+	ConsistentRouterType = int32(iota)
+	// RandomRouterType 随机路由
+	RandomRouterType
+	// WeightedRouterType 基于权重
+	WeightedRouterType
+	// TargetRouterType 特定路由
+	TargetRouterType
+	// KVRouterType 键值对路由
 	KVRouterType
 )
 

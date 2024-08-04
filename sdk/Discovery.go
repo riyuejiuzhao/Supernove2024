@@ -5,22 +5,8 @@ import (
 	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/util"
 	"errors"
-	"math/rand"
 	"stathat.com/c/consistent"
 	"time"
-)
-
-const (
-	// Consistent 一致性哈希
-	Consistent = int32(iota)
-	// Random 随机路由
-	Random
-	// Weighted 基于权重
-	Weighted
-	// Target 特定路由
-	Target
-	// KeyValue 键值对路由
-	KeyValue
 )
 
 type GetInstancesArgv struct {
@@ -49,6 +35,9 @@ type DiscoveryCli struct {
 func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (*GetInstancesResult, error) {
 	//在缓存数据中查找
 	service, ok := c.dataMgr.GetServiceInfo(argv.ServiceName)
+	if !ok {
+		return nil, errors.New("不存在该服务")
+	}
 	nowTime := time.Now().Unix()
 	result := &GetInstancesResult{ServiceName: argv.ServiceName,
 		Instances: make([]*pb.InstanceInfo, 0, len(service.Instances))}
@@ -68,9 +57,6 @@ func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (*GetInstancesResult
 		}
 	}
 
-	if !ok {
-		return nil, errors.New("不存在该服务")
-	}
 	return result, nil
 }
 
@@ -94,18 +80,13 @@ func (c *DiscoveryCli) processRandomRouter(dstInstances []*pb.InstanceInfo) (*Pr
 }
 
 func (c *DiscoveryCli) processWeightRouter(dstInstances []*pb.InstanceInfo) (*ProcessRouterResult, error) {
-	totalWeight := int32(0)
+	maxWeight := dstInstances[0]
 	for _, v := range dstInstances {
-		totalWeight += v.Weight
-	}
-	targetWeight := rand.Int31n(totalWeight)
-	for _, v := range dstInstances {
-		if targetWeight <= v.Weight {
-			return &ProcessRouterResult{DstInstance: v}, nil
+		if v.Weight > maxWeight.Weight {
+			maxWeight = v
 		}
-		targetWeight -= v.Weight
 	}
-	return nil, errors.New("权重超过上限")
+	return &ProcessRouterResult{DstInstance: maxWeight}, nil
 }
 
 func (c *DiscoveryCli) processTargetRouter(srcInstanceID string, dstService string) (*ProcessRouterResult, error) {
@@ -135,7 +116,7 @@ func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string) (*Pr
 // ProcessRouter 如果没有提供可选的Instance，那么自动从缓冲中获取
 func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterResult, error) {
 	instances := argv.DstService.GetInstance()
-	if instances != nil || len(instances) == 0 {
+	if instances == nil || len(instances) == 0 {
 		service, ok := c.dataMgr.GetServiceInfo(argv.DstService.GetServiceName())
 		if !ok {
 			return nil, errors.New("不存在目标服务")
@@ -144,18 +125,18 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterRes
 	}
 
 	switch argv.Method {
-	case Target:
+	case util.TargetRouterType:
 		return c.processTargetRouter(argv.SrcInstanceID, argv.DstService.GetServiceName())
-	case KeyValue:
+	case util.KVRouterType:
 		if argv.Key == "" {
 			return nil, errors.New("使用键值对路由但是缺少Key")
 		}
 		return c.processKeyValueRouter(argv.Key, argv.DstService.GetServiceName())
-	case Consistent:
+	case util.ConsistentRouterType:
 		return c.processConsistentRouter(argv.SrcInstanceID, instances)
-	case Random:
+	case util.RandomRouterType:
 		return c.processRandomRouter(instances)
-	case Weighted:
+	case util.WeightedRouterType:
 		return c.processWeightRouter(instances)
 	}
 	return nil, errors.New("不支持的路由算法类型")
@@ -182,7 +163,7 @@ type ProcessRouterArgv struct {
 	Method        int32
 	SrcInstanceID string
 	DstService    DstService
-
+	//可选的，只有kv需要
 	Key string
 }
 

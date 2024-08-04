@@ -5,6 +5,8 @@ import (
 	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
+	"errors"
+	"fmt"
 	"github.com/go-redis/redis"
 	"google.golang.org/grpc"
 	"log"
@@ -30,7 +32,7 @@ func (s *Server) GetHealthInfo(_ context.Context,
 
 	serviceInfo, ok := s.InstanceBuffer.GetServiceInfo(req.ServiceName)
 	if !ok {
-		return nil, err
+		return nil, errors.New(fmt.Sprintf("没有对应服务%v的健康数据", req.ServiceName))
 	}
 
 	instanceInfos := make([]*pb.InstanceHealthInfo, 0, len(serviceInfo.Instances))
@@ -71,7 +73,7 @@ func (s *Server) HeartBeat(_ context.Context, req *pb.HeartBeatRequest) (*pb.Hea
 	return &pb.HeartBeatReply{}, nil
 }
 
-func SetupServer(address string, redisAddress string, redisPassword string, redisDB int) {
+func SetupServer(ctx context.Context, address string, redisAddress string, redisPassword string, redisDB int) {
 	//创建rpc服务器
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
@@ -81,6 +83,11 @@ func SetupServer(address string, redisAddress string, redisPassword string, redi
 	grpcServer := grpc.NewServer()
 	pb.RegisterHealthServiceServer(grpcServer,
 		&Server{BufferServer: svrutil.NewBufferSvr(redisAddress, redisPassword, redisDB)})
+	go func() {
+		<-ctx.Done()
+		grpcServer.GracefulStop()
+		util.Info("Stop grpc ser")
+	}()
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Fatalln(err)
 	}
