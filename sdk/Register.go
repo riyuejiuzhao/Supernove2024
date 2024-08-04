@@ -95,12 +95,14 @@ type AddTargetRouterArgv struct {
 	SrcInstanceID  string
 	DstServiceName string
 	DstInstanceID  string
+	Timeout        int64
 }
 
 type AddKVRouterArgv struct {
 	Key            string
 	DstServiceName string
 	DstInstanceID  string
+	Timeout        int64
 }
 
 func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
@@ -111,8 +113,13 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
 	defer conn.Close()
 	rpcCli := pb.NewRegisterServiceClient(conn.Value())
 	_, err = rpcCli.AddRouter(context.Background(), &pb.AddRouterRequest{
-		RouterType: util.TargetRouterType, ServiceName: argv.DstServiceName, TargetRouterInfo: &pb.TargetRouterInfo{
-			SrcInstanceID: argv.SrcInstanceID, DstInstanceID: argv.DstInstanceID}})
+		RouterType:  util.TargetRouterType,
+		ServiceName: argv.DstServiceName,
+		TargetRouterInfo: &pb.TargetRouterInfo{
+			SrcInstanceID: argv.SrcInstanceID,
+			DstInstanceID: argv.DstInstanceID,
+			Timeout:       argv.Timeout,
+		}})
 	if err != nil {
 		return err
 	}
@@ -127,8 +134,13 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) error {
 	defer conn.Close()
 	rpcCli := pb.NewRegisterServiceClient(conn.Value())
 	_, err = rpcCli.AddRouter(context.Background(), &pb.AddRouterRequest{
-		RouterType: util.KVRouterType, ServiceName: argv.DstServiceName, KvRouterInfo: &pb.KVRouterInfo{
-			Key: argv.Key, DstInstanceID: argv.DstInstanceID}})
+		RouterType:  util.KVRouterType,
+		ServiceName: argv.DstServiceName,
+		KvRouterInfo: &pb.KVRouterInfo{
+			Key:           argv.Key,
+			DstInstanceID: argv.DstInstanceID,
+			Timeout:       argv.Timeout,
+		}})
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package svrutil
 import (
 	"Supernove2024/pb"
 	"sync"
+	"time"
 )
 
 type ServiceRouterBuffer struct {
@@ -75,7 +76,7 @@ func (m *DefaultRouterBuffer) GetTargetRouter(service string, srcInstanceID stri
 	return v, ok
 }
 
-func (m *DefaultRouterBuffer) AddKVRouter(serviceName string, key string, dstInstanceID string) *pb.KVRouterInfo {
+func (m *DefaultRouterBuffer) AddKVRouter(serviceName string, key string, dstInstanceID string, timeout int64) *pb.KVRouterInfo {
 	mgr := func() *ServiceRouterBuffer {
 		m.rwMutex.Lock()
 		defer m.rwMutex.Unlock()
@@ -92,13 +93,15 @@ func (m *DefaultRouterBuffer) AddKVRouter(serviceName string, key string, dstIns
 	info := &pb.KVRouterInfo{
 		Key:           key,
 		DstInstanceID: dstInstanceID,
+		Timeout:       timeout,
+		CreateTime:    time.Now().Unix(),
 	}
 	mgr.KVRouterDic[key] = info
 	mgr.ServiceRouterInfo.KVRouters = append(mgr.ServiceRouterInfo.KVRouters, info)
 	return info
 }
 
-func (m *DefaultRouterBuffer) AddTargetRouter(serviceName string, srcInstanceID string, dstInstanceID string) *pb.TargetRouterInfo {
+func (m *DefaultRouterBuffer) AddTargetRouter(serviceName string, srcInstanceID string, dstInstanceID string, timeout int64) *pb.TargetRouterInfo {
 	mgr := func() *ServiceRouterBuffer {
 		m.rwMutex.Lock()
 		defer m.rwMutex.Unlock()
@@ -115,6 +118,8 @@ func (m *DefaultRouterBuffer) AddTargetRouter(serviceName string, srcInstanceID 
 	info := &pb.TargetRouterInfo{
 		SrcInstanceID: srcInstanceID,
 		DstInstanceID: dstInstanceID,
+		Timeout:       timeout,
+		CreateTime:    time.Now().Unix(),
 	}
 	mgr.TargetRouterDic[srcInstanceID] = info
 	mgr.ServiceRouterInfo.TargetRouters = append(mgr.ServiceRouterInfo.TargetRouters, info)
@@ -233,8 +238,10 @@ type RouterBuffer interface {
 	GetKVRouter(service string, key string) (*pb.KVRouterInfo, bool)
 	GetTargetRouter(service string, srcInstanceID string) (*pb.TargetRouterInfo, bool)
 
-	AddKVRouter(serviceName string, key string, dstInstanceID string) *pb.KVRouterInfo
-	AddTargetRouter(serviceName string, srcInstanceID string, dstInstanceID string) *pb.TargetRouterInfo
+	AddKVRouter(serviceName string, key string,
+		dstInstanceID string, timeout int64) *pb.KVRouterInfo
+	AddTargetRouter(serviceName string, srcInstanceID string,
+		dstInstanceID string, timeout int64) *pb.TargetRouterInfo
 
 	FlushService(info *pb.ServiceRouterInfo)
 

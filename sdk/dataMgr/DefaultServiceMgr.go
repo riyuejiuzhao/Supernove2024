@@ -62,18 +62,30 @@ func (b *ServiceRouterBuffer) SetRouterInfo(info *pb.ServiceRouterInfo) {
 	}
 }
 
-func (b *ServiceRouterBuffer) TryGetKVRouter(key string) (*pb.KVRouterInfo, bool) {
+func (b *ServiceRouterBuffer) TryGetKVRouter(key string, skipTimeCheck bool) (*pb.KVRouterInfo, bool) {
 	b.routerBufferLock.RLock()
 	defer b.routerBufferLock.RUnlock()
 	r, ok := b.kvRouterDic.Get(key)
-	return r, ok
+	if !ok || skipTimeCheck {
+		return r, ok
+	}
+	if r.Timeout+r.CreateTime >= time.Now().Unix() {
+		return r, ok
+	}
+	return nil, false
 }
 
-func (b *ServiceRouterBuffer) TryGetTargetRouter(srcID string) (*pb.TargetRouterInfo, bool) {
+func (b *ServiceRouterBuffer) TryGetTargetRouter(srcID string, skipTimeCheck bool) (*pb.TargetRouterInfo, bool) {
 	b.routerBufferLock.RLock()
 	defer b.routerBufferLock.RUnlock()
 	r, ok := b.targetRouterDic[srcID]
-	return r, ok
+	if !ok || skipTimeCheck {
+		return r, ok
+	}
+	if r.CreateTime+r.Timeout >= time.Now().Unix() {
+		return r, ok
+	}
+	return nil, false
 }
 
 type SyncContainer[T any] struct {
@@ -279,7 +291,7 @@ func (m *DefaultServiceMgr) flushHealthInfo(serviceName string, serviceHealth *S
 	serviceHealth.Value = serviceHealthInfo
 }
 
-func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceID string) (*pb.TargetRouterInfo, bool) {
+func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceID string, skipTimeCheck bool) (*pb.TargetRouterInfo, bool) {
 	m.routerBuffer.Mutex.RLock()
 	defer m.routerBuffer.Mutex.RUnlock()
 
@@ -287,10 +299,10 @@ func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceID st
 	if !ok {
 		return nil, false
 	}
-	return b.TryGetTargetRouter(SrcInstanceID)
+	return b.TryGetTargetRouter(SrcInstanceID, skipTimeCheck)
 }
 
-func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Key string) (*pb.KVRouterInfo, bool) {
+func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Key string, skipTimeCheck bool) (*pb.KVRouterInfo, bool) {
 	m.routerBuffer.Mutex.RLock()
 	defer m.routerBuffer.Mutex.RUnlock()
 
@@ -298,7 +310,7 @@ func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Key string) (*pb.KVR
 	if !ok {
 		return nil, false
 	}
-	return b.TryGetKVRouter(Key)
+	return b.TryGetKVRouter(Key, skipTimeCheck)
 }
 
 func (m *DefaultServiceMgr) startFlushInfo() {

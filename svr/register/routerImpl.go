@@ -17,7 +17,11 @@ func (r *Server) AddKVRouter(hash string, request *pb.AddRouterRequest) (*pb.Add
 		return nil, errors.New("该路由已经被注册了")
 	}
 	//如果不存在，那么添加新实例
-	routerKvInfo = r.RouterBuffer.AddKVRouter(request.ServiceName, routerKvInfo.Key, routerKvInfo.DstInstanceID)
+	routerKvInfo = r.RouterBuffer.AddKVRouter(
+		request.ServiceName,
+		routerKvInfo.Key,
+		routerKvInfo.DstInstanceID,
+		routerKvInfo.Timeout)
 	//获取调整后的结果
 	routerInfo, ok := r.RouterBuffer.GetServiceRouter(request.ServiceName)
 	if !ok {
@@ -50,8 +54,11 @@ func (r *Server) AddTargetRouter(hash string, request *pb.AddRouterRequest) (*pb
 		return nil, errors.New("该路由已经被注册了")
 	}
 	//如果不存在，那么添加新实例
-	targetRouterInfo = r.RouterBuffer.AddTargetRouter(request.ServiceName,
-		targetRouterInfo.SrcInstanceID, targetRouterInfo.DstInstanceID)
+	targetRouterInfo = r.RouterBuffer.AddTargetRouter(
+		request.ServiceName,
+		targetRouterInfo.SrcInstanceID,
+		targetRouterInfo.DstInstanceID,
+		targetRouterInfo.Timeout)
 	//获取调整后的结果
 	routerInfo, ok := r.RouterBuffer.GetServiceRouter(request.ServiceName)
 	if !ok {

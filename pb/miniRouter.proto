@@ -43,11 +43,15 @@ message DeregisterReply{
 message TargetRouterInfo{
   string SrcInstanceID = 1;
   string DstInstanceID = 2;
+  int64 Timeout = 3;
+  int64 CreateTime = 4;
 }
 
 message KVRouterInfo{
   string Key = 1;
   string DstInstanceID = 2;
+  int64 Timeout = 3;
+  int64 CreateTime = 4;
 }
 
 message ServiceRouterInfo{

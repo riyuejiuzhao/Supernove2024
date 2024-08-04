@@ -90,7 +90,7 @@ func (c *DiscoveryCli) processWeightRouter(dstInstances []*pb.InstanceInfo) (*Pr
 }
 
 func (c *DiscoveryCli) processTargetRouter(srcInstanceID string, dstService string) (*ProcessRouterResult, error) {
-	target, ok := c.dataMgr.GetTargetRouter(dstService, srcInstanceID)
+	target, ok := c.dataMgr.GetTargetRouter(dstService, srcInstanceID, false)
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
@@ -102,7 +102,7 @@ func (c *DiscoveryCli) processTargetRouter(srcInstanceID string, dstService stri
 }
 
 func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string) (*ProcessRouterResult, error) {
-	v, ok := c.dataMgr.GetKVRouter(dstService, key)
+	v, ok := c.dataMgr.GetKVRouter(dstService, key, false)
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
