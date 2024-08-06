@@ -5,10 +5,13 @@ cmd: pb
 	docker build --build-arg svrName=health -t mini-router/health-svr .
 	docker build --build-arg svrName=register -t mini-router/register-svr .
 
+test:
+	$(MAKE) -C $@
+
 pb:
 	$(MAKE) -C $@
 
 clean:
 	$(MAKE) -C proto $@
 
-.PHONY: pb
+.PHONY: pb test

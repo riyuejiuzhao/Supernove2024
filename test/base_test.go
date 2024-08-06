@@ -232,11 +232,21 @@ func TestRouter(t *testing.T) {
 	//注册路由
 	// src0 -> dst1
 	// key:key0 -> dst2
-	err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{SrcInstanceID: "src0", DstServiceName: dstService, DstInstanceID: "dst1"})
+	err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{
+		SrcInstanceID:  "src0",
+		DstServiceName: dstService,
+		DstInstanceID:  "dst1",
+		Timeout:        100,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{Key: "key0", DstServiceName: dstService, DstInstanceID: "dst2"})
+	err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
+		Key:            "key0",
+		DstServiceName: dstService,
+		DstInstanceID:  "dst2",
+		Timeout:        100,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
