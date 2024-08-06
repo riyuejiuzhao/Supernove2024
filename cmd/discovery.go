@@ -1,8 +1,9 @@
 package main
 
 import (
-	"Supernove2024/svr/register"
+	"Supernove2024/svr/discovery"
 	"Supernove2024/util"
+	"context"
 	"flag"
 )
 
@@ -17,5 +18,5 @@ func main() {
 	util.Info("redis password: %s", *redisPassword)
 	util.Info("redis db: %v", *redisDB)
 
-	register.SetupServer(*rpcAddress, *redisAddress, *redisPassword, *redisDB)
+	discovery.SetupServer(context.Background(), *rpcAddress, *redisAddress, *redisPassword, *redisDB)
 }
