@@ -14,7 +14,6 @@ import (
 	"github.com/go-redis/redis"
 	"google.golang.org/protobuf/proto"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 )
@@ -62,67 +61,6 @@ func SetupSvr() context.CancelFunc {
 	//等待服务器启动
 	time.Sleep(1 * time.Second)
 	return cancel
-}
-
-// 大量并发测试
-// 共计1万个实例
-func TestManyService(t *testing.T) {
-	serviceName := "testDiscovery"
-	serviceNum := 10
-	testData := make(map[string]map[string]*sdk.RegisterArgv)
-	instanceNum := 1000
-
-	for i := 0; i < serviceNum; i++ {
-		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
-		testData[nowServiceName] = RandomRegisterArgv(nowServiceName, instanceNum)
-	}
-
-	//链接并清空数据库
-	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
-	err := rdb.FlushDB().Err()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 从另一个协程启动
-	cancel := SetupSvr()
-	defer cancel()
-
-	config.GlobalConfigFilePath = "many_register.yaml"
-	api, err := sdk.NewRegisterAPI()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var wg sync.WaitGroup
-	//有10个服务
-	//每个服务一次性上100个
-	for _, si := range testData {
-		wg.Add(1)
-		go func(nowSi map[string]*sdk.RegisterArgv) {
-			defer wg.Done()
-			count := 0
-			for _, nowIi := range nowSi {
-				_, err := api.Register(nowIi)
-				if err != nil {
-					t.Error(err)
-				}
-				count += 1
-				if count%100 == 0 {
-					time.Sleep(time.Second)
-				}
-			}
-		}(si)
-	}
-	wg.Wait()
-	fmt.Println("所有服务注册结束")
-
-	time.Sleep(1 * time.Second)
-
-}
-
-func TestRWMutex(t *testing.T) {
-
 }
 
 func TestRouter(t *testing.T) {

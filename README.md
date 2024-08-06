@@ -465,3 +465,7 @@ HeartBeat只需要提供自身服务的InstanceID即可，服务器会更新Redi
 - test：测试代码
 - util：一些服务器和客户端都可能用到的通用组件
 - document：存放README用到的图片资源等
+
+## 优化项
+
+- FlushService刷新过程时间太长

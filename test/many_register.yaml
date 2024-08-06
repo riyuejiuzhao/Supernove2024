@@ -1,13 +1,21 @@
 Global:
   RegisterService:
     - Host: 127.0.0.1
+      Port: 8000
+    - Host: 127.0.0.1
       Port: 8001
-  DiscoverService:
     - Host: 127.0.0.1
       Port: 8002
-  HealthService:
     - Host: 127.0.0.1
       Port: 8003
+    - Host: 127.0.0.1
+      Port: 8004
+  DiscoverService:
+    - Host: 127.0.0.1
+      Port: 8100
+  HealthService:
+    - Host: 127.0.0.1
+      Port: 8200
   Register:
     DefaultWeight: 10
     DefaultTTL: 2

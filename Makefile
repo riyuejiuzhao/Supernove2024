@@ -14,4 +14,4 @@ pb:
 clean:
 	$(MAKE) -C proto $@
 
-.PHONY: pb test
+.PHONY: pb test cmd
