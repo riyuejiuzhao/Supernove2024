@@ -102,10 +102,6 @@ func TestManyService(t *testing.T) {
 	}
 
 	config.GlobalConfigFilePath = "many_register.yaml"
-	api, err := sdk.NewRegisterAPI()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	var wg sync.WaitGroup
 	//有10个服务
@@ -114,6 +110,10 @@ func TestManyService(t *testing.T) {
 	for _, si := range testData {
 		wg.Add(1)
 		go func(nowSi map[string]*sdk.RegisterArgv) {
+			api, err := sdk.NewRegisterAPI()
+			if err != nil {
+				t.Fatal(err)
+			}
 			defer wg.Done()
 			count := 0
 			for _, nowIi := range nowSi {
