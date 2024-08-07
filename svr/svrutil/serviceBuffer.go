@@ -1,5 +1,7 @@
 package svrutil
 
+/*
+
 import (
 	"Supernove2024/pb"
 	"Supernove2024/util"
@@ -37,10 +39,6 @@ func newInstanceMgr(serviceName string) *InstanceMgr {
 type DefaultServiceBuffer struct {
 	rwMutex sync.RWMutex
 	dict    map[string]*InstanceMgr
-}
-
-func InstanceAddress(host string, port int32) string {
-	return fmt.Sprintf("%v:%v", host, port)
 }
 
 func (m *DefaultServiceBuffer) FlushService(info *pb.ServiceInfo) {
@@ -216,3 +214,4 @@ type ServiceBuffer interface {
 	// RemoveInstance 删除一个Instance
 	RemoveInstance(serviceName string, host string, port int32, instanceID string) error
 }
+*/
