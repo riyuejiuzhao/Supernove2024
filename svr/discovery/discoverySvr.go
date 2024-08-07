@@ -71,41 +71,50 @@ func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest
 	return
 }
 
-func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (*pb.GetRoutersReply, error) {
+func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (reply *pb.GetRoutersReply, err error) {
+	defer func() {
+		if reply == nil {
+			return
+		}
+		util.Info("GetRouters: %v", reply)
+	}()
+
 	hash := svrutil.RouterHash(request.ServiceName)
 
-	err := s.FlushRouterBufferLocked(hash, request.ServiceName)
+	err = s.FlushRouterBufferLocked(hash, request.ServiceName)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	serviceInfo, ok := s.RouterBuffer.GetServiceRouter(request.ServiceName)
 	if !ok {
-		return &pb.GetRoutersReply{
+		reply = &pb.GetRoutersReply{
 			Router: &pb.ServiceRouterInfo{
 				ServiceName:   request.ServiceName,
 				Revision:      int64(0),
 				TargetRouters: make([]*pb.TargetRouterInfo, 0),
 				KVRouters:     make([]*pb.KVRouterInfo, 0),
 			},
-		}, nil
+		}
+		return
 	}
 
 	if serviceInfo.Revision == request.Revision {
-		return &pb.GetRoutersReply{
+		reply = &pb.GetRoutersReply{
 			Router: &pb.ServiceRouterInfo{
 				ServiceName:   request.ServiceName,
 				Revision:      request.Revision,
 				TargetRouters: make([]*pb.TargetRouterInfo, 0),
 				KVRouters:     make([]*pb.KVRouterInfo, 0),
 			},
-		}, nil
+		}
+		return
 	}
 
-	return &pb.GetRoutersReply{
+	reply = &pb.GetRoutersReply{
 		Router: serviceInfo,
-	}, nil
-
+	}
+	return
 }
 
 func SetupServer(ctx context.Context, address string, redisAddress string, redisPassword string, redisDB int) {

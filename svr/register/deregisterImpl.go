@@ -5,8 +5,6 @@ import (
 	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
-	"errors"
-	"fmt"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -40,17 +38,25 @@ func (r *Server) Deregister(_ context.Context,
 		return nil, err
 	}
 
+	serviceInfo, ok := r.InstanceBuffer.GetServiceInfo(request.ServiceName)
+	if !ok {
+		return &pb.DeregisterReply{}, nil
+	}
+	originRevision := serviceInfo.Revision
+
 	//删除本地缓存
 	err = r.InstanceBuffer.RemoveInstance(request.ServiceName,
 		request.Host, request.Port, request.InstanceID)
 	if err != nil {
 		return nil, err
 	}
-	serviceInfo, ok := r.InstanceBuffer.GetServiceInfo(request.ServiceName)
+	serviceInfo, ok = r.InstanceBuffer.GetServiceInfo(request.ServiceName)
 	if !ok {
-		err = errors.New(fmt.Sprintf("ServiceInfo丢失, name:%s", request.ServiceName))
-		util.Error("err: %v", err)
-		return nil, err
+		return &pb.DeregisterReply{}, nil
+	}
+
+	if originRevision == serviceInfo.Revision {
+		return &pb.DeregisterReply{}, nil
 	}
 
 	//写入redis

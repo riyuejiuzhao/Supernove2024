@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  register:
+    image: mini-router/register-svr
+    container_name: register-svr
+    command: "./myapp -rpc 0.0.0.0:8080 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
+  discovery:
+    image: mini-router/discovery-svr
+    container_name: discovery-svr
+    command: "./myapp -rpc 0.0.0.0:8080 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
+  health:
+    image: mini-router/health-svr
+    container_name: health-svr
+    command: "./myapp -rpc 0.0.0.0:8080 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
+
+networks:
+  mini-router-net:
+    driver: bridge

@@ -460,3 +460,12 @@ HeartBeat只需要提供自身服务的InstanceID即可，服务器会更新Redi
 - test：测试代码
 - util：一些服务器和客户端都可能用到的通用组件
 - document：存放README用到的图片资源等
+
+## 优化项
+
+- FlushService刷新过程时间太长，长时间锁定Redis会导致超时，即使增加服务器个数，也不能增加并发能力，因为Redis只有一个，
+每个服务占据分布式锁的时长肯定会受到限制的，
+说到底，每次注册都需要全量拉取数据，然后解析数据，实在是成本较高，尤其是数据量增大的情况下，分布式锁上锁的时间会覆盖下载，解析，更新，上传的整个过程
+放弃使用hash整个Service的Protobuf数据，更充分的利用redis本身的数据类型来优化。
+将ServiceInfo的每个InstanceInfo都储存为Hash的一个field
+然后为每个service新增一个Set，用来索引地址

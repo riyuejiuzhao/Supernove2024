@@ -18,8 +18,8 @@ type InstanceMgr struct {
 
 func (m *InstanceMgr) Reset(info *pb.ServiceInfo) {
 	m.ServiceInfo = info
-	clear(m.InstanceAddressDic)
-	clear(m.InstanceIDDic)
+	m.InstanceAddressDic = make(map[string]*pb.InstanceInfo)
+	m.InstanceIDDic = make(map[string]*pb.InstanceInfo)
 	for _, v := range info.Instances {
 		m.InstanceAddressDic[InstanceAddress(v.Host, v.Port)] = v
 		m.InstanceIDDic[v.InstanceID] = v

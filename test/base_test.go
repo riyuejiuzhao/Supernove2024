@@ -170,11 +170,21 @@ func TestRouter(t *testing.T) {
 	//注册路由
 	// src0 -> dst1
 	// key:key0 -> dst2
-	err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{SrcInstanceID: "src0", DstServiceName: dstService, DstInstanceID: "dst1"})
+	err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{
+		SrcInstanceID:  "src0",
+		DstServiceName: dstService,
+		DstInstanceID:  "dst1",
+		Timeout:        100,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{Key: "key0", DstServiceName: dstService, DstInstanceID: "dst2"})
+	err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
+		Key:            "key0",
+		DstServiceName: dstService,
+		DstInstanceID:  "dst2",
+		Timeout:        100,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,9 +420,13 @@ func doTestRegisterSvr(t *testing.T,
 	api sdk.RegisterAPI,
 	revisionInit int64,
 ) {
+	totalTime := time.Duration(0)
 	resultData := make(map[string]*sdk.RegisterArgv)
 	for address, v := range testData {
+		begin := time.Now()
 		result, err := api.Register(v)
+		end := time.Now()
+		totalTime += end.Sub(begin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -427,6 +441,7 @@ func doTestRegisterSvr(t *testing.T,
 		}
 		resultData[result.InstanceID] = v
 	}
+	t.Logf("平均时间 %v 秒", totalTime.Seconds()/float64(len(testData)))
 
 	//检查redis数据库是否全部写入了
 	revision, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.RevisionFiled).Int64()
@@ -495,7 +510,7 @@ func doTestRegisterSvr(t *testing.T,
 }
 
 func TestRegisterSvr(t *testing.T) {
-	serviceName := "testRegister"
+	serviceName := "testDiscovery"
 	instanceNum := 10
 
 	testData := RandomRegisterArgv(serviceName, instanceNum)
