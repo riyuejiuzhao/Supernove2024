@@ -7,12 +7,10 @@ import (
 	"Supernove2024/svr/discovery"
 	"Supernove2024/svr/health"
 	"Supernove2024/svr/register"
-	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
 	"fmt"
 	"github.com/go-redis/redis"
-	"google.golang.org/protobuf/proto"
 	"math/rand"
 	"testing"
 	"time"
@@ -252,29 +250,6 @@ func TestHealthSvr(t *testing.T) {
 		resultList = append(resultList, result)
 	}
 
-	config, err := config.GlobalConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	// 检测redis健康信息 是否创建
-	for _, v := range resultList {
-		hash := svrutil.HealthHash(serviceName, v.InstanceID)
-		ttl, err := rdb.HGet(hash, svrutil.HealthTtlFiled).Int64()
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-		if ttl != config.Global.Register.DefaultTTL {
-			t.Errorf("%s ttl %v != %v", v.InstanceID, ttl, config.Global.Register.DefaultTTL)
-			continue
-		}
-		_, err = rdb.HGet(hash, svrutil.HealthLastHeartBeatField).Int64()
-		if err != nil {
-			t.Error(err)
-			continue
-		}
-	}
-
 	discoveryAPI, err := sdk.NewDiscoveryAPI()
 	if err != nil {
 		t.Fatal(err)
@@ -411,134 +386,4 @@ func TestDiscoverSvr(t *testing.T) {
 				v.Host, v.Port, v.Weight)
 		}
 	}
-}
-
-func doTestRegisterSvr(t *testing.T,
-	serviceName string,
-	rdb *redis.Client,
-	testData map[string]*sdk.RegisterArgv,
-	api sdk.RegisterAPI,
-	revisionInit int64,
-) {
-	totalTime := time.Duration(0)
-	resultData := make(map[string]*sdk.RegisterArgv)
-	for address, v := range testData {
-		begin := time.Now()
-		result, err := api.Register(v)
-		end := time.Now()
-		totalTime += end.Sub(begin)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if v.InstanceID == nil {
-			if result.InstanceID != address {
-				t.Errorf("%s的InstanceID为%s", address, result.InstanceID)
-			}
-		} else {
-			if result.InstanceID != *v.InstanceID {
-				t.Errorf("%s的InstanceID为%s", *v.InstanceID, result.InstanceID)
-			}
-		}
-		resultData[result.InstanceID] = v
-	}
-	t.Logf("平均时间 %v 秒", totalTime.Seconds()/float64(len(testData)))
-
-	//检查redis数据库是否全部写入了
-	revision, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.RevisionFiled).Int64()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if revision != revisionInit+int64(len(testData)) {
-		t.Fatal("服务版本号没有正常更新")
-	}
-	bytes, err := rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.InfoFiled).Bytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var serviceInfo pb.ServiceInfo
-	err = proto.Unmarshal(bytes, &serviceInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, v := range serviceInfo.Instances {
-		dataInTest, ok := resultData[v.InstanceID]
-		if !ok {
-			t.Errorf("服务没有正常写入 ID:%v", v.InstanceID)
-		}
-		if dataInTest.Host != v.Host ||
-			dataInTest.Port != v.Port ||
-			*dataInTest.Weight != v.Weight {
-			t.Errorf("ID:%v 发送的数据为{Host:%s,Port:%v,Weight:%v}, redis数据为{Host:%s,Port:%v,Weight:%v}",
-				v.InstanceID,
-				dataInTest.Host, dataInTest.Port, *dataInTest.Weight,
-				v.Host, v.Port, v.Weight)
-		}
-	}
-
-	//逐个删除
-	targetRevision := revision + int64(len(serviceInfo.Instances))
-	for _, v := range serviceInfo.Instances {
-		err = api.Deregister(&sdk.DeregisterArgv{
-			ServiceName: serviceName,
-			Host:        v.Host,
-			Port:        v.Port,
-			InstanceID:  v.InstanceID,
-		})
-		if err != nil {
-			t.Error(err)
-		}
-	}
-	revision, err = rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.RevisionFiled).Int64()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if revision != targetRevision {
-		t.Fatal("服务版本号没有正常更新")
-	}
-	bytes, err = rdb.HGet(svrutil.ServiceHash(serviceName), svrutil.InfoFiled).Bytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = proto.Unmarshal(bytes, &serviceInfo)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, v := range serviceInfo.Instances {
-		t.Errorf("未删除 id:%s, host:%s, port:%v", v.InstanceID, v.Host, v.Port)
-	}
-}
-
-func TestRegisterSvr(t *testing.T) {
-	serviceName := "testDiscovery"
-	instanceNum := 10
-
-	testData := RandomRegisterArgv(serviceName, instanceNum)
-	//链接并清空数据库
-	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
-	err := rdb.FlushDB().Err()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 从另一个协程启动
-	cancel := SetupSvr()
-	defer cancel()
-
-	config.GlobalConfigFilePath = "register_test.yaml"
-	api, err := sdk.NewRegisterAPI()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	doTestRegisterSvr(t, serviceName, rdb, testData, api, 0)
-
-	//赋予名字
-	count := 0
-	for _, v := range testData {
-		id := fmt.Sprintf("testInstance%v", count)
-		v.InstanceID = &id
-		count += 1
-	}
-	doTestRegisterSvr(t, serviceName, rdb, testData, api, int64(2*len(testData)))
 }

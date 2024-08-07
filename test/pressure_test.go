@@ -6,13 +6,9 @@ import (
 	"Supernove2024/svr/discovery"
 	"Supernove2024/svr/health"
 	"Supernove2024/svr/register"
-	"Supernove2024/svr/svrutil"
-	"Supernove2024/util"
 	"context"
 	"fmt"
 	"github.com/go-redis/redis"
-	"github.com/go-redsync/redsync/v4"
-	"github.com/go-redsync/redsync/v4/redis/goredis"
 	"math/rand"
 	"sync"
 	"testing"
@@ -43,31 +39,6 @@ func RandomInstanceGlobal(serviceName string, instanceNum int) map[string]*sdk.R
 	return testData
 }
 
-// 确定是不是Redis的瓶颈
-func TestRedis(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
-	pool := goredis.NewPool(rdb)
-	rs := redsync.New(pool)
-
-	for i := 0; i < 100000; i++ {
-		go func() {
-			mutex := rs.NewMutex("lock")
-			err := mutex.Lock()
-			if err != nil {
-				util.Error("lock redis failed err:%v", err)
-				return
-			}
-			defer svrutil.TryUnlock(mutex)
-
-			err = rdb.HSet("testKey", "testField", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").Err()
-			if err != nil {
-				util.Error("redis err: %v", err)
-				return
-			}
-		}()
-	}
-}
-
 // 大量并发测试
 // 共计1万个实例
 func TestManyService(t *testing.T) {
@@ -77,6 +48,11 @@ func TestManyService(t *testing.T) {
 	go register.SetupServer(ctx, "127.0.0.1:8002", "9.134.93.168:6380", "SDZsdz2000", 0)
 	go register.SetupServer(ctx, "127.0.0.1:8003", "9.134.93.168:6380", "SDZsdz2000", 0)
 	go register.SetupServer(ctx, "127.0.0.1:8004", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go register.SetupServer(ctx, "127.0.0.1:8005", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go register.SetupServer(ctx, "127.0.0.1:8006", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go register.SetupServer(ctx, "127.0.0.1:8007", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go register.SetupServer(ctx, "127.0.0.1:8008", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go register.SetupServer(ctx, "127.0.0.1:8009", "9.134.93.168:6380", "SDZsdz2000", 0)
 	go discovery.SetupServer(ctx, "127.0.0.1:8100", "9.134.93.168:6380", "SDZsdz2000", 0)
 	go health.SetupServer(ctx, "127.0.0.1:8200", "9.134.93.168:6380", "SDZsdz2000", 0)
 	defer cancel()
@@ -102,18 +78,15 @@ func TestManyService(t *testing.T) {
 	}
 
 	config.GlobalConfigFilePath = "many_register.yaml"
+	api, err := sdk.NewRegisterAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var wg sync.WaitGroup
-	//有10个服务
-	//每个服务一次性上100个
-	//总的加起来就是一次性上1000个
 	for _, si := range testData {
 		wg.Add(1)
 		go func(nowSi map[string]*sdk.RegisterArgv) {
-			api, err := sdk.NewRegisterAPI()
-			if err != nil {
-				t.Fatal(err)
-			}
 			defer wg.Done()
 			count := 0
 			for _, nowIi := range nowSi {
@@ -126,7 +99,7 @@ func TestManyService(t *testing.T) {
 					}
 				}()
 				count += 1
-				if count%100 == 0 {
+				if count%200 == 0 {
 					time.Sleep(time.Second)
 				}
 			}

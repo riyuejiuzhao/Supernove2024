@@ -10,6 +10,16 @@ Global:
       Port: 8003
     - Host: 127.0.0.1
       Port: 8004
+    - Host: 127.0.0.1
+      Port: 8005
+    - Host: 127.0.0.1
+      Port: 8006
+    - Host: 127.0.0.1
+      Port: 8007
+    - Host: 127.0.0.1
+      Port: 8008
+    - Host: 127.0.0.1
+      Port: 8009
   DiscoverService:
     - Host: 127.0.0.1
       Port: 8100

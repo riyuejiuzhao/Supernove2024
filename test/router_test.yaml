@@ -10,7 +10,7 @@ Global:
       Port: 8003
   Register:
     DefaultWeight: 10
-    DefaultTTL: 2
+    DefaultTTL: 20000
   Discovery:
     DefaultTimeout: 1
     DstService:
