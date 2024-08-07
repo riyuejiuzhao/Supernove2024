@@ -2,13 +2,14 @@ package sdk
 
 import (
 	"Supernove2024/pb"
+	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
 	"context"
 )
 
 type RegisterCli struct {
-	APIContext
+	*APIContext
 }
 
 type RegisterArgv struct {
@@ -156,10 +157,20 @@ type RegisterAPI interface {
 	AddKVRouter(argv *AddKVRouterArgv) error
 }
 
+func NewRegisterAPIStandalone(
+	config *config.Config,
+	conn connMgr.ConnManager,
+) RegisterAPI {
+	ctx := NewAPIContextStandalone(config, conn)
+	return &RegisterCli{
+		APIContext: ctx,
+	}
+}
+
 func NewRegisterAPI() (RegisterAPI, error) {
 	ctx, err := NewAPIContext()
 	if err != nil {
 		return nil, err
 	}
-	return &RegisterCli{*ctx}, nil
+	return &RegisterCli{ctx}, nil
 }

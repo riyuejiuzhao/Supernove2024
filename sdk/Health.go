@@ -2,12 +2,13 @@ package sdk
 
 import (
 	"Supernove2024/pb"
+	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 	"context"
 )
 
 type HealthCli struct {
-	APIContext
+	*APIContext
 }
 
 type HeartBeatArgv struct {
@@ -39,10 +40,20 @@ type HealthAPI interface {
 	HeartBeat(*HeartBeatArgv) error
 }
 
+func NewHealthAPIStandalone(
+	config *config.Config,
+	conn connMgr.ConnManager,
+) HealthAPI {
+	ctx := NewAPIContextStandalone(config, conn)
+	return &HealthCli{
+		APIContext: ctx,
+	}
+}
+
 func NewHealthAPI() (HealthAPI, error) {
 	ctx, err := NewAPIContext()
 	if err != nil {
 		return nil, err
 	}
-	return &HealthCli{*ctx}, nil
+	return &HealthCli{ctx}, nil
 }

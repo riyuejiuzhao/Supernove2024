@@ -41,7 +41,7 @@ func GlobalConfig() (*Config, error) {
 	if globalConfig != nil {
 		return globalConfig, nil
 	}
-	config, err := loadConfig()
+	config, err := LoadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +49,8 @@ func GlobalConfig() (*Config, error) {
 	return globalConfig, nil
 }
 
-// 从文件中读取配置
-func loadConfig(configFileOpts ...string) (*Config, error) {
+// LoadConfig 从文件中读取配置
+func LoadConfig(configFileOpts ...string) (*Config, error) {
 	configFile := GlobalConfigFilePath
 	if len(configFileOpts) == 1 {
 		configFile = configFileOpts[0]

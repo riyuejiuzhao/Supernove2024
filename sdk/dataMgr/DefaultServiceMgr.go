@@ -174,7 +174,7 @@ func (m *DefaultServiceMgr) flushRouter(buffer *ServiceRouterBuffer) {
 		return
 	}
 	if reply.Router.Revision == request.Revision {
-		util.Info("无需更新本地路由缓存 %v", request.Revision)
+		//util.Info("无需更新本地路由缓存 %v", request.Revision)
 		return
 	}
 

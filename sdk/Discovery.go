@@ -2,6 +2,8 @@ package sdk
 
 import (
 	"Supernove2024/pb"
+	"Supernove2024/sdk/config"
+	"Supernove2024/sdk/connMgr"
 	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/util"
 	"errors"
@@ -28,7 +30,7 @@ func (r *GetInstancesResult) GetInstance() []*pb.InstanceInfo {
 }
 
 type DiscoveryCli struct {
-	APIContext
+	*APIContext
 	dataMgr dataMgr.ServiceDataManager
 }
 
@@ -176,6 +178,18 @@ type DiscoveryAPI interface {
 	ProcessRouter(*ProcessRouterArgv) (*ProcessRouterResult, error)
 }
 
+func NewDiscoveryAPIStandalone(
+	config *config.Config,
+	conn connMgr.ConnManager,
+	mgr dataMgr.ServiceDataManager,
+) DiscoveryAPI {
+	ctx := NewAPIContextStandalone(config, conn)
+	return &DiscoveryCli{
+		APIContext: ctx,
+		dataMgr:    mgr,
+	}
+}
+
 func NewDiscoveryAPI() (DiscoveryAPI, error) {
 	ctx, err := NewAPIContext()
 	if err != nil {
@@ -185,5 +199,5 @@ func NewDiscoveryAPI() (DiscoveryAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DiscoveryCli{*ctx, dataManager}, nil
+	return &DiscoveryCli{ctx, dataManager}, nil
 }

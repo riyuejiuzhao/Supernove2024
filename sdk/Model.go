@@ -12,6 +12,13 @@ type APIContext struct {
 	ConnManager connMgr.ConnManager
 }
 
+func NewAPIContextStandalone(config *config.Config, conn connMgr.ConnManager) *APIContext {
+	return &APIContext{
+		Config:      config,
+		ConnManager: conn,
+	}
+}
+
 func NewAPIContext() (*APIContext, error) {
 	globalConfig, err := config.GlobalConfig()
 	if err != nil {

@@ -23,7 +23,7 @@ func newAddressPoolDic(serviceConfig []config.InstanceConfig) AddressPoolDic {
 			util.Error("创建连接池失败，地址：%s, err:%v", address, err)
 			continue
 		}
-		util.Info("创建连接池，地址: %s", address)
+		//util.Info("创建连接池，地址: %s", address)
 		poolDic[address] = p
 	}
 	return poolDic
@@ -37,7 +37,7 @@ func newDefaultConnManager(config *config.Config) ConnManager {
 		config.Global.RegisterService)
 	poolDic[HealthCheck] = newAddressPoolDic(
 		config.Global.HealthService)
-	util.Info("初始化GrpcConnManager成功")
+	//util.Info("初始化GrpcConnManager成功")
 	return &DefaultConnManager{poolDic: poolDic}
 }
 
@@ -62,7 +62,7 @@ func (m *DefaultConnManager) GetConn(service ServiceType, address string) (pool.
 		if err != nil {
 			return nil, err
 		}
-		util.Info("创建连接池 %s", address)
+		//util.Info("创建连接池 %s", address)
 		m.poolDic[service][address] = newPool
 		p = newPool
 	}
