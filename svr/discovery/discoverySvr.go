@@ -6,6 +6,7 @@ import (
 	"Supernove2024/util"
 	"context"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"net"
 )
@@ -15,59 +16,69 @@ type Server struct {
 	pb.UnimplementedDiscoveryServiceServer
 }
 
-func (s *Server) GetServices(_ context.Context, _ *pb.GetServicesRequest) (*pb.GetServicesReply, error) {
-	nowKeys, c, err := s.Rdb.Scan(0, svrutil.ServiceHash("*"), 1000).Result()
-	if err != nil {
-		return nil, err
-	}
-	keys := util.Map(nowKeys, svrutil.ServiceHashToServiceName)
-	for c != 0 {
-		nowKeys, c, err = s.Rdb.Scan(0, svrutil.ServiceHash("*"), 1000).Result()
-		keys = append(keys, util.Map(nowKeys, svrutil.ServiceHashToServiceName)...)
-	}
-	return &pb.GetServicesReply{ServiceName: keys}, nil
-}
-
 func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (reply *pb.GetInstancesReply, err error) {
 	hash := svrutil.ServiceHash(request.ServiceName)
-
 	reply = nil
-	err = s.FlushServiceBufferLocked(hash, request.ServiceName)
-	if err != nil {
-		return
-	}
 	//汇报报文
 	defer func() { util.Info("GetInstancesReply:%v", reply) }()
 
-	serviceInfo, ok := s.InstanceBuffer.GetServiceInfo(request.ServiceName)
-	if !ok {
-		reply = &pb.GetInstancesReply{
-			Service: &pb.ServiceInfo{
-				ServiceName: request.ServiceName,
-				Revision:    int64(0),
-				Instances:   make([]*pb.InstanceInfo, 0),
-			},
+	allResult := make([][]string, 0, 10)
+	count := 0
+	revision := int64(0)
+	err = func() error {
+		mutex, err := s.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
+		if err != nil {
+			util.Error("lock redis failed err:%v", err)
+			return err
 		}
-		err = nil
+		defer svrutil.TryUnlock(mutex)
+
+		revision, err = s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
+		if request.Revision == revision {
+			return err
+		}
+
+		cursor := uint64(0)
+		result, cursor, err := s.Rdb.HScan(hash, cursor, svrutil.InfoFieldMatch, 10000).Result()
+		if err != nil {
+			return err
+		}
+		allResult = append(allResult, result)
+		count = len(result)
+		for cursor != 0 {
+			result, cursor, err = s.Rdb.HScan(hash, cursor, svrutil.InfoFieldMatch, 10000).Result()
+			if err != nil {
+				return err
+			}
+			count += len(result)
+			allResult = append(allResult, result)
+		}
+		return nil
+	}()
+
+	if err != nil {
 		return
 	}
 
-	if serviceInfo.Revision == request.Revision {
-		err = nil
-		reply = &pb.GetInstancesReply{
-			Service: &pb.ServiceInfo{
-				ServiceName: request.ServiceName,
-				Revision:    request.Revision,
-				Instances:   make([]*pb.InstanceInfo, 0),
-			},
-		}
-		return
+	serviceInfo := &pb.ServiceInfo{
+		ServiceName: request.ServiceName,
+		Revision:    revision,
+		Instances:   make([]*pb.InstanceInfo, 0, count),
 	}
 
-	err = nil
-	reply = &pb.GetInstancesReply{
-		Service: serviceInfo,
+	for i := 0; i < len(allResult); i += 1 {
+		nowResult := allResult[i]
+		for j := 0; j < len(nowResult); j += 2 {
+			bytes := []byte(nowResult[j+1])
+			instance := &pb.InstanceInfo{}
+			err = proto.Unmarshal(bytes, instance)
+			if err != nil {
+				return
+			}
+			serviceInfo.Instances = append(serviceInfo.Instances, instance)
+		}
 	}
+	reply = &pb.GetInstancesReply{Service: serviceInfo}
 	return
 }
 

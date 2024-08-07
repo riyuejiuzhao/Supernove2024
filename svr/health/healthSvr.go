@@ -5,12 +5,11 @@ import (
 	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
-	"errors"
-	"fmt"
 	"github.com/go-redis/redis"
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -22,34 +21,49 @@ type Server struct {
 // GetHealthInfo 同步健康数据
 func (s *Server) GetHealthInfo(_ context.Context,
 	req *pb.GetHealthInfoRequest,
-) (*pb.GetHealthInfoReply, error) {
-	//批量获取ID
-	hash := svrutil.ServiceHash(req.ServiceName)
-	err := s.FlushServiceBufferLocked(hash, req.ServiceName)
+) (reply *pb.GetHealthInfoReply, err error) {
+	match := svrutil.HealthHash(req.ServiceName, "*")
+	prefix := svrutil.HealthHash(req.ServiceName, "")
+	reply = nil
+
+	cursor := uint64(0)
+	allResult := make([][]string, 0)
+	result, cursor, err := s.Rdb.Scan(cursor, match, 10000).Result()
+	allResult = append(allResult, result)
+	count := len(result)
 	if err != nil {
-		return nil, err
+		return
+	}
+	for cursor != 0 {
+		result, cursor, err = s.Rdb.Scan(cursor, match, 10000).Result()
+		if err != nil {
+			return
+		}
+		allResult = append(allResult, result)
+		count += len(result)
 	}
 
-	serviceInfo, ok := s.InstanceBuffer.GetServiceInfo(req.ServiceName)
-	if !ok {
-		return nil, errors.New(fmt.Sprintf("没有对应服务%v的健康数据", req.ServiceName))
+	allInstances := make([]string, 0, count)
+	for _, r := range allResult {
+		for _, i := range r {
+			allInstances = append(allInstances, strings.TrimPrefix(i, prefix))
+		}
 	}
-
-	instanceInfos := make([]*pb.InstanceHealthInfo, 0, len(serviceInfo.Instances))
-	nowTtlSlice := make([]*redis.StringCmd, 0, len(serviceInfo.Instances))
-	nowHeatBeatSlice := make([]*redis.StringCmd, 0, len(serviceInfo.Instances))
-	txPipeline := s.Rdb.TxPipeline()
-	for _, instance := range serviceInfo.Instances {
-		hash := svrutil.HealthHash(req.ServiceName, instance.InstanceID)
-		nowTtlSlice = append(nowTtlSlice, txPipeline.HGet(hash, svrutil.HealthTtlFiled))
-		nowHeatBeatSlice = append(nowHeatBeatSlice, txPipeline.HGet(hash, svrutil.HealthLastHeartBeatField))
+	instanceInfos := make([]*pb.InstanceHealthInfo, 0, count)
+	nowTtlSlice := make([]*redis.StringCmd, 0, count)
+	nowHeatBeatSlice := make([]*redis.StringCmd, 0, count)
+	pipeline := s.Rdb.Pipeline()
+	for _, instance := range allInstances {
+		hash := svrutil.HealthHash(req.ServiceName, instance)
+		nowTtlSlice = append(nowTtlSlice, pipeline.HGet(hash, svrutil.HealthTtlFiled))
+		nowHeatBeatSlice = append(nowHeatBeatSlice, pipeline.HGet(hash, svrutil.HealthLastHeartBeatField))
 	}
-	_, err = txPipeline.Exec()
+	_, err = pipeline.Exec()
 	if err != nil {
 		util.Error("%v", err)
 		return nil, err
 	}
-	for j, ins := range serviceInfo.Instances {
+	for j, ins := range allInstances {
 		ttl, err := nowTtlSlice[j].Int64()
 		if err != nil {
 			util.Error("get ttl err: %v", err)
@@ -60,8 +74,8 @@ func (s *Server) GetHealthInfo(_ context.Context,
 			util.Error("get lastHeartBeat err: %v", err)
 			continue
 		}
-		instanceInfos = append(instanceInfos, &pb.InstanceHealthInfo{InstanceID: ins.InstanceID,
-			TTL: ttl, LastHeartBeat: heartBeat})
+		instanceInfos = append(instanceInfos, &pb.InstanceHealthInfo{
+			InstanceID: ins, TTL: ttl, LastHeartBeat: heartBeat})
 	}
 	return &pb.GetHealthInfoReply{HealthInfo: &pb.ServiceHealthInfo{ServiceName: req.ServiceName, InstanceHealthInfo: instanceInfos}}, err
 }

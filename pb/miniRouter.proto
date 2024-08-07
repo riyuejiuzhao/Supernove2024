@@ -100,13 +100,6 @@ message GetInstancesReply{
   ServiceInfo service = 1;
 }
 
-message GetServicesRequest{
-}
-
-message GetServicesReply{
-  repeated string ServiceName = 1;
-}
-
 message GetRoutersRequest{
   string ServiceName = 1;
   int64 Revision = 2;
@@ -117,7 +110,6 @@ message GetRoutersReply{
 }
 
 service DiscoveryService{
-  rpc GetServices(GetServicesRequest) returns(GetServicesReply){}
   rpc GetInstances(GetInstancesRequest) returns (GetInstancesReply){}
   rpc GetRouters(GetRoutersRequest) returns (GetRoutersReply){}
 }

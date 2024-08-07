@@ -6,7 +6,7 @@ import (
 	"Supernove2024/util"
 	"context"
 	"errors"
-	"fmt"
+	"github.com/go-redis/redis"
 	"google.golang.org/protobuf/proto"
 	"time"
 )
@@ -28,70 +28,71 @@ func (c *RegisterContext) GetServiceHash() string {
 func (r *Server) Register(
 	_ context.Context,
 	request *pb.RegisterRequest,
-) (*pb.RegisterReply, error) {
+) (reply *pb.RegisterReply, err error) {
+	reply = nil
 	address := svrutil.InstanceAddress(request.Host, request.Port)
 	hash := svrutil.ServiceHash(request.ServiceName)
+	set := svrutil.ServiceSet(request.ServiceName)
+	var instanceID string
+	if request.InstanceID != nil {
+		instanceID = *request.InstanceID
+	} else {
+		instanceID = address
+	}
 
 	mutex, err := r.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
 	if err != nil {
 		util.Error("lock redis failed err:%v", err)
-		return nil, err
+		return
 	}
 	defer svrutil.TryUnlock(mutex)
 
-	err = r.FlushServiceBuffer(hash, request.ServiceName)
-	if err != nil {
-		util.Error("flush buffer failed err:%v", err)
-		return nil, err
-	}
-
-	instanceInfo, ok := r.InstanceBuffer.GetInstanceByAddress(request.ServiceName, address)
-	if ok {
-		//如果存在那么直接返回数据，不进行修改
-		return nil, errors.New("该地址已经被注册了")
-	}
-	if request.InstanceID != nil {
-		instanceInfo, ok = r.InstanceBuffer.GetInstanceByID(request.ServiceName, *request.InstanceID)
-		if ok {
-			return nil, errors.New("该ID已经被注册了")
+	pipeline := r.Rdb.Pipeline()
+	revisionCmd := pipeline.HGet(hash, svrutil.RevisionFiled)
+	sIsMemCmd := pipeline.SIsMember(set, address)
+	hExistCmd := pipeline.HExists(hash, instanceID)
+	_, err = pipeline.Exec()
+	var revision int64
+	if errors.Is(err, redis.Nil) {
+		revision = 0
+	} else if err != nil {
+		return
+	} else {
+		if sIsMemCmd.Val() || hExistCmd.Val() {
+			err = errors.New("实例已经存在")
+			return
 		}
+		revision, err = revisionCmd.Int64()
+		if err != nil {
+			return
+		}
+		revision += 1
 	}
 
-	//如果不存在，那么添加新实例
-	instanceInfo = r.InstanceBuffer.AddInstance(request.ServiceName, request.Host, request.Port, request.Weight, request.InstanceID)
-	//获取调整后的结果
-	serviceInfo, ok := r.InstanceBuffer.GetServiceInfo(request.ServiceName)
-	if !ok {
-		err = errors.New(fmt.Sprintf("没有成功创建ServiceInfo, name:%s", request.ServiceName))
-		util.Error("err: %v", err)
-		return nil, err
+	instanceInfo := &pb.InstanceInfo{
+		InstanceID: instanceID,
+		Host:       request.Host,
+		Port:       request.Port,
+		Weight:     request.Weight,
 	}
 
+	bytes, err := proto.Marshal(instanceInfo)
+	if err != nil {
+		return
+	}
 	//写入redis 数据和第一次的健康信息
-	healthKey := svrutil.HealthHash(serviceInfo.ServiceName, instanceInfo.InstanceID)
-	bytes, err := proto.Marshal(serviceInfo)
-	if err != nil {
-		util.Error("err: %v", err)
-		return nil, err
-	}
-	//这里需要给健康信息也上锁
-	healthMutex, err := r.LockRedis(svrutil.HealthInfoLockName(request.ServiceName))
-	if err != nil {
-		util.Error("create lock err:%v", err)
-		return nil, err
-	}
-	defer svrutil.TryUnlock(healthMutex)
-	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(hash, svrutil.RevisionFiled, serviceInfo.Revision)
-	txPipeline.HSet(hash, svrutil.InfoFiled, bytes)
+	healthKey := svrutil.HealthHash(request.ServiceName, instanceInfo.InstanceID)
+	pipeline = r.Rdb.Pipeline()
+	pipeline.HSet(hash, svrutil.RevisionFiled, revision)
+	pipeline.HSet(hash, svrutil.InstanceIDFiled(instanceID), bytes)
 	// 健康信息
-	txPipeline.HSet(healthKey, svrutil.HealthLastHeartBeatField, time.Now().Unix())
-	txPipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
-	_, err = txPipeline.Exec()
+	pipeline.HSet(healthKey, svrutil.HealthLastHeartBeatField, time.Now().Unix())
+	pipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
+	_, err = pipeline.Exec()
 	if err != nil {
-		return nil, err
+		return
 	}
-	util.Info("更新redis: %s, %v", serviceInfo.ServiceName, serviceInfo.Revision)
-
-	return &pb.RegisterReply{InstanceID: instanceInfo.InstanceID}, nil
+	util.Info("更新redis: %s, %v", request.ServiceName, revision)
+	reply = &pb.RegisterReply{InstanceID: instanceInfo.InstanceID}
+	return
 }

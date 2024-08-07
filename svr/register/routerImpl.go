@@ -94,12 +94,6 @@ func (r *Server) AddRouter(_ context.Context, request *pb.AddRouterRequest) (*pb
 	}
 	defer svrutil.TryUnlock(mutex)
 
-	err = r.FlushRouterBuffer(hash, request.ServiceName)
-	if err != nil {
-		util.Error("flush buffer failed err:%v", err)
-		return nil, err
-	}
-
 	switch request.RouterType {
 	case util.KVRouterType:
 		return r.AddKVRouter(hash, request)
@@ -180,7 +174,7 @@ func (r *Server) RemoveRouter(_ context.Context, request *pb.RemoveRouterRequest
 	defer svrutil.TryUnlock(mutex)
 
 	//更新缓存
-	err = r.FlushServiceBuffer(hash, request.ServiceName)
+	err = r.FlushRouterBuffer(hash, request.ServiceName)
 	if err != nil {
 		return nil, err
 	}

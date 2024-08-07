@@ -9,24 +9,26 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis"
 	"google.golang.org/protobuf/proto"
-	"strings"
 )
 
 const (
 	//健康信息 redis key
 	HealthHashKey            = "Hash.Health"
-	HealthLockKey            = "HealthLock"
 	HealthTtlFiled           = "TTL"
 	HealthLastHeartBeatField = "LastHeartBeat"
+
 	//服务信息 redis key
 	ServiceHashKey = "Hash.Service"
+	ServiceSetKey  = "Set.Service"
 	ServiceLockKey = "ServiceLock"
+
 	//路由信息
 	RouterHashKey = "Hash.Router"
 	RouterLockKey = "RouterLock"
 
-	InfoFiled     = "Info"
-	RevisionFiled = "Revision"
+	InfoFiled      = "Info"
+	InfoFieldMatch = "Info.*"
+	RevisionFiled  = "Revision"
 )
 
 func TryUnlock(mutex *redsync.Mutex) {
@@ -45,16 +47,23 @@ type BaseServer struct {
 // BufferServer 带数据缓存的服务器
 type BufferServer struct {
 	*BaseServer
-	InstanceBuffer ServiceBuffer
-	RouterBuffer   RouterBuffer
+	RouterBuffer RouterBuffer
 }
 
 func ServiceHash(serviceName string) string {
 	return fmt.Sprintf("%s.%s", ServiceHashKey, serviceName)
 }
 
-func ServiceHashToServiceName(hash string) string {
-	return strings.TrimPrefix(hash, ServiceHashKey)
+func ServiceSet(serviceName string) string {
+	return fmt.Sprintf("%s.%s", ServiceSetKey, serviceName)
+}
+
+func InstanceIDFiled(instanceID string) string {
+	return fmt.Sprintf("%s.%s", InfoFiled, instanceID)
+}
+
+func InstanceAddress(host string, port int32) string {
+	return fmt.Sprintf("%v:%v", host, port)
 }
 
 func HealthHash(serviceName string, instanceID string) string {
@@ -74,11 +83,6 @@ func RouterInfoLockName(serviceName string) string {
 	return fmt.Sprintf("%s.%s", RouterLockKey, serviceName)
 }
 
-// HealthInfoLockName 对一个资源的分布式锁命名
-func HealthInfoLockName(serviceName string) string {
-	return fmt.Sprintf("%s.%s", HealthLockKey, serviceName)
-}
-
 func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseServer {
 	//链接redis
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddress, Password: redisPassword, DB: redisDB})
@@ -92,9 +96,8 @@ func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseSer
 
 func NewBufferSvr(redisAddress string, redisPassword string, redisDB int) *BufferServer {
 	return &BufferServer{
-		BaseServer:     NewBaseSvr(redisAddress, redisPassword, redisDB),
-		InstanceBuffer: NewServiceBuffer(),
-		RouterBuffer:   NewRouterBuffer(),
+		BaseServer:   NewBaseSvr(redisAddress, redisPassword, redisDB),
+		RouterBuffer: NewRouterBuffer(),
 	}
 }
 
@@ -137,49 +140,6 @@ func (r *BufferServer) FlushRouterBuffer(hash string, service string) error {
 		}
 		r.RouterBuffer.FlushService(routerInfo)
 		util.Info("刷新服务器路由缓存: %s,%v->%v", routerInfo.ServiceName, originRevision, redisRevision)
-	}
-	return nil
-}
-
-func (r *BufferServer) FlushServiceBufferLocked(hash string, service string) error {
-	mutex, err := r.LockRedis(ServiceInfoLockName(service))
-	if err != nil {
-		return err
-	}
-	defer TryUnlock(mutex)
-	err = r.FlushServiceBuffer(hash, service)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// FlushServiceBuffer 如果Revision和Redis不同就刷新
-func (r *BufferServer) FlushServiceBuffer(hash string, service string) error {
-	redisRevision, err := r.Rdb.HGet(hash, RevisionFiled).Int64()
-	if errors.Is(err, redis.Nil) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	serviceInfo, ok := r.InstanceBuffer.GetServiceInfo(service)
-	if !ok || serviceInfo.Revision != redisRevision {
-		originRevision := int64(0)
-		if ok {
-			originRevision = serviceInfo.Revision
-		}
-		//需要更新本地缓存
-		infoBytes, err := r.Rdb.HGet(hash, InfoFiled).Bytes()
-		if err != nil {
-			return err
-		}
-		serviceInfo = &pb.ServiceInfo{}
-		err = proto.Unmarshal(infoBytes, serviceInfo)
-		if err != nil {
-			return err
-		}
-		r.InstanceBuffer.FlushService(serviceInfo)
-		util.Info("刷新服务器缓存: %s,%v->%v", serviceInfo.ServiceName, originRevision, redisRevision)
 	}
 	return nil
 }
