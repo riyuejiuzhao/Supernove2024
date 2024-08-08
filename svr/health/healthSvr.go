@@ -14,7 +14,7 @@ import (
 )
 
 type Server struct {
-	*svrutil.BufferServer
+	*svrutil.BaseServer
 	pb.UnimplementedHealthServiceServer
 }
 
@@ -96,7 +96,7 @@ func SetupServer(ctx context.Context, address string, redisAddress string, redis
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterHealthServiceServer(grpcServer,
-		&Server{BufferServer: svrutil.NewBufferSvr(redisAddress, redisPassword, redisDB)})
+		&Server{BaseServer: svrutil.NewBaseSvr(redisAddress, redisPassword, redisDB)})
 	go func() {
 		<-ctx.Done()
 		grpcServer.GracefulStop()

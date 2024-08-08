@@ -5,8 +5,6 @@ import (
 	"Supernove2024/svr/svrutil"
 	"Supernove2024/util"
 	"context"
-	"errors"
-	"github.com/go-redis/redis"
 	"google.golang.org/protobuf/proto"
 	"time"
 )
@@ -32,7 +30,6 @@ func (r *Server) Register(
 	reply = nil
 	address := svrutil.InstanceAddress(request.Host, request.Port)
 	hash := svrutil.ServiceHash(request.ServiceName)
-	set := svrutil.ServiceSet(request.ServiceName)
 	var instanceID string
 	if request.InstanceID != nil {
 		instanceID = *request.InstanceID
@@ -52,38 +49,15 @@ func (r *Server) Register(
 		return
 	}
 
-	err = func() error {
-		mutex, err := r.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
-		if err != nil {
-			util.Error("lock redis failed err:%v", err)
-			return err
-		}
-		defer svrutil.TryUnlock(mutex)
-
-		pipeline := r.Rdb.Pipeline()
-		sIsMemCmd := pipeline.SIsMember(set, address)
-		hExistCmd := pipeline.HExists(hash, instanceID)
-		_, err = pipeline.Exec()
-		if err != nil && !errors.Is(err, redis.Nil) {
-			return err
-		} else if sIsMemCmd.Val() || hExistCmd.Val() {
-			err = errors.New("实例已经存在")
-			return err
-		}
-		//写入redis 数据和第一次的健康信息
-		healthKey := svrutil.HealthHash(request.ServiceName, instanceInfo.InstanceID)
-		pipeline = r.Rdb.Pipeline()
-		pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
-		pipeline.HSet(hash, svrutil.InstanceIDFiled(instanceID), bytes)
-		// 健康信息
-		pipeline.HSet(healthKey, svrutil.HealthLastHeartBeatField, time.Now().Unix())
-		pipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
-		_, err = pipeline.Exec()
-		if err != nil {
-			return err
-		}
-		return nil
-	}()
+	//写入redis 数据和第一次的健康信息
+	healthKey := svrutil.HealthHash(request.ServiceName, instanceInfo.InstanceID)
+	pipeline := r.Rdb.Pipeline()
+	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
+	pipeline.HSet(hash, address, bytes)
+	// 健康信息
+	pipeline.HSet(healthKey, svrutil.HealthLastHeartBeatField, time.Now().Unix())
+	pipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
+	_, err = pipeline.Exec()
 	if err != nil {
 		return
 	}

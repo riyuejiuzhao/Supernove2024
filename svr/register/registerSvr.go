@@ -11,12 +11,11 @@ import (
 )
 
 type Server struct {
-	*svrutil.BufferServer
+	*svrutil.BaseServer
 	pb.UnimplementedRegisterServiceServer
 }
 
 func SetupServer(ctx context.Context, address string, redisAddress string, redisPassword string, redisDB int) {
-	baseSvr := svrutil.NewBufferSvr(redisAddress, redisPassword, redisDB)
 	//创建rpc服务器
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
@@ -29,7 +28,7 @@ func SetupServer(ctx context.Context, address string, redisAddress string, redis
 		util.Info("Stop grpc ser")
 	}()
 	pb.RegisterRegisterServiceServer(grpcServer,
-		&Server{BufferServer: baseSvr})
+		&Server{BaseServer: svrutil.NewBaseSvr(redisAddress, redisPassword, redisDB)})
 	if err = grpcServer.Serve(lis); err != nil {
 		log.Fatalln(err)
 	}

@@ -6,94 +6,54 @@ import (
 	"Supernove2024/util"
 	"context"
 	"errors"
-	"fmt"
 	"google.golang.org/protobuf/proto"
+	"time"
 )
 
 func (r *Server) AddKVRouter(hash string, request *pb.AddRouterRequest) (*pb.AddRouterReply, error) {
 	routerKvInfo := request.KvRouterInfo
-	_, ok := r.RouterBuffer.GetKVRouter(request.ServiceName, routerKvInfo.Key)
-	if ok {
-		return nil, errors.New("该路由已经被注册了")
-	}
-	//如果不存在，那么添加新实例
-	routerKvInfo = r.RouterBuffer.AddKVRouter(
-		request.ServiceName,
-		routerKvInfo.Key,
-		routerKvInfo.DstInstanceID,
-		routerKvInfo.Timeout)
-	//获取调整后的结果
-	routerInfo, ok := r.RouterBuffer.GetServiceRouter(request.ServiceName)
-	if !ok {
-		err := errors.New(fmt.Sprintf("没有成功创建ServiceInfo, name:%s", request.ServiceName))
-		util.Error("err: %v", err)
-		return nil, err
-	}
-
+	routerKvInfo.CreateTime = time.Now().Unix()
+	infoField := svrutil.RouterKVInfoField(routerKvInfo.Key)
 	//写入redis 数据和第一次的健康信息
-	bytes, err := proto.Marshal(routerInfo)
+	bytes, err := proto.Marshal(routerKvInfo)
 	if err != nil {
 		util.Error("err: %v", err)
 		return nil, err
 	}
-	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(hash, svrutil.RevisionFiled, routerInfo.Revision)
-	txPipeline.HSet(hash, svrutil.InfoFiled, bytes)
-	_, err = txPipeline.Exec()
+	pipeline := r.Rdb.Pipeline()
+	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
+	pipeline.HSet(hash, infoField, bytes)
+	_, err = pipeline.Exec()
 	if err != nil {
 		return nil, err
 	}
-	util.Info("更新redis路由: %s, %v", routerInfo.ServiceName, routerInfo.Revision)
+	util.Info("更新redis路由: %s", request.ServiceName)
 	return &pb.AddRouterReply{}, nil
 }
 
 func (r *Server) AddTargetRouter(hash string, request *pb.AddRouterRequest) (*pb.AddRouterReply, error) {
 	targetRouterInfo := request.TargetRouterInfo
-	_, ok := r.RouterBuffer.GetTargetRouter(request.ServiceName, targetRouterInfo.SrcInstanceID)
-	if ok {
-		return nil, errors.New("该路由已经被注册了")
-	}
-	//如果不存在，那么添加新实例
-	targetRouterInfo = r.RouterBuffer.AddTargetRouter(
-		request.ServiceName,
-		targetRouterInfo.SrcInstanceID,
-		targetRouterInfo.DstInstanceID,
-		targetRouterInfo.Timeout)
-	//获取调整后的结果
-	routerInfo, ok := r.RouterBuffer.GetServiceRouter(request.ServiceName)
-	if !ok {
-		err := errors.New(fmt.Sprintf("没有成功创建ServiceInfo, name:%s", request.ServiceName))
-		util.Error("err: %v", err)
-		return nil, err
-	}
-
+	targetRouterInfo.CreateTime = time.Now().Unix()
+	infoField := svrutil.RouterDstInfoField(targetRouterInfo.SrcInstanceID)
 	//写入redis 数据和第一次的健康信息
-	bytes, err := proto.Marshal(routerInfo)
+	bytes, err := proto.Marshal(targetRouterInfo)
 	if err != nil {
 		util.Error("err: %v", err)
 		return nil, err
 	}
-	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(hash, svrutil.RevisionFiled, routerInfo.Revision)
-	txPipeline.HSet(hash, svrutil.InfoFiled, bytes)
-	_, err = txPipeline.Exec()
+	pipeline := r.Rdb.Pipeline()
+	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
+	pipeline.HSet(hash, infoField, bytes)
+	_, err = pipeline.Exec()
 	if err != nil {
 		return nil, err
 	}
-	util.Info("更新redis路由: %s, %v", routerInfo.ServiceName, routerInfo.Revision)
 	return &pb.AddRouterReply{}, nil
 }
 
 func (r *Server) AddRouter(_ context.Context, request *pb.AddRouterRequest) (*pb.AddRouterReply, error) {
+	defer util.Info(request.String())
 	hash := svrutil.RouterHash(request.ServiceName)
-
-	mutex, err := r.LockRedis(svrutil.RouterInfoLockName(request.ServiceName))
-	if err != nil {
-		util.Error("lock redis failed err:%v", err)
-		return nil, err
-	}
-	defer svrutil.TryUnlock(mutex)
-
 	switch request.RouterType {
 	case util.KVRouterType:
 		return r.AddKVRouter(hash, request)
@@ -105,80 +65,34 @@ func (r *Server) AddRouter(_ context.Context, request *pb.AddRouterRequest) (*pb
 }
 
 func (r *Server) RemoveTargetRouter(hash string, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
-	info := request.KvRouterInfo
-	//删除本地缓存
-	err := r.RouterBuffer.RemoveKVRouter(request.ServiceName, info.Key)
-	if err != nil {
-		return nil, err
-	}
-	routerInfo, ok := r.RouterBuffer.GetServiceRouter(request.ServiceName)
-	if !ok {
-		err = errors.New(fmt.Sprintf("ServiceInfo丢失, name:%s", request.ServiceName))
-		util.Error("err: %v", err)
-		return nil, err
-	}
 	//写入redis
-	bytes, err := proto.Marshal(routerInfo)
+	pipeline := r.Rdb.Pipeline()
+	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
+	pipeline.HDel(hash, svrutil.RouterDstInfoField(request.TargetRouterInfo.SrcInstanceID))
+	_, err := pipeline.Exec()
 	if err != nil {
 		return nil, err
 	}
-	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(hash, svrutil.RevisionFiled, routerInfo.Revision)
-	txPipeline.HSet(hash, svrutil.InfoFiled, bytes)
-	_, err = txPipeline.Exec()
-	if err != nil {
-		return nil, err
-	}
-	util.Info("更新redis路由: %s, %v", routerInfo.ServiceName, routerInfo.Revision)
-
 	return &pb.RemoveRouterReply{}, nil
 }
 
 func (r *Server) RemoveKVRouter(hash string, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
 	info := request.KvRouterInfo
-	//删除本地缓存
-	err := r.RouterBuffer.RemoveKVRouter(request.ServiceName, info.Key)
-	if err != nil {
-		return nil, err
-	}
-	routerInfo, ok := r.RouterBuffer.GetServiceRouter(request.ServiceName)
-	if !ok {
-		err = errors.New(fmt.Sprintf("ServiceInfo丢失, name:%s", request.ServiceName))
-		util.Error("err: %v", err)
-		return nil, err
-	}
 	//写入redis
-	bytes, err := proto.Marshal(routerInfo)
+	pipeline := r.Rdb.TxPipeline()
+	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
+	pipeline.HDel(hash, svrutil.RouterKVInfoField(info.Key))
+	_, err := pipeline.Exec()
 	if err != nil {
 		return nil, err
 	}
-	txPipeline := r.Rdb.TxPipeline()
-	txPipeline.HSet(hash, svrutil.RevisionFiled, routerInfo.Revision)
-	txPipeline.HSet(hash, svrutil.InfoFiled, bytes)
-	_, err = txPipeline.Exec()
-	if err != nil {
-		return nil, err
-	}
-	util.Info("更新redis路由: %s, %v", routerInfo.ServiceName, routerInfo.Revision)
-
 	return &pb.RemoveRouterReply{}, nil
 }
 
 func (r *Server) RemoveRouter(_ context.Context, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
 	hash := svrutil.ServiceHash(request.ServiceName)
-
-	mutex, err := r.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
-	if err != nil {
-		return nil, err
-	}
-	defer svrutil.TryUnlock(mutex)
-
+	defer util.Info(request.String())
 	//更新缓存
-	err = r.FlushRouterBuffer(hash, request.ServiceName)
-	if err != nil {
-		return nil, err
-	}
-
 	switch request.RouterType {
 	case util.KVRouterType:
 		return r.RemoveKVRouter(hash, request)
