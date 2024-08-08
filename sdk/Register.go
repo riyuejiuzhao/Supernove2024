@@ -39,8 +39,7 @@ func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
-	rpcCli := pb.NewRegisterServiceClient(conn.Value())
+	rpcCli := pb.NewRegisterServiceClient(conn)
 	var weight int32
 	var ttl int64
 	if service.Weight != nil {
@@ -75,8 +74,7 @@ func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	rpcCli := pb.NewRegisterServiceClient(conn.Value())
+	rpcCli := pb.NewRegisterServiceClient(conn)
 	request := pb.DeregisterRequest{
 		ServiceName: service.ServiceName,
 		Host:        service.Host,
@@ -111,8 +109,7 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	rpcCli := pb.NewRegisterServiceClient(conn.Value())
+	rpcCli := pb.NewRegisterServiceClient(conn)
 	_, err = rpcCli.AddRouter(context.Background(), &pb.AddRouterRequest{
 		RouterType:  util.TargetRouterType,
 		ServiceName: argv.DstServiceName,
@@ -132,8 +129,7 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	rpcCli := pb.NewRegisterServiceClient(conn.Value())
+	rpcCli := pb.NewRegisterServiceClient(conn)
 	_, err = rpcCli.AddRouter(context.Background(), &pb.AddRouterRequest{
 		RouterType:  util.KVRouterType,
 		ServiceName: argv.DstServiceName,

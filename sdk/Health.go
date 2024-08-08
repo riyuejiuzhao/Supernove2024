@@ -21,8 +21,7 @@ func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	rpcCli := pb.NewHealthServiceClient(conn.Value())
+	rpcCli := pb.NewHealthServiceClient(conn)
 	_, err = rpcCli.HeartBeat(context.Background(),
 		&pb.HeartBeatRequest{
 			ServiceName: argv.ServiceName,

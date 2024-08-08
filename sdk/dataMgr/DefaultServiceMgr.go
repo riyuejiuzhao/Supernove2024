@@ -160,8 +160,7 @@ func (m *DefaultServiceMgr) flushRouter(buffer *ServiceRouterBuffer) {
 		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", buffer.ServiceName, err)
 		return
 	}
-	defer disConn.Close()
-	cli := pb.NewDiscoveryServiceClient(disConn.Value())
+	cli := pb.NewDiscoveryServiceClient(disConn)
 
 	request := &pb.GetRoutersRequest{
 		ServiceName: buffer.ServiceName,
@@ -204,8 +203,7 @@ func (m *DefaultServiceMgr) flushService(service *ServiceInfoBuffer) {
 		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", service.ServiceName, err)
 		return
 	}
-	defer disConn.Close()
-	cli := pb.NewDiscoveryServiceClient(disConn.Value())
+	cli := pb.NewDiscoveryServiceClient(disConn)
 
 	request := &pb.GetInstancesRequest{
 		ServiceName: service.ServiceName,
@@ -276,9 +274,8 @@ func (m *DefaultServiceMgr) flushHealthInfo(serviceName string, serviceHealth *S
 		util.Error("更新健康信息连接获取失败 err:%v", err)
 		return
 	}
-	defer conn.Close()
 
-	cli := pb.NewHealthServiceClient(conn.Value())
+	cli := pb.NewHealthServiceClient(conn)
 	reply, err := cli.GetHealthInfo(context.Background(), &pb.GetHealthInfoRequest{ServiceName: serviceName})
 	if err != nil {
 		util.Error("更新健康信息rpc失败 err:%v", err)

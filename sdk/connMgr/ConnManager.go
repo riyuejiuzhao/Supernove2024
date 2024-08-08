@@ -3,7 +3,7 @@ package connMgr
 import (
 	"Supernove2024/sdk/config"
 	"errors"
-	"github.com/shimingyah/pool"
+	"google.golang.org/grpc"
 )
 
 type ServiceType int32
@@ -19,9 +19,9 @@ const (
 // ConnManager 管理GRPC链接
 type ConnManager interface {
 	// GetServiceConn 指定服务的链接
-	GetServiceConn(service ServiceType) (pool.Conn, error)
+	GetServiceConn(service ServiceType) (*grpc.ClientConn, error)
 	// GetConn 指定地址的链接
-	GetConn(service ServiceType, address string) (pool.Conn, error)
+	GetConn(service ServiceType, address string) (*grpc.ClientConn, error)
 }
 
 var (
