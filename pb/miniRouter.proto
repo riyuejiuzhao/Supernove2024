@@ -97,7 +97,9 @@ message GetInstancesRequest{
 }
 
 message GetInstancesReply{
-  ServiceInfo service = 1;
+  string ServiceName = 1;
+  int64 Revision = 2;
+  repeated InstanceInfo Instances = 3;
 }
 
 message GetRoutersRequest{
@@ -106,12 +108,15 @@ message GetRoutersRequest{
 }
 
 message GetRoutersReply{
-  ServiceRouterInfo router = 1;
+  string ServiceName = 1;
+  int64 Revision = 2;
+  repeated KVRouterInfo KvRouters = 3;
+  repeated TargetRouterInfo TargetRouters = 4;
 }
 
 service DiscoveryService{
-  rpc GetInstances(GetInstancesRequest) returns (GetInstancesReply){}
-  rpc GetRouters(GetRoutersRequest) returns (GetRoutersReply){}
+  rpc GetInstances(GetInstancesRequest) returns (stream GetInstancesReply){}
+  rpc GetRouters(GetRoutersRequest) returns (stream GetRoutersReply){}
 }
 
 message HeartBeatRequest{

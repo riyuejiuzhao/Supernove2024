@@ -21,22 +21,15 @@ type Server struct {
 	pb.UnimplementedDiscoveryServiceServer
 }
 
-func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (reply *pb.GetInstancesReply, err error) {
+func (s *Server) GetInstances(request *pb.GetInstancesRequest, stream pb.DiscoveryService_GetInstancesServer) (err error) {
 	hash := svrutil.ServiceHash(request.ServiceName)
-	reply = nil
-	//汇报报文
-	//defer func() { util.Info("GetInstancesReply:%v", reply) }()
 	serviceInfo, ok := s.ServiceBuffer.GetServiceInfo(request.ServiceName)
 	revision, err := s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
 	if errors.Is(err, redis.Nil) {
-		err = nil
-		reply = &pb.GetInstancesReply{
-			Service: &pb.ServiceInfo{
-				ServiceName: request.ServiceName,
-				Revision:    request.Revision,
-				Instances:   make([]*pb.InstanceInfo, 0),
-			},
-		}
+		err = stream.Send(&pb.GetInstancesReply{
+			ServiceName: request.ServiceName,
+			Instances:   make([]*pb.InstanceInfo, 0),
+		})
 		return
 	} else if err != nil {
 		return
@@ -74,41 +67,52 @@ func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest
 	}
 
 	if serviceInfo.Revision == request.Revision {
-		reply = &pb.GetInstancesReply{
-			Service: &pb.ServiceInfo{
-				ServiceName: request.ServiceName,
-				Revision:    request.Revision,
-				Instances:   make([]*pb.InstanceInfo, 0),
-			},
-		}
+		err = stream.Send(&pb.GetInstancesReply{
+			ServiceName: request.ServiceName,
+			Revision:    request.Revision,
+			Instances:   make([]*pb.InstanceInfo, 0),
+		})
 		return
 	}
 
-	if revision == serviceInfo.Revision {
-		reply = &pb.GetInstancesReply{
-			Service: serviceInfo,
+	instanceList := make([]*pb.InstanceInfo, 0, 100)
+	for _, instance := range serviceInfo.Instances {
+		instanceList = append(instanceList, instance)
+		if len(instanceList) >= 100 {
+			err = stream.Send(&pb.GetInstancesReply{
+				ServiceName: serviceInfo.ServiceName,
+				Revision:    serviceInfo.Revision,
+				Instances:   instanceList,
+			})
+			if err != nil {
+				return
+			}
+			instanceList = make([]*pb.InstanceInfo, 0, 100)
 		}
-		return
 	}
-
-	reply = &pb.GetInstancesReply{Service: serviceInfo}
+	if len(instanceList) != 0 {
+		err = stream.Send(&pb.GetInstancesReply{
+			ServiceName: serviceInfo.ServiceName,
+			Revision:    serviceInfo.Revision,
+			Instances:   instanceList,
+		})
+		if err != nil {
+			return
+		}
+	}
 	return
 }
 
-func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (reply *pb.GetRoutersReply, err error) {
-	//defer func() { util.Info("GetRouters: %v err: %v", reply, err) }()
+func (s *Server) GetRouters(request *pb.GetRoutersRequest, stream pb.DiscoveryService_GetRoutersServer) (err error) {
 	hash := svrutil.RouterHash(request.ServiceName)
 	revision, err := s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
 	if errors.Is(err, redis.Nil) {
-		reply = &pb.GetRoutersReply{
-			Router: &pb.ServiceRouterInfo{
-				ServiceName:   request.ServiceName,
-				Revision:      request.Revision,
-				TargetRouters: make([]*pb.TargetRouterInfo, 0),
-				KVRouters:     make([]*pb.KVRouterInfo, 0),
-			},
-		}
-		err = nil
+		err = stream.Send(&pb.GetRoutersReply{
+			ServiceName:   request.ServiceName,
+			Revision:      0,
+			KvRouters:     make([]*pb.KVRouterInfo, 0),
+			TargetRouters: make([]*pb.TargetRouterInfo, 0),
+		})
 		return
 	} else if err != nil {
 		return
@@ -154,22 +158,67 @@ func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (r
 				return
 			}
 		}
+		s.RouterBuffer.FlushService(routerInfo)
 	}
 
 	if routerInfo.Revision == request.Revision {
-		reply = &pb.GetRoutersReply{
-			Router: &pb.ServiceRouterInfo{
-				ServiceName:   request.ServiceName,
-				Revision:      request.Revision,
-				TargetRouters: make([]*pb.TargetRouterInfo, 0),
-				KVRouters:     make([]*pb.KVRouterInfo, 0),
-			},
-		}
+		err = stream.Send(&pb.GetRoutersReply{
+			ServiceName:   routerInfo.ServiceName,
+			Revision:      routerInfo.Revision,
+			TargetRouters: make([]*pb.TargetRouterInfo, 0),
+			KvRouters:     make([]*pb.KVRouterInfo, 0),
+		})
 		return
 	}
 
-	s.RouterBuffer.FlushService(routerInfo)
-	reply = &pb.GetRoutersReply{Router: routerInfo}
+	kvRouters := make([]*pb.KVRouterInfo, 0, 100)
+	tRouters := make([]*pb.TargetRouterInfo, 0, 100)
+	for _, v := range routerInfo.KVRouters {
+		kvRouters = append(kvRouters, v)
+		if len(kvRouters)+len(tRouters) >= 100 {
+			err = stream.Send(&pb.GetRoutersReply{
+				ServiceName:   routerInfo.ServiceName,
+				Revision:      routerInfo.Revision,
+				TargetRouters: tRouters,
+				KvRouters:     kvRouters,
+			})
+			if err != nil {
+				return
+			}
+			kvRouters = make([]*pb.KVRouterInfo, 0, 100)
+			tRouters = make([]*pb.TargetRouterInfo, 0, 100)
+		}
+	}
+
+	for _, v := range routerInfo.TargetRouters {
+		tRouters = append(tRouters, v)
+		if len(kvRouters)+len(tRouters) >= 100 {
+			err = stream.Send(&pb.GetRoutersReply{
+				ServiceName:   routerInfo.ServiceName,
+				Revision:      routerInfo.Revision,
+				TargetRouters: tRouters,
+				KvRouters:     kvRouters,
+			})
+			if err != nil {
+				return
+			}
+			kvRouters = make([]*pb.KVRouterInfo, 0, 100)
+			tRouters = make([]*pb.TargetRouterInfo, 0, 100)
+		}
+	}
+
+	if len(tRouters) > 0 {
+		err = stream.Send(&pb.GetRoutersReply{
+			ServiceName:   routerInfo.ServiceName,
+			Revision:      routerInfo.Revision,
+			TargetRouters: tRouters,
+			KvRouters:     kvRouters,
+		})
+		if err != nil {
+			return
+		}
+	}
+
 	return
 }
 

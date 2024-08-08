@@ -6,6 +6,7 @@ import (
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
 	"context"
+	"io"
 	"sync"
 	"time"
 )
@@ -157,7 +158,7 @@ func (m *DefaultServiceMgr) flushAllRouterLocked() {
 func (m *DefaultServiceMgr) flushRouter(buffer *ServiceRouterBuffer) {
 	disConn, err := m.connManager.GetServiceConn(connMgr.Discovery)
 	if err != nil {
-		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", buffer.ServiceName, err)
+		util.Error("更新路由 %v 缓冲数据失败, 无法获取链接, err: %v", buffer.ServiceName, err)
 		return
 	}
 	cli := pb.NewDiscoveryServiceClient(disConn)
@@ -167,18 +168,43 @@ func (m *DefaultServiceMgr) flushRouter(buffer *ServiceRouterBuffer) {
 		Revision:    buffer.Revision,
 	}
 
-	reply, err := cli.GetRouters(context.Background(), request)
+	stream, err := cli.GetRouters(context.Background(), request)
 	if err != nil {
-		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", buffer.ServiceName, err)
-		return
-	}
-	if reply.Router.Revision == request.Revision {
-		//util.Info("无需更新本地路由缓存 %v", request.Revision)
+		util.Error("更新路由 %v 缓冲数据失败, grpc错误, err: %v", buffer.ServiceName, err)
 		return
 	}
 
-	buffer.SetRouterInfo(reply.Router)
-	util.Info("更新本地路由缓存 %v->%v", request.Revision, reply.Router.Revision)
+	chunk, err := stream.Recv()
+	if err != nil {
+		util.Error("更新路由 %v 缓冲数据失败, grpc错误, err: %v", buffer.ServiceName, err)
+		return
+	}
+
+	routerInfo := &pb.ServiceRouterInfo{
+		ServiceName:   chunk.ServiceName,
+		Revision:      chunk.Revision,
+		TargetRouters: chunk.TargetRouters,
+		KVRouters:     chunk.KvRouters,
+	}
+
+	for {
+		chunk, err = stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			util.Error("更新路由 %v 缓冲数据失败, grpc错误, err: %v", buffer.ServiceName, err)
+			return
+		}
+		routerInfo.TargetRouters = append(routerInfo.TargetRouters, chunk.TargetRouters...)
+		routerInfo.KVRouters = append(routerInfo.KVRouters, chunk.KvRouters...)
+	}
+	if routerInfo.Revision == request.Revision {
+		return
+	}
+
+	buffer.SetRouterInfo(routerInfo)
+	util.Info("更新本地路由缓存 %v->%v", request.Revision, routerInfo.Revision)
 }
 
 func (m *DefaultServiceMgr) flushAllServiceLocked() {
@@ -210,18 +236,41 @@ func (m *DefaultServiceMgr) flushService(service *ServiceInfoBuffer) {
 		Revision:    service.Revision,
 	}
 
-	reply, err := cli.GetInstances(context.Background(), request)
+	stream, err := cli.GetInstances(context.Background(), request)
 	if err != nil {
 		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", service.ServiceName, err)
 		return
 	}
-	if reply.Service.Revision == request.Revision {
-		util.Info("无需更新本地缓存 %v", request.Revision)
+
+	chunk, err := stream.Recv()
+	if err != nil {
+		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", request.ServiceName, err)
 		return
 	}
 
-	service.SetServiceInfo(reply.Service)
-	util.Info("更新本地缓存 %v->%v", request.Revision, reply.Service.Revision)
+	serviceInfo := &pb.ServiceInfo{
+		ServiceName: chunk.ServiceName,
+		Revision:    chunk.Revision,
+		Instances:   chunk.Instances,
+	}
+
+	for {
+		chunk, err = stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return
+		}
+		serviceInfo.Instances = append(serviceInfo.Instances, chunk.Instances...)
+	}
+
+	if serviceInfo.Revision == service.Revision {
+		return
+	}
+
+	service.SetServiceInfo(serviceInfo)
+	util.Info("更新本地缓存 %v->%v", request.Revision, serviceInfo.Revision)
 }
 
 func (m *DefaultServiceMgr) GetServiceInfo(serviceName string) (*pb.ServiceInfo, bool) {
