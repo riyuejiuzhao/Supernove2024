@@ -59,6 +59,7 @@ func (r *Server) Register(
 	pipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
 	_, err = pipeline.Exec()
 	if err != nil {
+		util.Error("register pipeline err: %v", err)
 		return
 	}
 

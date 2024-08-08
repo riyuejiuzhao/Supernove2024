@@ -216,8 +216,8 @@ var RegisterService_ServiceDesc = grpc.ServiceDesc{
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DiscoveryServiceClient interface {
-	GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (DiscoveryService_GetInstancesClient, error)
-	GetRouters(ctx context.Context, in *GetRoutersRequest, opts ...grpc.CallOption) (DiscoveryService_GetRoutersClient, error)
+	GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (*GetInstancesReply, error)
+	GetRouters(ctx context.Context, in *GetRoutersRequest, opts ...grpc.CallOption) (*GetRoutersReply, error)
 }
 
 type discoveryServiceClient struct {
@@ -228,76 +228,30 @@ func NewDiscoveryServiceClient(cc grpc.ClientConnInterface) DiscoveryServiceClie
 	return &discoveryServiceClient{cc}
 }
 
-func (c *discoveryServiceClient) GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (DiscoveryService_GetInstancesClient, error) {
-	stream, err := c.cc.NewStream(ctx, &DiscoveryService_ServiceDesc.Streams[0], "/DiscoveryService/GetInstances", opts...)
+func (c *discoveryServiceClient) GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (*GetInstancesReply, error) {
+	out := new(GetInstancesReply)
+	err := c.cc.Invoke(ctx, "/DiscoveryService/GetInstances", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &discoveryServiceGetInstancesClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
 
-type DiscoveryService_GetInstancesClient interface {
-	Recv() (*GetInstancesReply, error)
-	grpc.ClientStream
-}
-
-type discoveryServiceGetInstancesClient struct {
-	grpc.ClientStream
-}
-
-func (x *discoveryServiceGetInstancesClient) Recv() (*GetInstancesReply, error) {
-	m := new(GetInstancesReply)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *discoveryServiceClient) GetRouters(ctx context.Context, in *GetRoutersRequest, opts ...grpc.CallOption) (DiscoveryService_GetRoutersClient, error) {
-	stream, err := c.cc.NewStream(ctx, &DiscoveryService_ServiceDesc.Streams[1], "/DiscoveryService/GetRouters", opts...)
+func (c *discoveryServiceClient) GetRouters(ctx context.Context, in *GetRoutersRequest, opts ...grpc.CallOption) (*GetRoutersReply, error) {
+	out := new(GetRoutersReply)
+	err := c.cc.Invoke(ctx, "/DiscoveryService/GetRouters", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &discoveryServiceGetRoutersClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type DiscoveryService_GetRoutersClient interface {
-	Recv() (*GetRoutersReply, error)
-	grpc.ClientStream
-}
-
-type discoveryServiceGetRoutersClient struct {
-	grpc.ClientStream
-}
-
-func (x *discoveryServiceGetRoutersClient) Recv() (*GetRoutersReply, error) {
-	m := new(GetRoutersReply)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 // DiscoveryServiceServer is the server API for DiscoveryService service.
 // All implementations must embed UnimplementedDiscoveryServiceServer
 // for forward compatibility
 type DiscoveryServiceServer interface {
-	GetInstances(*GetInstancesRequest, DiscoveryService_GetInstancesServer) error
-	GetRouters(*GetRoutersRequest, DiscoveryService_GetRoutersServer) error
+	GetInstances(context.Context, *GetInstancesRequest) (*GetInstancesReply, error)
+	GetRouters(context.Context, *GetRoutersRequest) (*GetRoutersReply, error)
 	mustEmbedUnimplementedDiscoveryServiceServer()
 }
 
@@ -305,11 +259,11 @@ type DiscoveryServiceServer interface {
 type UnimplementedDiscoveryServiceServer struct {
 }
 
-func (UnimplementedDiscoveryServiceServer) GetInstances(*GetInstancesRequest, DiscoveryService_GetInstancesServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetInstances not implemented")
+func (UnimplementedDiscoveryServiceServer) GetInstances(context.Context, *GetInstancesRequest) (*GetInstancesReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetInstances not implemented")
 }
-func (UnimplementedDiscoveryServiceServer) GetRouters(*GetRoutersRequest, DiscoveryService_GetRoutersServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetRouters not implemented")
+func (UnimplementedDiscoveryServiceServer) GetRouters(context.Context, *GetRoutersRequest) (*GetRoutersReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRouters not implemented")
 }
 func (UnimplementedDiscoveryServiceServer) mustEmbedUnimplementedDiscoveryServiceServer() {}
 
@@ -324,46 +278,40 @@ func RegisterDiscoveryServiceServer(s grpc.ServiceRegistrar, srv DiscoveryServic
 	s.RegisterService(&DiscoveryService_ServiceDesc, srv)
 }
 
-func _DiscoveryService_GetInstances_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetInstancesRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _DiscoveryService_GetInstances_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetInstancesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(DiscoveryServiceServer).GetInstances(m, &discoveryServiceGetInstancesServer{stream})
-}
-
-type DiscoveryService_GetInstancesServer interface {
-	Send(*GetInstancesReply) error
-	grpc.ServerStream
-}
-
-type discoveryServiceGetInstancesServer struct {
-	grpc.ServerStream
-}
-
-func (x *discoveryServiceGetInstancesServer) Send(m *GetInstancesReply) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func _DiscoveryService_GetRouters_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetRoutersRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+	if interceptor == nil {
+		return srv.(DiscoveryServiceServer).GetInstances(ctx, in)
 	}
-	return srv.(DiscoveryServiceServer).GetRouters(m, &discoveryServiceGetRoutersServer{stream})
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/DiscoveryService/GetInstances",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DiscoveryServiceServer).GetInstances(ctx, req.(*GetInstancesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-type DiscoveryService_GetRoutersServer interface {
-	Send(*GetRoutersReply) error
-	grpc.ServerStream
-}
-
-type discoveryServiceGetRoutersServer struct {
-	grpc.ServerStream
-}
-
-func (x *discoveryServiceGetRoutersServer) Send(m *GetRoutersReply) error {
-	return x.ServerStream.SendMsg(m)
+func _DiscoveryService_GetRouters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRoutersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiscoveryServiceServer).GetRouters(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/DiscoveryService/GetRouters",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DiscoveryServiceServer).GetRouters(ctx, req.(*GetRoutersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 // DiscoveryService_ServiceDesc is the grpc.ServiceDesc for DiscoveryService service.
@@ -372,19 +320,17 @@ func (x *discoveryServiceGetRoutersServer) Send(m *GetRoutersReply) error {
 var DiscoveryService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "DiscoveryService",
 	HandlerType: (*DiscoveryServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
-	Streams: []grpc.StreamDesc{
+	Methods: []grpc.MethodDesc{
 		{
-			StreamName:    "GetInstances",
-			Handler:       _DiscoveryService_GetInstances_Handler,
-			ServerStreams: true,
+			MethodName: "GetInstances",
+			Handler:    _DiscoveryService_GetInstances_Handler,
 		},
 		{
-			StreamName:    "GetRouters",
-			Handler:       _DiscoveryService_GetRouters_Handler,
-			ServerStreams: true,
+			MethodName: "GetRouters",
+			Handler:    _DiscoveryService_GetRouters_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "miniRouter.proto",
 }
 
