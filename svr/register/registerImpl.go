@@ -40,35 +40,6 @@ func (r *Server) Register(
 		instanceID = address
 	}
 
-	mutex, err := r.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
-	if err != nil {
-		util.Error("lock redis failed err:%v", err)
-		return
-	}
-	defer svrutil.TryUnlock(mutex)
-
-	pipeline := r.Rdb.Pipeline()
-	revisionCmd := pipeline.HGet(hash, svrutil.RevisionFiled)
-	sIsMemCmd := pipeline.SIsMember(set, address)
-	hExistCmd := pipeline.HExists(hash, instanceID)
-	_, err = pipeline.Exec()
-	var revision int64
-	if errors.Is(err, redis.Nil) {
-		revision = 0
-	} else if err != nil {
-		return
-	} else {
-		if sIsMemCmd.Val() || hExistCmd.Val() {
-			err = errors.New("实例已经存在")
-			return
-		}
-		revision, err = revisionCmd.Int64()
-		if err != nil {
-			return
-		}
-		revision += 1
-	}
-
 	instanceInfo := &pb.InstanceInfo{
 		InstanceID: instanceID,
 		Host:       request.Host,
@@ -80,19 +51,44 @@ func (r *Server) Register(
 	if err != nil {
 		return
 	}
-	//写入redis 数据和第一次的健康信息
-	healthKey := svrutil.HealthHash(request.ServiceName, instanceInfo.InstanceID)
-	pipeline = r.Rdb.Pipeline()
-	pipeline.HSet(hash, svrutil.RevisionFiled, revision)
-	pipeline.HSet(hash, svrutil.InstanceIDFiled(instanceID), bytes)
-	// 健康信息
-	pipeline.HSet(healthKey, svrutil.HealthLastHeartBeatField, time.Now().Unix())
-	pipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
-	_, err = pipeline.Exec()
+
+	err = func() error {
+		mutex, err := r.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
+		if err != nil {
+			util.Error("lock redis failed err:%v", err)
+			return err
+		}
+		defer svrutil.TryUnlock(mutex)
+
+		pipeline := r.Rdb.Pipeline()
+		sIsMemCmd := pipeline.SIsMember(set, address)
+		hExistCmd := pipeline.HExists(hash, instanceID)
+		_, err = pipeline.Exec()
+		if err != nil && !errors.Is(err, redis.Nil) {
+			return err
+		} else if sIsMemCmd.Val() || hExistCmd.Val() {
+			err = errors.New("实例已经存在")
+			return err
+		}
+		//写入redis 数据和第一次的健康信息
+		healthKey := svrutil.HealthHash(request.ServiceName, instanceInfo.InstanceID)
+		pipeline = r.Rdb.Pipeline()
+		pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
+		pipeline.HSet(hash, svrutil.InstanceIDFiled(instanceID), bytes)
+		// 健康信息
+		pipeline.HSet(healthKey, svrutil.HealthLastHeartBeatField, time.Now().Unix())
+		pipeline.HSet(healthKey, svrutil.HealthTtlFiled, request.TTL)
+		_, err = pipeline.Exec()
+		if err != nil {
+			return err
+		}
+		return nil
+	}()
 	if err != nil {
 		return
 	}
-	util.Info("更新redis: %s, %v", request.ServiceName, revision)
+
+	util.Info("更新redis: %s, %v", request.ServiceName, instanceInfo)
 	reply = &pb.RegisterReply{InstanceID: instanceInfo.InstanceID}
 	return
 }

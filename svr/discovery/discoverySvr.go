@@ -13,6 +13,7 @@ import (
 
 type Server struct {
 	*svrutil.BufferServer
+	svrutil.ServiceBuffer
 	pb.UnimplementedDiscoveryServiceServer
 }
 
@@ -24,59 +25,78 @@ func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest
 
 	allResult := make([][]string, 0, 10)
 	count := 0
-	revision := int64(0)
-	err = func() error {
+	serviceInfo, ok := s.ServiceBuffer.GetServiceInfo(request.ServiceName)
+	if ok && serviceInfo.Revision == request.Revision {
+		reply = &pb.GetInstancesReply{
+			Service: &pb.ServiceInfo{
+				ServiceName: request.ServiceName,
+				Revision:    request.Revision,
+				Instances:   make([]*pb.InstanceInfo, 0),
+			},
+		}
+		return
+	}
+	var revision int64
+	if !ok {
+		revision = 0
+	} else {
+		revision = serviceInfo.Revision
+	}
+	needUpdate, err := func() (bool, error) {
 		mutex, err := s.LockRedis(svrutil.ServiceInfoLockName(request.ServiceName))
 		if err != nil {
 			util.Error("lock redis failed err:%v", err)
-			return err
+			return false, err
 		}
 		defer svrutil.TryUnlock(mutex)
 
-		revision, err = s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
-		if request.Revision == revision {
-			return err
+		latestRevision, err := s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
+		if latestRevision == revision {
+			return false, nil
 		}
 
 		cursor := uint64(0)
 		result, cursor, err := s.Rdb.HScan(hash, cursor, svrutil.InfoFieldMatch, 10000).Result()
 		if err != nil {
-			return err
+			return false, err
 		}
 		allResult = append(allResult, result)
 		count = len(result)
 		for cursor != 0 {
 			result, cursor, err = s.Rdb.HScan(hash, cursor, svrutil.InfoFieldMatch, 10000).Result()
 			if err != nil {
-				return err
+				return false, err
 			}
 			count += len(result)
 			allResult = append(allResult, result)
 		}
-		return nil
+		return true, nil
 	}()
 
 	if err != nil {
 		return
 	}
 
-	serviceInfo := &pb.ServiceInfo{
-		ServiceName: request.ServiceName,
-		Revision:    revision,
-		Instances:   make([]*pb.InstanceInfo, 0, count),
-	}
-
-	for i := 0; i < len(allResult); i += 1 {
-		nowResult := allResult[i]
-		for j := 0; j < len(nowResult); j += 2 {
-			bytes := []byte(nowResult[j+1])
-			instance := &pb.InstanceInfo{}
-			err = proto.Unmarshal(bytes, instance)
-			if err != nil {
-				return
-			}
-			serviceInfo.Instances = append(serviceInfo.Instances, instance)
+	if needUpdate {
+		serviceInfo = &pb.ServiceInfo{
+			ServiceName: request.ServiceName,
+			Revision:    revision,
+			Instances:   make([]*pb.InstanceInfo, 0, count),
 		}
+
+		for i := 0; i < len(allResult); i += 1 {
+			nowResult := allResult[i]
+			for j := 0; j < len(nowResult); j += 2 {
+				bytes := []byte(nowResult[j+1])
+				instance := &pb.InstanceInfo{}
+				err = proto.Unmarshal(bytes, instance)
+				if err != nil {
+					return
+				}
+				serviceInfo.Instances = append(serviceInfo.Instances, instance)
+			}
+		}
+		s.ServiceBuffer.FlushService(serviceInfo)
 	}
 	reply = &pb.GetInstancesReply{Service: serviceInfo}
 	return
@@ -138,7 +158,7 @@ func SetupServer(ctx context.Context, address string, redisAddress string, redis
 	}
 	grpcServer := grpc.NewServer()
 	pb.RegisterDiscoveryServiceServer(grpcServer,
-		&Server{BufferServer: baseSvr})
+		&Server{BufferServer: baseSvr, ServiceBuffer: svrutil.NewServiceBuffer()})
 
 	go func() {
 		<-ctx.Done()

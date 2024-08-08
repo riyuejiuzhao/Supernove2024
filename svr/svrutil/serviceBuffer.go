@@ -1,12 +1,9 @@
 package svrutil
 
-/*
-
 import (
 	"Supernove2024/pb"
 	"Supernove2024/util"
 	"errors"
-	"fmt"
 	"sync"
 )
 
@@ -214,4 +211,3 @@ type ServiceBuffer interface {
 	// RemoveInstance 删除一个Instance
 	RemoveInstance(serviceName string, host string, port int32, instanceID string) error
 }
-*/
