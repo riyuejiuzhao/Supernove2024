@@ -23,10 +23,18 @@ func (c *RegisterContext) GetServiceHash() string {
 }
 
 // Register 注册一个新服务实例
-func (r *Server) Register(
+func (s *Server) Register(
 	_ context.Context,
 	request *pb.RegisterRequest,
 ) (reply *pb.RegisterReply, err error) {
+	defer func() {
+		const (
+			Service = "Register"
+			Method  = "Register"
+		)
+		s.MetricsUpload(Service, Method, request, reply)
+	}()
+
 	reply = nil
 	address := svrutil.InstanceAddress(request.Host, request.Port)
 	hash := svrutil.ServiceHash(request.ServiceName)
@@ -51,7 +59,7 @@ func (r *Server) Register(
 
 	//写入redis 数据和第一次的健康信息
 	healthKey := svrutil.HealthHash(request.ServiceName, instanceInfo.InstanceID)
-	pipeline := r.Rdb.Pipeline()
+	pipeline := s.Rdb.Pipeline()
 	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
 	pipeline.HSet(hash, address, bytes)
 	// 健康信息

@@ -11,12 +11,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"net"
 	"net/http"
 )
 
 const (
+	MethodTag  = "Method"
+	ServiceTag = "Service"
+
+	AllServiceChannel = "AllService"
+	ServiceChannel    = "Chan.Service"
+
 	//健康信息 redis key
 	HealthHashKey            = "Hash.Health"
 	HealthTtlFiled           = "TTL"
@@ -38,6 +45,15 @@ type BaseServer struct {
 	RedMutex   *redsync.Redsync
 	GrpcServer *grpc.Server
 	PromReg    *prometheus.Registry
+
+	RedisSend    *prometheus.CounterVec
+	RedisRecv    *prometheus.CounterVec
+	RpcSendCount *prometheus.CounterVec
+	RpcRecvCount *prometheus.CounterVec
+}
+
+func ServiceChan(service string) string {
+	return fmt.Sprintf("%s.%s", ServiceChannel, service)
 }
 
 func ServiceHash(serviceName string) string {
@@ -100,19 +116,61 @@ func (s *BaseServer) Setup(ctx context.Context, address string, metricsAddress s
 	}
 }
 
+func (s *BaseServer) MetricsUpload(
+	service string,
+	method string,
+	request proto.Message,
+	reply proto.Message,
+) {
+	if reply == nil {
+		return
+	}
+	bytes, err := proto.Marshal(reply)
+	if err != nil {
+		return
+	}
+	s.RpcSendCount.With(
+		prometheus.Labels{
+			ServiceTag: service,
+			MethodTag:  method,
+		},
+	).Add(float64(len(bytes)))
+	bytes, err = proto.Marshal(request)
+	if err != nil {
+		return
+	}
+	s.RpcRecvCount.With(
+		prometheus.Labels{
+			ServiceTag: service,
+			MethodTag:  method,
+		},
+	).Add(float64(len(bytes)))
+}
+
 func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseServer {
 	//链接redis
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddress, Password: redisPassword, DB: redisDB})
 	pool := goredis.NewPool(rdb)
 	rs := redsync.New(pool)
-	//创建监控
-	srvMetrics := grpcprom.NewServerMetrics(
-		grpcprom.WithServerHandlingTimeHistogram(
-			grpcprom.WithHistogramBuckets([]float64{0.001, 0.01, 0.1, 0.3, 0.6, 1, 3, 6, 9, 20, 30, 60, 90, 120}),
-		),
-	)
+
+	//redis 监控
+	redisSend := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "RedisSend",
+	}, []string{MethodTag, ServiceTag})
+	redisRecv := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "RedisRecv",
+	}, []string{MethodTag, ServiceTag})
+
+	//创建grpc监控
+	rpcSendCount := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "RpcSendCount",
+	}, []string{MethodTag, ServiceTag})
+	rpcRecvCount := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "RpcRecvCount",
+	}, []string{MethodTag, ServiceTag})
+	srvMetrics := grpcprom.NewServerMetrics()
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(srvMetrics)
+	reg.MustRegister(srvMetrics, redisSend, redisRecv, rpcSendCount, rpcRecvCount)
 
 	//创建grpc服务器
 	grpcServer := grpc.NewServer(
@@ -126,5 +184,10 @@ func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseSer
 		RedMutex:   rs,
 		GrpcServer: grpcServer,
 		PromReg:    reg,
+
+		RedisSend:    redisSend,
+		RedisRecv:    redisRecv,
+		RpcSendCount: rpcSendCount,
+		RpcRecvCount: rpcRecvCount,
 	}
 }

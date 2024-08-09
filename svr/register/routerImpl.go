@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func (r *Server) AddKVRouter(hash string, request *pb.AddRouterRequest) (*pb.AddRouterReply, error) {
+func (s *Server) AddKVRouter(hash string, request *pb.AddRouterRequest) (*pb.AddRouterReply, error) {
 	routerKvInfo := request.KvRouterInfo
 	routerKvInfo.CreateTime = time.Now().Unix()
 	infoField := svrutil.RouterKVInfoField(routerKvInfo.Key)
@@ -20,7 +20,7 @@ func (r *Server) AddKVRouter(hash string, request *pb.AddRouterRequest) (*pb.Add
 		util.Error("err: %v", err)
 		return nil, err
 	}
-	pipeline := r.Rdb.Pipeline()
+	pipeline := s.Rdb.Pipeline()
 	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
 	pipeline.HSet(hash, infoField, bytes)
 	_, err = pipeline.Exec()
@@ -31,7 +31,7 @@ func (r *Server) AddKVRouter(hash string, request *pb.AddRouterRequest) (*pb.Add
 	return &pb.AddRouterReply{}, nil
 }
 
-func (r *Server) AddTargetRouter(hash string, request *pb.AddRouterRequest) (*pb.AddRouterReply, error) {
+func (s *Server) AddTargetRouter(hash string, request *pb.AddRouterRequest) (*pb.AddRouterReply, error) {
 	targetRouterInfo := request.TargetRouterInfo
 	targetRouterInfo.CreateTime = time.Now().Unix()
 	infoField := svrutil.RouterDstInfoField(targetRouterInfo.SrcInstanceID)
@@ -41,7 +41,7 @@ func (r *Server) AddTargetRouter(hash string, request *pb.AddRouterRequest) (*pb
 		util.Error("err: %v", err)
 		return nil, err
 	}
-	pipeline := r.Rdb.Pipeline()
+	pipeline := s.Rdb.Pipeline()
 	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
 	pipeline.HSet(hash, infoField, bytes)
 	_, err = pipeline.Exec()
@@ -51,22 +51,31 @@ func (r *Server) AddTargetRouter(hash string, request *pb.AddRouterRequest) (*pb
 	return &pb.AddRouterReply{}, nil
 }
 
-func (r *Server) AddRouter(_ context.Context, request *pb.AddRouterRequest) (*pb.AddRouterReply, error) {
-	defer util.Info(request.String())
+func (s *Server) AddRouter(_ context.Context, request *pb.AddRouterRequest) (reply *pb.AddRouterReply, err error) {
+	defer func() {
+		const (
+			Service = "Register"
+			Method  = "RemoveRouter"
+		)
+		s.MetricsUpload(Service, Method, request, reply)
+	}()
 	hash := svrutil.RouterHash(request.ServiceName)
 	switch request.RouterType {
 	case util.KVRouterType:
-		return r.AddKVRouter(hash, request)
+		reply, err = s.AddKVRouter(hash, request)
+		return
 	case util.TargetRouterType:
-		return r.AddTargetRouter(hash, request)
+		reply, err = s.AddTargetRouter(hash, request)
+		return
 	default:
-		return nil, errors.New("不支持的路由类型")
+		reply, err = nil, errors.New("不支持的路由类型")
+		return
 	}
 }
 
-func (r *Server) RemoveTargetRouter(hash string, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
+func (s *Server) RemoveTargetRouter(hash string, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
 	//写入redis
-	pipeline := r.Rdb.Pipeline()
+	pipeline := s.Rdb.Pipeline()
 	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
 	pipeline.HDel(hash, svrutil.RouterDstInfoField(request.TargetRouterInfo.SrcInstanceID))
 	_, err := pipeline.Exec()
@@ -76,10 +85,10 @@ func (r *Server) RemoveTargetRouter(hash string, request *pb.RemoveRouterRequest
 	return &pb.RemoveRouterReply{}, nil
 }
 
-func (r *Server) RemoveKVRouter(hash string, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
+func (s *Server) RemoveKVRouter(hash string, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
 	info := request.KvRouterInfo
 	//写入redis
-	pipeline := r.Rdb.TxPipeline()
+	pipeline := s.Rdb.TxPipeline()
 	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
 	pipeline.HDel(hash, svrutil.RouterKVInfoField(info.Key))
 	_, err := pipeline.Exec()
@@ -89,16 +98,24 @@ func (r *Server) RemoveKVRouter(hash string, request *pb.RemoveRouterRequest) (*
 	return &pb.RemoveRouterReply{}, nil
 }
 
-func (r *Server) RemoveRouter(_ context.Context, request *pb.RemoveRouterRequest) (*pb.RemoveRouterReply, error) {
+func (s *Server) RemoveRouter(_ context.Context, request *pb.RemoveRouterRequest) (reply *pb.RemoveRouterReply, err error) {
+	defer func() {
+		const (
+			Service = "Register"
+			Method  = "RemoveRouter"
+		)
+		s.MetricsUpload(Service, Method, request, reply)
+	}()
 	hash := svrutil.ServiceHash(request.ServiceName)
-	defer util.Info(request.String())
-	//更新缓存
 	switch request.RouterType {
 	case util.KVRouterType:
-		return r.RemoveKVRouter(hash, request)
+		reply, err = s.RemoveKVRouter(hash, request)
+		return
 	case util.TargetRouterType:
-		return r.RemoveTargetRouter(hash, request)
+		reply, err = s.RemoveTargetRouter(hash, request)
+		return
 	default:
-		return nil, errors.New("不能识别的路由类型")
+		reply, err = nil, errors.New("不能识别的路由类型")
+		return
 	}
 }

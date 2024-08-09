@@ -7,15 +7,23 @@ import (
 	"context"
 )
 
-func (r *Server) Deregister(_ context.Context,
+func (s *Server) Deregister(_ context.Context,
 	request *pb.DeregisterRequest,
 ) (reply *pb.DeregisterReply, err error) {
+	defer func() {
+		const (
+			Service = "Register"
+			Method  = "Deregister"
+		)
+		s.MetricsUpload(Service, Method, request, reply)
+	}()
+
 	reply = nil
 	address := svrutil.InstanceAddress(request.Host, request.Port)
 	hash := svrutil.ServiceHash(request.ServiceName)
 	healthKey := svrutil.HealthHash(request.ServiceName, request.InstanceID)
 
-	pipeline := r.Rdb.Pipeline()
+	pipeline := s.Rdb.Pipeline()
 	pipeline.HIncrBy(hash, svrutil.RevisionFiled, 1)
 	pipeline.HDel(hash, address)
 	pipeline.Del(healthKey)

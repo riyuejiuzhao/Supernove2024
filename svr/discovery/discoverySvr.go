@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"github.com/go-redis/redis"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/protobuf/proto"
 	"strconv"
 )
@@ -18,10 +19,38 @@ type Server struct {
 }
 
 func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (reply *pb.GetInstancesReply, err error) {
+	defer func() {
+		const (
+			Service = "Discovery"
+			Method  = "GetInstances"
+		)
+		if reply == nil {
+			return
+		}
+		bytes, err := proto.Marshal(reply)
+		if err != nil {
+			return
+		}
+		s.RpcSendCount.With(
+			prometheus.Labels{
+				svrutil.ServiceTag: Service,
+				svrutil.MethodTag:  Method,
+			},
+		).Add(float64(len(bytes)))
+		bytes, err = proto.Marshal(request)
+		if err != nil {
+			return
+		}
+		s.RpcRecvCount.With(
+			prometheus.Labels{
+				svrutil.ServiceTag: Service,
+				svrutil.MethodTag:  Method,
+			},
+		).Add(float64(len(bytes)))
+	}()
+
 	hash := svrutil.ServiceHash(request.ServiceName)
 	reply = nil
-	//汇报报文
-	//defer func() { util.Info("GetInstancesReply:%v", reply) }()
 	serviceInfo, ok := s.ServiceBuffer.GetServiceInfo(request.ServiceName)
 	revision, err := s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
 	if errors.Is(err, redis.Nil) {
@@ -92,7 +121,13 @@ func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest
 }
 
 func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (reply *pb.GetRoutersReply, err error) {
-	//defer func() { util.Info("GetRouters: %v err: %v", reply, err) }()
+	defer func() {
+		const (
+			Service = "Discovery"
+			Method  = "GetRouters"
+		)
+		s.MetricsUpload(Service, Method, request, reply)
+	}()
 	hash := svrutil.RouterHash(request.ServiceName)
 	revision, err := s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
 	if errors.Is(err, redis.Nil) {
@@ -169,6 +204,25 @@ func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (r
 	return
 }
 
+// 订阅信息获取，增量获取，降低流量压力
+/*
+func (s *Server) Channel() {
+	allServicePul := s.Rdb.Subscribe(svrutil.AllServiceChannel)
+	_, err := allServicePul.Receive()
+	if err != nil {
+		log.Fatalf("AllServiceChannel failed %v", err)
+	}
+
+	allServiceChan := allServicePul.Channel()
+	go func() {
+		for msg := range allServiceChan {
+			newService := msg.Payload
+			s.Rdb.Subscribe("")
+		}
+	}()
+}
+*/
+
 func SetupServer(
 	ctx context.Context,
 	address string,
@@ -183,5 +237,6 @@ func SetupServer(
 			ServiceBuffer: svrutil.NewServiceBuffer(),
 			RouterBuffer:  svrutil.NewRouterBuffer(),
 		})
+
 	baseSvr.Setup(ctx, address, metricsAddress)
 }
