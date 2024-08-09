@@ -1,0 +1,46 @@
+version: "3.9"
+services:
+# register:
+#   image: mini-router/register-svr
+#   container_name: register-svr
+#   ports:
+#     - "30000:8080"
+#     - "40000:9090"
+#   command: "./myapp -rpc 0.0.0.0:8080 -metrics 0.0.0.0:9090 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
+#   networks:
+#     - mini-router-net
+# discovery:
+#   image: mini-router/discovery-svr
+#   container_name: discovery-svr
+#   ports:
+#     - "31000:8080"
+#     - "41000:9090"
+#   command: "./myapp -rpc 0.0.0.0:8080 -metrics 0.0.0.0:9090 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
+#   networks:
+#     - mini-router-net
+# health:
+#   image: mini-router/health-svr
+#   container_name: health-svr
+#   ports:
+#     - "32000:8080"
+#     - "42000:9090"
+#   command: "./myapp -rpc 0.0.0.0:8080 -metrics 0.0.0.0:9090 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
+#   networks:
+#     - mini-router-net
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    network_mode: host
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    network_mode: host
+
+volumes:
+  grafana-data:
