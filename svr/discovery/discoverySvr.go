@@ -3,14 +3,10 @@ package discovery
 import (
 	"Supernove2024/pb"
 	"Supernove2024/svr/svrutil"
-	"Supernove2024/util"
 	"context"
 	"errors"
 	"github.com/go-redis/redis"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
-	"log"
-	"net"
 	"strconv"
 )
 
@@ -173,28 +169,19 @@ func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (r
 	return
 }
 
-func SetupServer(ctx context.Context, address string, redisAddress string, redisPassword string, redisDB int) {
+func SetupServer(
+	ctx context.Context,
+	address string,
+	metricsAddress string,
+	redisAddress string,
+	redisPassword string,
+	redisDB int,
+) {
 	baseSvr := svrutil.NewBaseSvr(redisAddress, redisPassword, redisDB)
-
-	//创建rpc服务器
-	lis, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	grpcServer := grpc.NewServer()
-	pb.RegisterDiscoveryServiceServer(grpcServer,
+	pb.RegisterDiscoveryServiceServer(baseSvr.GrpcServer,
 		&Server{BaseServer: baseSvr,
 			ServiceBuffer: svrutil.NewServiceBuffer(),
 			RouterBuffer:  svrutil.NewRouterBuffer(),
 		})
-
-	go func() {
-		<-ctx.Done()
-		grpcServer.GracefulStop()
-		util.Info("Stop grpc ser")
-	}()
-
-	if err = grpcServer.Serve(lis); err != nil {
-		log.Fatalln(err)
-	}
+	baseSvr.Setup(ctx, address, metricsAddress)
 }

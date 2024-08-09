@@ -6,9 +6,6 @@ import (
 	"Supernove2024/util"
 	"context"
 	"github.com/go-redis/redis"
-	"google.golang.org/grpc"
-	"log"
-	"net"
 	"strings"
 	"time"
 )
@@ -87,22 +84,16 @@ func (s *Server) HeartBeat(_ context.Context, req *pb.HeartBeatRequest) (*pb.Hea
 	return &pb.HeartBeatReply{}, nil
 }
 
-func SetupServer(ctx context.Context, address string, redisAddress string, redisPassword string, redisDB int) {
-	//创建rpc服务器
-	lis, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	grpcServer := grpc.NewServer()
-	pb.RegisterHealthServiceServer(grpcServer,
-		&Server{BaseServer: svrutil.NewBaseSvr(redisAddress, redisPassword, redisDB)})
-	go func() {
-		<-ctx.Done()
-		grpcServer.GracefulStop()
-		util.Info("Stop grpc ser")
-	}()
-	if err = grpcServer.Serve(lis); err != nil {
-		log.Fatalln(err)
-	}
+func SetupServer(
+	ctx context.Context,
+	address string,
+	metricsAddress string,
+	redisAddress string,
+	redisPassword string,
+	redisDB int,
+) {
+	baseSvr := svrutil.NewBaseSvr(redisAddress, redisPassword, redisDB)
+	pb.RegisterHealthServiceServer(baseSvr.GrpcServer,
+		&Server{BaseServer: baseSvr})
+	baseSvr.Setup(ctx, address, metricsAddress)
 }
