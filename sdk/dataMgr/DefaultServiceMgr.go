@@ -152,8 +152,8 @@ func (m *DefaultServiceMgr) flushAllRouterLocked() {
 		m.routerBuffer.Mutex.Unlock()
 		m.flushRouter(router)
 		router.routerBufferLock.Unlock()
+		runtime.GC()
 	}
-	runtime.GC()
 }
 
 func (m *DefaultServiceMgr) flushRouter(buffer *ServiceRouterBuffer) {
@@ -196,8 +196,8 @@ func (m *DefaultServiceMgr) flushAllServiceLocked() {
 		m.serviceBuffer.Mutex.Unlock()
 		m.flushService(service)
 		service.Mutex.Unlock()
+		runtime.GC()
 	}
-	runtime.GC()
 }
 
 func (m *DefaultServiceMgr) flushService(service *ServiceInfoBuffer) {

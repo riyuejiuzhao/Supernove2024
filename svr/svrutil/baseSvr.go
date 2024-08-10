@@ -11,10 +11,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 	"log"
 	"net"
 	"net/http"
+	"sync/atomic"
 )
 
 const (
@@ -46,10 +46,10 @@ type BaseServer struct {
 	GrpcServer *grpc.Server
 	PromReg    *prometheus.Registry
 
-	RedisSend    *prometheus.CounterVec
-	RedisRecv    *prometheus.CounterVec
-	RpcSendCount *prometheus.CounterVec
-	RpcRecvCount *prometheus.CounterVec
+	SendRedisCount  *prometheus.CounterVec
+	RecvRedisCount  *prometheus.CounterVec
+	RpcRequestCount *prometheus.CounterVec
+	RpcReplyCount   *prometheus.CounterVec
 }
 
 func ServiceChan(service string) string {
@@ -116,35 +116,37 @@ func (s *BaseServer) Setup(ctx context.Context, address string, metricsAddress s
 	}
 }
 
-func (s *BaseServer) MetricsUpload(
-	service string,
-	method string,
-	request proto.Message,
-	reply proto.Message,
-) {
-	if reply == nil {
-		return
+func (s *BaseServer) MethodMetricsUpload(
+	label prometheus.Labels,
+	request *int64,
+	reply *int64,
+	sendRedis *int64,
+	recvRedis *int64) {
+	var temp int64
+
+	if reply != nil {
+		temp = atomic.LoadInt64(reply)
+		atomic.AddInt64(reply, -temp)
+		s.RpcReplyCount.With(label).Add(float64(temp))
 	}
-	bytes, err := proto.Marshal(reply)
-	if err != nil {
-		return
+
+	if request != nil {
+		temp = atomic.LoadInt64(request)
+		atomic.AddInt64(request, -temp)
+		s.RpcRequestCount.With(label).Add(float64(temp))
 	}
-	s.RpcSendCount.With(
-		prometheus.Labels{
-			ServiceTag: service,
-			MethodTag:  method,
-		},
-	).Add(float64(len(bytes)))
-	bytes, err = proto.Marshal(request)
-	if err != nil {
-		return
+
+	if recvRedis != nil {
+		temp = atomic.LoadInt64(recvRedis)
+		atomic.AddInt64(recvRedis, -temp)
+		s.RecvRedisCount.With(label).Add(float64(temp))
 	}
-	s.RpcRecvCount.With(
-		prometheus.Labels{
-			ServiceTag: service,
-			MethodTag:  method,
-		},
-	).Add(float64(len(bytes)))
+
+	if sendRedis != nil {
+		temp = atomic.LoadInt64(sendRedis)
+		atomic.AddInt64(sendRedis, -temp)
+		s.SendRedisCount.With(label).Add(float64(temp))
+	}
 }
 
 func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseServer {
@@ -155,18 +157,18 @@ func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseSer
 
 	//redis 监控
 	redisSend := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "RedisSend",
+		Name: "SendRedisCount",
 	}, []string{MethodTag, ServiceTag})
 	redisRecv := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "RedisRecv",
+		Name: "RecvRedisCount",
 	}, []string{MethodTag, ServiceTag})
 
 	//创建grpc监控
 	rpcSendCount := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "RpcSendCount",
+		Name: "RpcRequestCount",
 	}, []string{MethodTag, ServiceTag})
 	rpcRecvCount := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "RpcRecvCount",
+		Name: "RpcReplyCount",
 	}, []string{MethodTag, ServiceTag})
 	srvMetrics := grpcprom.NewServerMetrics()
 	reg := prometheus.NewRegistry()
@@ -185,9 +187,9 @@ func NewBaseSvr(redisAddress string, redisPassword string, redisDB int) *BaseSer
 		GrpcServer: grpcServer,
 		PromReg:    reg,
 
-		RedisSend:    redisSend,
-		RedisRecv:    redisRecv,
-		RpcSendCount: rpcSendCount,
-		RpcRecvCount: rpcRecvCount,
+		SendRedisCount:  redisSend,
+		RecvRedisCount:  redisRecv,
+		RpcRequestCount: rpcSendCount,
+		RpcReplyCount:   rpcRecvCount,
 	}
 }

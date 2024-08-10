@@ -52,13 +52,6 @@ func (s *Server) AddTargetRouter(hash string, request *pb.AddRouterRequest) (*pb
 }
 
 func (s *Server) AddRouter(_ context.Context, request *pb.AddRouterRequest) (reply *pb.AddRouterReply, err error) {
-	defer func() {
-		const (
-			Service = "Register"
-			Method  = "RemoveRouter"
-		)
-		s.MetricsUpload(Service, Method, request, reply)
-	}()
 	hash := svrutil.RouterHash(request.ServiceName)
 	switch request.RouterType {
 	case util.KVRouterType:
@@ -99,13 +92,6 @@ func (s *Server) RemoveKVRouter(hash string, request *pb.RemoveRouterRequest) (*
 }
 
 func (s *Server) RemoveRouter(_ context.Context, request *pb.RemoveRouterRequest) (reply *pb.RemoveRouterReply, err error) {
-	defer func() {
-		const (
-			Service = "Register"
-			Method  = "RemoveRouter"
-		)
-		s.MetricsUpload(Service, Method, request, reply)
-	}()
 	hash := svrutil.ServiceHash(request.ServiceName)
 	switch request.RouterType {
 	case util.KVRouterType:

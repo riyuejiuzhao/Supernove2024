@@ -27,14 +27,6 @@ func (s *Server) Register(
 	_ context.Context,
 	request *pb.RegisterRequest,
 ) (reply *pb.RegisterReply, err error) {
-	defer func() {
-		const (
-			Service = "Register"
-			Method  = "Register"
-		)
-		s.MetricsUpload(Service, Method, request, reply)
-	}()
-
 	reply = nil
 	address := svrutil.InstanceAddress(request.Host, request.Port)
 	hash := svrutil.ServiceHash(request.ServiceName)

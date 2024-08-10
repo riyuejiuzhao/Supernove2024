@@ -19,14 +19,6 @@ type Server struct {
 func (s *Server) GetHealthInfo(_ context.Context,
 	req *pb.GetHealthInfoRequest,
 ) (reply *pb.GetHealthInfoReply, err error) {
-	defer func() {
-		const (
-			Service = "Health"
-			Method  = "HeartBeat"
-		)
-		s.MetricsUpload(Service, Method, req, reply)
-	}()
-
 	match := svrutil.HealthHash(req.ServiceName, "*")
 	prefix := svrutil.HealthHash(req.ServiceName, "")
 	reply = nil
@@ -86,13 +78,6 @@ func (s *Server) GetHealthInfo(_ context.Context,
 }
 
 func (s *Server) HeartBeat(_ context.Context, request *pb.HeartBeatRequest) (reply *pb.HeartBeatReply, err error) {
-	defer func() {
-		const (
-			Service = "Health"
-			Method  = "HeartBeat"
-		)
-		s.MetricsUpload(Service, Method, request, reply)
-	}()
 	lastHeartBeat := time.Now().Unix()
 	key := svrutil.HealthHash(request.ServiceName, request.InstanceID)
 	s.Rdb.HSet(key, svrutil.HealthLastHeartBeatField, lastHeartBeat)

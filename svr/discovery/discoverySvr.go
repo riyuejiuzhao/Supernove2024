@@ -6,53 +6,45 @@ import (
 	"context"
 	"errors"
 	"github.com/go-redis/redis"
-	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/protobuf/proto"
 	"strconv"
+	"sync/atomic"
 )
 
 type Server struct {
 	*svrutil.BaseServer
-	svrutil.RouterBuffer
-	svrutil.ServiceBuffer
+	RouterBuffer  svrutil.RouterBuffer
+	ServiceBuffer svrutil.ServiceBuffer
+
+	GetRoutersRecvRedis int64
+	GetRoutersReply     int64
+	GetRoutersRequest   int64
+
+	GetInstancesRecvRedis int64
+	GetInstanceReply      int64
+	GetInstanceRequest    int64
+
 	pb.UnimplementedDiscoveryServiceServer
 }
 
 func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest) (reply *pb.GetInstancesReply, err error) {
 	defer func() {
-		const (
-			Service = "Discovery"
-			Method  = "GetInstances"
-		)
-		if reply == nil {
-			return
+		bytes, err := proto.Marshal(request)
+		if err == nil {
+			atomic.AddInt64(&s.GetInstanceRequest, int64(len(bytes)))
 		}
-		bytes, err := proto.Marshal(reply)
-		if err != nil {
-			return
+		bytes, err = proto.Marshal(reply)
+		if err == nil {
+			atomic.AddInt64(&s.GetInstanceReply, int64(len(bytes)))
 		}
-		s.RpcSendCount.With(
-			prometheus.Labels{
-				svrutil.ServiceTag: Service,
-				svrutil.MethodTag:  Method,
-			},
-		).Add(float64(len(bytes)))
-		bytes, err = proto.Marshal(request)
-		if err != nil {
-			return
-		}
-		s.RpcRecvCount.With(
-			prometheus.Labels{
-				svrutil.ServiceTag: Service,
-				svrutil.MethodTag:  Method,
-			},
-		).Add(float64(len(bytes)))
 	}()
 
 	hash := svrutil.ServiceHash(request.ServiceName)
 	reply = nil
 	serviceInfo, ok := s.ServiceBuffer.GetServiceInfo(request.ServiceName)
 	revision, err := s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
+	atomic.AddInt64(&s.GetInstancesRecvRedis, 8)
+
 	if errors.Is(err, redis.Nil) {
 		err = nil
 		reply = &pb.GetInstancesReply{
@@ -66,6 +58,7 @@ func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest
 	} else if err != nil {
 		return
 	}
+
 	var result map[string]string
 	if !ok || revision != serviceInfo.Revision {
 		result, err = s.Rdb.HGetAll(hash).Result()
@@ -79,6 +72,7 @@ func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest
 		}
 
 		for k, v := range result {
+			atomic.AddInt64(&s.GetInstancesRecvRedis, int64(len(k)+len(v)))
 			if k == svrutil.RevisionFiled {
 				revision, err = strconv.ParseInt(v, 10, 64)
 				if err != nil {
@@ -122,14 +116,20 @@ func (s *Server) GetInstances(_ context.Context, request *pb.GetInstancesRequest
 
 func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (reply *pb.GetRoutersReply, err error) {
 	defer func() {
-		const (
-			Service = "Discovery"
-			Method  = "GetRouters"
-		)
-		s.MetricsUpload(Service, Method, request, reply)
+		bytes, err := proto.Marshal(request)
+		if err == nil {
+			atomic.AddInt64(&s.GetRoutersRequest, int64(len(bytes)))
+		}
+		bytes, err = proto.Marshal(reply)
+		if err == nil {
+			atomic.AddInt64(&s.GetRoutersReply, int64(len(bytes)))
+		}
 	}()
+
 	hash := svrutil.RouterHash(request.ServiceName)
 	revision, err := s.Rdb.HGet(hash, svrutil.RevisionFiled).Int64()
+	atomic.AddInt64(&s.GetRoutersRecvRedis, 8)
+
 	if errors.Is(err, redis.Nil) {
 		reply = &pb.GetRoutersReply{
 			Router: &pb.ServiceRouterInfo{
@@ -144,6 +144,7 @@ func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (r
 	} else if err != nil {
 		return
 	}
+
 	routerInfo, ok := s.RouterBuffer.GetServiceRouter(request.ServiceName)
 	var result map[string]string
 	if !ok || routerInfo.Revision != revision {
@@ -160,6 +161,7 @@ func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (r
 		}
 
 		for k, v := range result {
+			atomic.AddInt64(&s.GetRoutersRecvRedis, int64(len(k)+len(v)))
 			if k == svrutil.RevisionFiled {
 				revision, err = strconv.ParseInt(v, 10, 64)
 				if err != nil {
@@ -204,25 +206,6 @@ func (s *Server) GetRouters(_ context.Context, request *pb.GetRoutersRequest) (r
 	return
 }
 
-// 订阅信息获取，增量获取，降低流量压力
-/*
-func (s *Server) Channel() {
-	allServicePul := s.Rdb.Subscribe(svrutil.AllServiceChannel)
-	_, err := allServicePul.Receive()
-	if err != nil {
-		log.Fatalf("AllServiceChannel failed %v", err)
-	}
-
-	allServiceChan := allServicePul.Channel()
-	go func() {
-		for msg := range allServiceChan {
-			newService := msg.Payload
-			s.Rdb.Subscribe("")
-		}
-	}()
-}
-*/
-
 func SetupServer(
 	ctx context.Context,
 	address string,
@@ -232,11 +215,12 @@ func SetupServer(
 	redisDB int,
 ) {
 	baseSvr := svrutil.NewBaseSvr(redisAddress, redisPassword, redisDB)
-	pb.RegisterDiscoveryServiceServer(baseSvr.GrpcServer,
-		&Server{BaseServer: baseSvr,
-			ServiceBuffer: svrutil.NewServiceBuffer(),
-			RouterBuffer:  svrutil.NewRouterBuffer(),
-		})
+	server := &Server{
+		BaseServer:    baseSvr,
+		ServiceBuffer: svrutil.NewServiceBuffer(),
+		RouterBuffer:  svrutil.NewRouterBuffer(),
+	}
+	pb.RegisterDiscoveryServiceServer(baseSvr.GrpcServer, server)
 
 	baseSvr.Setup(ctx, address, metricsAddress)
 }

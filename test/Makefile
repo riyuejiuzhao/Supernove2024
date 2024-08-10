@@ -3,5 +3,8 @@ test:
 	go test -run TestHealthSvr
 	go test -run TestDiscoverSvr
 
-pressure-test:
-	go test -run TestManyService
+many-instance:
+	go test -run TestManyInstance
+
+many-discovery:
+	go test -run TestManyDiscovery

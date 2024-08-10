@@ -53,9 +53,12 @@ func RandomRegisterArgv(serviceName string, instanceNum int) map[string]*sdk.Reg
 
 func SetupSvr() context.CancelFunc {
 	ctx, cancel := context.WithCancel(context.Background())
-	go register.SetupServer(ctx, "127.0.0.1:8001", "9.134.93.168:6380", "SDZsdz2000", 0)
-	go discovery.SetupServer(ctx, "127.0.0.1:8002", "9.134.93.168:6380", "SDZsdz2000", 0)
-	go health.SetupServer(ctx, "127.0.0.1:8003", "9.134.93.168:6380", "SDZsdz2000", 0)
+	go register.SetupServer(ctx, "127.0.0.1:18001", "127.0.0.1:19001",
+		"9.134.93.168:6380", "SDZsdz2000", 0)
+	go discovery.SetupServer(ctx, "127.0.0.1:18002", "127.0.0.1:19002",
+		"9.134.93.168:6380", "SDZsdz2000", 0)
+	go health.SetupServer(ctx, "127.0.0.1:18003", "127.0.0.1:18003",
+		"9.134.93.168:6380", "SDZsdz2000", 0)
 	//等待服务器启动
 	time.Sleep(1 * time.Second)
 	return cancel
