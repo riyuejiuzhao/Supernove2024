@@ -1,48 +1,10 @@
 Global:
-  RegisterService:
+  Etcd:
     - Host: 127.0.0.1
-      Port: 18000
-    - Host: 127.0.0.1
-      Port: 18001
-    - Host: 127.0.0.1
-      Port: 18002
-    - Host: 127.0.0.1
-      Port: 18003
-    - Host: 127.0.0.1
-      Port: 18004
-    - Host: 127.0.0.1
-      Port: 18005
-    - Host: 127.0.0.1
-      Port: 18006
-    - Host: 127.0.0.1
-      Port: 18007
-  DiscoverService:
-    - Host: 127.0.0.1
-      Port: 18100
-    - Host: 127.0.0.1
-      Port: 18101
-    - Host: 127.0.0.1
-      Port: 18102
-    - Host: 127.0.0.1
-      Port: 18103
-    - Host: 127.0.0.1
-      Port: 18104
-    - Host: 127.0.0.1
-      Port: 18105
-    - Host: 127.0.0.1
-      Port: 18106
-    - Host: 127.0.0.1
-      Port: 18107
-    - Host: 127.0.0.1
-      Port: 18108
-    - Host: 127.0.0.1
-      Port: 18109
-  HealthService:
-    - Host: 127.0.0.1
-      Port: 18200
+      Port: 2379
   Register:
     DefaultWeight: 10
-    DefaultTTL: 2
+    DefaultTTL: 200000
   Discovery:
     DefaultTimeout: 10
     DstService:

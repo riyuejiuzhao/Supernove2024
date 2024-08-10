@@ -1,13 +1,7 @@
 Global:
-  RegisterService:
+  Etcd:
     - Host: 127.0.0.1
-      Port: 8001
-  DiscoverService:
-    - Host: 127.0.0.1
-      Port: 8002
-  HealthService:
-    - Host: 127.0.0.1
-      Port: 8003
+      Port: 2379
   Register:
     DefaultWeight: 10
     DefaultTTL: 20000

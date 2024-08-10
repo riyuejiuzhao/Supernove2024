@@ -4,7 +4,7 @@ Global:
       Port: 2379
   Register:
     DefaultWeight: 10
-    DefaultTTL: 20000
+    DefaultTTL: 2
   Discovery:
     DefaultTimeout: 1
     DstService:

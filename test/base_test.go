@@ -4,13 +4,10 @@ import (
 	"Supernove2024/pb"
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
-	"Supernove2024/svr/discovery"
-	"Supernove2024/svr/health"
-	"Supernove2024/svr/register"
 	"Supernove2024/util"
 	"context"
 	"fmt"
-	"github.com/go-redis/redis"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"math/rand"
 	"testing"
 	"time"
@@ -51,48 +48,26 @@ func RandomRegisterArgv(serviceName string, instanceNum int) map[string]*sdk.Reg
 	return testData
 }
 
-func SetupSvr() context.CancelFunc {
-	ctx, cancel := context.WithCancel(context.Background())
-	go register.SetupServer(ctx, "127.0.0.1:18001", "127.0.0.1:19001",
-		"9.134.93.168:6380", "SDZsdz2000", 0)
-	go discovery.SetupServer(ctx, "127.0.0.1:18002", "127.0.0.1:19002",
-		"9.134.93.168:6380", "SDZsdz2000", 0)
-	go health.SetupServer(ctx, "127.0.0.1:18003", "127.0.0.1:18003",
-		"9.134.93.168:6380", "SDZsdz2000", 0)
-	//等待服务器启动
-	time.Sleep(1 * time.Second)
-	return cancel
-}
-
 func TestRouter(t *testing.T) {
 	srcService := "srcService"
 	dstService := "dstService"
 	instanceNum := 10
 
 	srcData := RandomRegisterArgv(srcService, instanceNum)
-	count := 0
-	for _, v := range srcData {
-		name := fmt.Sprintf("src%v", count)
-		v.InstanceID = &name
-		count += 1
-	}
 	dstData := RandomRegisterArgv(dstService, instanceNum)
-	count = 0
-	for _, v := range dstData {
-		name := fmt.Sprintf("dst%v", count)
-		v.InstanceID = &name
-		count += 1
-	}
+
 	//链接并清空数据库
-	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
-	err := rdb.FlushDB().Err()
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{"127.0.0.1:2379"},
+		DialTimeout: 5 * time.Second,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// 从另一个协程启动
-	cancel := SetupSvr()
-	defer cancel()
+	_, err = client.Delete(context.Background(), "", clientv3.WithPrefix())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	config.GlobalConfigFilePath = "router_test.yaml"
 	// 注册
@@ -118,7 +93,7 @@ func TestRouter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = discoveryapi.GetInstances(&sdk.GetInstancesArgv{
+	srcServices, err := discoveryapi.GetInstances(&sdk.GetInstancesArgv{
 		ServiceName: srcService,
 	})
 	if err != nil {
@@ -133,7 +108,7 @@ func TestRouter(t *testing.T) {
 	//先检测其他三种路由正不正常
 	processResult, err := discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:        util.ConsistentRouterType,
-		SrcInstanceID: "src0",
+		SrcInstanceID: srcServices.Instances[0].InstanceID,
 		DstService:    dstServices,
 	})
 	if err != nil {
@@ -142,7 +117,7 @@ func TestRouter(t *testing.T) {
 	t.Logf("一致性哈希:%s", processResult.DstInstance)
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:        util.RandomRouterType,
-		SrcInstanceID: "src0",
+		SrcInstanceID: srcServices.Instances[0].InstanceID,
 		DstService:    dstServices,
 	})
 	if err != nil {
@@ -151,7 +126,7 @@ func TestRouter(t *testing.T) {
 	t.Logf("随机:%s", processResult.DstInstance)
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:        util.WeightedRouterType,
-		SrcInstanceID: "src0",
+		SrcInstanceID: srcServices.Instances[0].InstanceID,
 		DstService:    dstServices,
 	})
 	if err != nil {
@@ -172,9 +147,9 @@ func TestRouter(t *testing.T) {
 	// src0 -> dst1
 	// key:key0 -> dst2
 	err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{
-		SrcInstanceID:  "src0",
+		SrcInstanceID:  srcServices.Instances[0].InstanceID,
 		DstServiceName: dstService,
-		DstInstanceID:  "dst1",
+		DstInstanceID:  dstServices.Instances[1].InstanceID,
 		Timeout:        100,
 	})
 	if err != nil {
@@ -183,7 +158,7 @@ func TestRouter(t *testing.T) {
 	err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
 		Key:            "key0",
 		DstServiceName: dstService,
-		DstInstanceID:  "dst2",
+		DstInstanceID:  dstServices.Instances[2].InstanceID,
 		Timeout:        100,
 	})
 	if err != nil {
@@ -194,26 +169,26 @@ func TestRouter(t *testing.T) {
 
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:        util.TargetRouterType,
-		SrcInstanceID: "src0",
+		SrcInstanceID: srcServices.Instances[0].InstanceID,
 		DstService:    dstServices,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if processResult.DstInstance.InstanceID != "dst1" {
+	if processResult.DstInstance.InstanceID != dstServices.Instances[1].InstanceID {
 		t.Fatalf("路由错误")
 	}
 
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:        util.KVRouterType,
-		SrcInstanceID: "src2",
+		SrcInstanceID: srcServices.Instances[2].InstanceID, //"src2",
 		DstService:    dstServices,
 		Key:           "key0",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if processResult.DstInstance.InstanceID != "dst2" {
+	if processResult.DstInstance.InstanceID != dstServices.Instances[2].InstanceID {
 		t.Fatalf("路由错误")
 	}
 }
@@ -223,17 +198,19 @@ func TestHealthSvr(t *testing.T) {
 	instanceNum := 10
 	testData := RandomRegisterArgv(serviceName, instanceNum)
 	//连接数据库
-	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
-	//清空
-	err := rdb.FlushDB().Err()
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{"127.0.0.1:2379"},
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Delete(context.Background(), "", clientv3.WithPrefix())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cancel := SetupSvr()
-	defer cancel()
-
-	config.GlobalConfigFilePath = "register_test.yaml"
+	config.GlobalConfigFilePath = "health_test.yaml"
 	registerAPI, err := sdk.NewRegisterAPI()
 	//等待一下更新
 	time.Sleep(1 * time.Second)
@@ -268,7 +245,7 @@ func TestHealthSvr(t *testing.T) {
 		t.Fatal("没有获得全部的服务")
 	}
 	//等待6秒让所有的服务都过期
-	time.Sleep(6 * time.Second)
+	time.Sleep(7 * time.Second)
 	getInstanceResult, err = discoveryAPI.GetInstances(getInstanceArgv)
 	if err != nil {
 		t.Fatal(err)
@@ -276,16 +253,6 @@ func TestHealthSvr(t *testing.T) {
 	if len(getInstanceResult.GetInstance()) != 0 {
 		t.Fatal("服务健康信息不正确")
 	}
-	//假设不进行健康过滤
-	getInstanceArgv.SkipHealthFilter = true
-	getInstanceResult, err = discoveryAPI.GetInstances(getInstanceArgv)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(getInstanceResult.GetInstance()) != len(testData) {
-		t.Fatal("要求不进行健康过滤但是健康过滤依然发生了")
-	}
-	getInstanceArgv.SkipHealthFilter = false
 	//通过心跳再次激活所有的服务
 	healthCli, err := sdk.NewHealthAPI()
 	if err != nil {
@@ -294,19 +261,9 @@ func TestHealthSvr(t *testing.T) {
 	for _, v := range resultList {
 		err = healthCli.HeartBeat(&sdk.HeartBeatArgv{ServiceName: serviceName, InstanceID: v.InstanceID})
 		if err != nil {
-			t.Error(err)
+			t.Error("租约没有正常超时")
 		}
 	}
-	//等待同步
-	time.Sleep(1 * time.Second)
-	getInstanceResult, err = discoveryAPI.GetInstances(getInstanceArgv)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(getInstanceResult.GetInstance()) != len(resultList) {
-		t.Fatal("有服务没有唤醒")
-	}
-
 }
 
 func TestDiscoverSvr(t *testing.T) {
@@ -315,15 +272,17 @@ func TestDiscoverSvr(t *testing.T) {
 
 	testData := RandomRegisterArgv(serviceName, instanceNum)
 	//连接数据库
-	rdb := redis.NewClient(&redis.Options{Addr: "9.134.93.168:6380", Password: "SDZsdz2000", DB: 0})
-	//清空
-	err := rdb.FlushDB().Err()
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{"127.0.0.1:2379"},
+		DialTimeout: 5 * time.Second,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	cancel := SetupSvr()
-	defer cancel()
+	_, err = client.Delete(context.Background(), "", clientv3.WithPrefix())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	config.GlobalConfigFilePath = "register_test.yaml"
 	registerAPI, err := sdk.NewRegisterAPI()
@@ -331,7 +290,7 @@ func TestDiscoverSvr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resultData := make(map[string]*sdk.RegisterArgv)
+	resultData := make(map[int64]*sdk.RegisterArgv)
 	for _, v := range testData {
 		result, err := registerAPI.Register(v)
 		if err != nil {
