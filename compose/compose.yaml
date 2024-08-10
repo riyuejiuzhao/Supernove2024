@@ -41,6 +41,19 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
     network_mode: host
+  etcd:
+    image: quay.io/coreos/etcd
+    container_name: etcd
+    command: >
+      /usr/local/bin/etcd
+      --name s1
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --listen-metrics-urls http://0.0.0.0:2381
+      --metrics extensive
+    network_mode: host
 
 volumes:
   grafana-data:
