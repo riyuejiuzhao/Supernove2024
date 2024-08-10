@@ -29,6 +29,7 @@ type Config struct {
 			//Service
 			DstService []string `yaml:"DstService"`
 		} `yaml:"Discovery"`
+		Metrics string `yaml:"Metrics"`
 	} `yaml:"Global"`
 }
 

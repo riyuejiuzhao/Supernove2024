@@ -5,10 +5,13 @@ import (
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/sdk/dataMgr"
+	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"stathat.com/c/consistent"
 	"strconv"
+	"time"
 )
 
 type GetInstancesArgv struct {
@@ -32,7 +35,15 @@ type DiscoveryCli struct {
 	*APIContext
 }
 
+var getInstancesLabel = prometheus.Labels{"Method": "GetInstances"}
+
 func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (*GetInstancesResult, error) {
+	begin := time.Now()
+	defer func() {
+		duration := time.Since(begin).Milliseconds()
+		c.Metrics.MethodTime.With(getInstancesLabel).Observe(float64(duration))
+		c.Metrics.MethodCounter.With(getInstancesLabel).Inc()
+	}()
 	//在缓存数据中查找
 	service, ok := c.DataMgr.GetServiceInfo(argv.ServiceName)
 	if !ok {
@@ -97,8 +108,16 @@ func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string) (*Pr
 	return &ProcessRouterResult{DstInstance: instance}, nil
 }
 
+var processRouterLabel = prometheus.Labels{"Method": "ProcessRouter"}
+
 // ProcessRouter 如果没有提供可选的Instance，那么自动从缓冲中获取
 func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterResult, error) {
+	begin := time.Now()
+	defer func() {
+		duration := time.Since(begin).Milliseconds()
+		c.Metrics.MethodTime.With(processRouterLabel).Observe(float64(duration))
+		c.Metrics.MethodCounter.With(processRouterLabel).Inc()
+	}()
 	instances := argv.DstService.GetInstance()
 	if instances == nil || len(instances) == 0 {
 		service, ok := c.DataMgr.GetServiceInfo(argv.DstService.GetServiceName())
@@ -164,8 +183,9 @@ func NewDiscoveryAPIStandalone(
 	config *config.Config,
 	conn connMgr.ConnManager,
 	dmgr dataMgr.ServiceDataManager,
+	mt *metrics.MetricsManager,
 ) DiscoveryAPI {
-	ctx := NewAPIContextStandalone(config, conn, dmgr)
+	ctx := NewAPIContextStandalone(config, conn, dmgr, mt)
 	return &DiscoveryCli{
 		APIContext: ctx,
 	}

@@ -4,6 +4,7 @@ import (
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/sdk/dataMgr"
+	"Supernove2024/sdk/metrics"
 )
 
 type APIContext struct {
@@ -13,13 +14,21 @@ type APIContext struct {
 	ConnManager connMgr.ConnManager
 	//缓存
 	DataMgr dataMgr.ServiceDataManager
+
+	Metrics *metrics.MetricsManager
 }
 
-func NewAPIContextStandalone(config *config.Config, conn connMgr.ConnManager, dataManger dataMgr.ServiceDataManager) *APIContext {
+func NewAPIContextStandalone(
+	config *config.Config,
+	conn connMgr.ConnManager,
+	dataManger dataMgr.ServiceDataManager,
+	mt *metrics.MetricsManager,
+) *APIContext {
 	return &APIContext{
 		Config:      config,
 		ConnManager: conn,
 		DataMgr:     dataManger,
+		Metrics:     mt,
 	}
 }
 
@@ -36,7 +45,18 @@ func NewAPIContext() (*APIContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	api := APIContext{ConnManager: connManager,
-		Config: globalConfig, DataMgr: mgr}
+
+	metricsMgr, err := metrics.Instance()
+	if err != nil {
+		return nil, err
+	}
+
+	api := APIContext{
+		ConnManager: connManager,
+		Config:      globalConfig,
+		DataMgr:     mgr,
+		Metrics:     metricsMgr,
+	}
+
 	return &api, nil
 }

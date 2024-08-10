@@ -5,8 +5,10 @@ import (
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/sdk/dataMgr"
+	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
 	"time"
@@ -35,7 +37,15 @@ type DeregisterArgv struct {
 	InstanceID  int64
 }
 
+var registerLabel = prometheus.Labels{"Method": "Register"}
+
 func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
+	begin := time.Now()
+	defer func() {
+		duration := time.Since(begin).Milliseconds()
+		c.Metrics.MethodTime.With(registerLabel).Observe(float64(duration))
+		c.Metrics.MethodCounter.With(registerLabel).Inc()
+	}()
 	key := util.InstanceKey(service.ServiceName, service.Host, service.Port)
 	var weight int32
 	if service.Weight != nil {
@@ -79,7 +89,15 @@ func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 	return &RegisterResult{InstanceID: instanceInfo.InstanceID}, nil
 }
 
+var deregisterLabel = prometheus.Labels{"Method": "Deregister"}
+
 func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
+	begin := time.Now()
+	defer func() {
+		duration := time.Since(begin).Milliseconds()
+		c.Metrics.MethodTime.With(deregisterLabel).Observe(float64(duration))
+		c.Metrics.MethodCounter.With(deregisterLabel).Inc()
+	}()
 	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
 		return err
@@ -105,7 +123,15 @@ type AddKVRouterArgv struct {
 	Timeout        int64
 }
 
+var addTargetRouterLabel = prometheus.Labels{"Method": "AddTargetRouter"}
+
 func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
+	begin := time.Now()
+	defer func() {
+		duration := time.Since(begin).Milliseconds()
+		c.Metrics.MethodTime.With(addTargetRouterLabel).Observe(float64(duration))
+		c.Metrics.MethodCounter.With(addTargetRouterLabel).Inc()
+	}()
 	key := util.RouterTargetInfoKey(argv.DstServiceName, argv.SrcInstanceID)
 	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
@@ -135,7 +161,15 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
 	return nil
 }
 
+var addKVRouterLabel = prometheus.Labels{"Method": "AddKVRouter"}
+
 func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) error {
+	begin := time.Now()
+	defer func() {
+		duration := time.Since(begin).Milliseconds()
+		c.Metrics.MethodTime.With(addKVRouterLabel).Observe(float64(duration))
+		c.Metrics.MethodCounter.With(addKVRouterLabel).Inc()
+	}()
 	key := util.RouterKVInfoKey(argv.DstServiceName, argv.Key)
 	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
@@ -178,8 +212,9 @@ func NewRegisterAPIStandalone(
 	config *config.Config,
 	conn connMgr.ConnManager,
 	dmgr dataMgr.ServiceDataManager,
+	mt *metrics.MetricsManager,
 ) RegisterAPI {
-	ctx := NewAPIContextStandalone(config, conn, dmgr)
+	ctx := NewAPIContextStandalone(config, conn, dmgr, mt)
 	return &RegisterCli{
 		APIContext: ctx,
 	}
