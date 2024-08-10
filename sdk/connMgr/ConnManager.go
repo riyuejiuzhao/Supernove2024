@@ -3,25 +3,20 @@ package connMgr
 import (
 	"Supernove2024/sdk/config"
 	"errors"
-	"google.golang.org/grpc"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type ServiceType int32
 
 const (
-	Discovery ServiceType = iota
-	HealthCheck
-	Register
-
+	Etcd = iota
 	ServiceTypeCount
 )
 
-// ConnManager 管理GRPC链接
+// ConnManager 管理链接
 type ConnManager interface {
 	// GetServiceConn 指定服务的链接
-	GetServiceConn(service ServiceType) (*grpc.ClientConn, error)
-	// GetConn 指定地址的链接
-	GetConn(service ServiceType, address string) (*grpc.ClientConn, error)
+	GetServiceConn(service ServiceType) (*clientv3.Client, error)
 }
 
 var (
@@ -35,7 +30,11 @@ func Instance() (ConnManager, error) {
 		if err != nil {
 			return nil, errors.New("创建连接管理器失败")
 		}
-		connMgr = NewConnManager(cfg)
+		newMgr, err := NewConnManager(cfg)
+		if err != nil {
+			return nil, err
+		}
+		connMgr = newMgr
 	}
 	return connMgr, nil
 }

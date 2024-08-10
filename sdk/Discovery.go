@@ -8,12 +8,11 @@ import (
 	"Supernove2024/util"
 	"errors"
 	"stathat.com/c/consistent"
-	"time"
+	"strconv"
 )
 
 type GetInstancesArgv struct {
-	ServiceName      string
-	SkipHealthFilter bool
+	ServiceName string
 }
 
 type GetInstancesResult struct {
@@ -31,45 +30,28 @@ func (r *GetInstancesResult) GetInstance() []*pb.InstanceInfo {
 
 type DiscoveryCli struct {
 	*APIContext
-	dataMgr dataMgr.ServiceDataManager
 }
 
 func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (*GetInstancesResult, error) {
 	//在缓存数据中查找
-	service, ok := c.dataMgr.GetServiceInfo(argv.ServiceName)
+	service, ok := c.DataMgr.GetServiceInfo(argv.ServiceName)
 	if !ok {
 		return nil, errors.New("不存在该服务")
 	}
-	nowTime := time.Now().Unix()
 	result := &GetInstancesResult{ServiceName: argv.ServiceName,
-		Instances: make([]*pb.InstanceInfo, 0, len(service.Instances))}
-	//健康信息过滤
-	if argv.SkipHealthFilter {
-		result.Instances = service.Instances
-	} else {
-		for _, instance := range service.Instances {
-			healthInfo, ok := c.dataMgr.GetHealthInfo(argv.ServiceName, instance.InstanceID)
-			if !ok {
-				continue
-			}
-			if healthInfo.LastHeartBeat+3*healthInfo.TTL < nowTime {
-				continue
-			}
-			result.Instances = append(result.Instances, instance)
-		}
-	}
-
+		Instances: service.Instances}
 	return result, nil
 }
 
-func (c *DiscoveryCli) processConsistentRouter(srcInstanceID string, dstInstances []*pb.InstanceInfo) (*ProcessRouterResult, error) {
+func (c *DiscoveryCli) processConsistentRouter(srcInstanceID int64, dstInstances []*pb.InstanceInfo) (*ProcessRouterResult, error) {
 	hash := consistent.New()
 	dict := make(map[string]*pb.InstanceInfo)
 	for _, v := range dstInstances {
-		dict[v.InstanceID] = v
-		hash.Add(v.InstanceID)
+		address := util.Address(v.Host, v.Port)
+		dict[address] = v
+		hash.Add(address)
 	}
-	dstInstanceID, err := hash.Get(srcInstanceID)
+	dstInstanceID, err := hash.Get(strconv.FormatInt(srcInstanceID, 10))
 	if err != nil {
 		return nil, err
 	}
@@ -91,12 +73,12 @@ func (c *DiscoveryCli) processWeightRouter(dstInstances []*pb.InstanceInfo) (*Pr
 	return &ProcessRouterResult{DstInstance: maxWeight}, nil
 }
 
-func (c *DiscoveryCli) processTargetRouter(srcInstanceID string, dstService string) (*ProcessRouterResult, error) {
-	target, ok := c.dataMgr.GetTargetRouter(dstService, srcInstanceID, false)
+func (c *DiscoveryCli) processTargetRouter(srcInstanceID int64, dstService string) (*ProcessRouterResult, error) {
+	target, ok := c.DataMgr.GetTargetRouter(dstService, srcInstanceID)
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
-	instance, ok := c.dataMgr.GetInstanceInfo(dstService, target.DstInstanceID)
+	instance, ok := c.DataMgr.GetInstanceInfo(dstService, target.DstInstanceID)
 	if !ok {
 		return nil, errors.New("没有目标实例")
 	}
@@ -104,11 +86,11 @@ func (c *DiscoveryCli) processTargetRouter(srcInstanceID string, dstService stri
 }
 
 func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string) (*ProcessRouterResult, error) {
-	v, ok := c.dataMgr.GetKVRouter(dstService, key, false)
+	v, ok := c.DataMgr.GetKVRouter(dstService, key)
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
-	instance, ok := c.dataMgr.GetInstanceInfo(dstService, v.DstInstanceID)
+	instance, ok := c.DataMgr.GetInstanceInfo(dstService, v.DstInstanceID)
 	if !ok {
 		return nil, errors.New("没有目标实例")
 	}
@@ -119,7 +101,7 @@ func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string) (*Pr
 func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterResult, error) {
 	instances := argv.DstService.GetInstance()
 	if instances == nil || len(instances) == 0 {
-		service, ok := c.dataMgr.GetServiceInfo(argv.DstService.GetServiceName())
+		service, ok := c.DataMgr.GetServiceInfo(argv.DstService.GetServiceName())
 		if !ok {
 			return nil, errors.New("不存在目标服务")
 		}
@@ -163,7 +145,7 @@ type DstService interface {
 
 type ProcessRouterArgv struct {
 	Method        int32
-	SrcInstanceID string
+	SrcInstanceID int64
 	DstService    DstService
 	//可选的，只有kv需要
 	Key string
@@ -181,12 +163,11 @@ type DiscoveryAPI interface {
 func NewDiscoveryAPIStandalone(
 	config *config.Config,
 	conn connMgr.ConnManager,
-	mgr dataMgr.ServiceDataManager,
+	dmgr dataMgr.ServiceDataManager,
 ) DiscoveryAPI {
-	ctx := NewAPIContextStandalone(config, conn)
+	ctx := NewAPIContextStandalone(config, conn, dmgr)
 	return &DiscoveryCli{
 		APIContext: ctx,
-		dataMgr:    mgr,
 	}
 }
 
@@ -195,9 +176,5 @@ func NewDiscoveryAPI() (DiscoveryAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	dataManager, err := dataMgr.Instance()
-	if err != nil {
-		return nil, err
-	}
-	return &DiscoveryCli{ctx, dataManager}, nil
+	return &DiscoveryCli{ctx}, nil
 }

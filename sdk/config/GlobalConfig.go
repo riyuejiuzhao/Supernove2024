@@ -18,10 +18,8 @@ func (s InstanceConfig) String() string {
 
 type Config struct {
 	Global struct {
-		DiscoverService []InstanceConfig `yaml:"DiscoverService"`
-		RegisterService []InstanceConfig `yaml:"RegisterService"`
-		HealthService   []InstanceConfig `yaml:"HealthService"`
-		Register        struct {
+		EtcdService []InstanceConfig `yaml:"Etcd"`
+		Register    struct {
 			DefaultWeight int32 `yaml:"DefaultWeight"`
 			DefaultTTL    int64 `yaml:"DefaultTTL"`
 		} `yaml:"Register"`

@@ -1,7 +1,6 @@
 package util
 
 import (
-	"Supernove2024/pb"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -20,12 +19,8 @@ const (
 	KVRouterType
 )
 
-func NewServiceInfo(serviceName string) *pb.ServiceInfo {
-	return &pb.ServiceInfo{
-		ServiceName: serviceName,
-		Revision:    0,
-		Instances:   make([]*pb.InstanceInfo, 0),
-	}
+func Address(host string, port int32) string {
+	return fmt.Sprintf("%s:%v", host, port)
 }
 
 func Map[T any, V any](list []T, fun func(T) V) []V {

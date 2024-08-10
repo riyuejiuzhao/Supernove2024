@@ -7,11 +7,10 @@ import (
 )
 
 type ServiceDataManager interface {
-	GetHealthInfo(serviceName string, instanceID string) (*pb.InstanceHealthInfo, bool)
 	GetServiceInfo(serviceName string) (*pb.ServiceInfo, bool)
-	GetInstanceInfo(serviceName string, instanceID string) (*pb.InstanceInfo, bool)
-	GetTargetRouter(ServiceName string, SrcInstanceID string, skipTimeCheck bool) (*pb.TargetRouterInfo, bool)
-	GetKVRouter(ServiceName string, Key string, skipTimeCheck bool) (*pb.KVRouterInfo, bool)
+	GetInstanceInfo(serviceName string, instanceID int64) (*pb.InstanceInfo, bool)
+	GetTargetRouter(ServiceName string, SrcInstanceID int64) (*pb.TargetRouterInfo, bool)
+	GetKVRouter(ServiceName string, Key string) (*pb.KVRouterInfo, bool)
 }
 
 var (

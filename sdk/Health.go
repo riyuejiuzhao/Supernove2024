@@ -1,10 +1,12 @@
 package sdk
 
 import (
-	"Supernove2024/pb"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/dataMgr"
 	"context"
+	"errors"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type HealthCli struct {
@@ -13,22 +15,22 @@ type HealthCli struct {
 
 type HeartBeatArgv struct {
 	ServiceName string
-	InstanceID  string
+	InstanceID  int64
 }
 
 func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) error {
-	conn, err := c.ConnManager.GetServiceConn(connMgr.HealthCheck)
+	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
 		return err
 	}
-	rpcCli := pb.NewHealthServiceClient(conn)
-	_, err = rpcCli.HeartBeat(context.Background(),
-		&pb.HeartBeatRequest{
-			ServiceName: argv.ServiceName,
-			InstanceID:  argv.InstanceID,
-		})
+	ch, err := client.KeepAlive(context.Background(), clientv3.LeaseID(argv.InstanceID))
 	if err != nil {
 		return err
+	}
+
+	ka, ok := <-ch
+	if !ok || ka == nil {
+		return errors.New("实例已经超时")
 	}
 	return nil
 }
@@ -42,8 +44,9 @@ type HealthAPI interface {
 func NewHealthAPIStandalone(
 	config *config.Config,
 	conn connMgr.ConnManager,
+	dmgr dataMgr.ServiceDataManager,
 ) HealthAPI {
-	ctx := NewAPIContextStandalone(config, conn)
+	ctx := NewAPIContextStandalone(config, conn, dmgr)
 	return &HealthCli{
 		APIContext: ctx,
 	}
