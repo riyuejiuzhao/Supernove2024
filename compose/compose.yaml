@@ -1,32 +1,5 @@
 version: "3.9"
 services:
-# register:
-#   image: mini-router/register-svr
-#   container_name: register-svr
-#   ports:
-#     - "30000:8080"
-#     - "40000:9090"
-#   command: "./myapp -rpc 0.0.0.0:8080 -metrics 0.0.0.0:9090 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
-#   networks:
-#     - mini-router-net
-# discovery:
-#   image: mini-router/discovery-svr
-#   container_name: discovery-svr
-#   ports:
-#     - "31000:8080"
-#     - "41000:9090"
-#   command: "./myapp -rpc 0.0.0.0:8080 -metrics 0.0.0.0:9090 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
-#   networks:
-#     - mini-router-net
-# health:
-#   image: mini-router/health-svr
-#   container_name: health-svr
-#   ports:
-#     - "32000:8080"
-#     - "42000:9090"
-#   command: "./myapp -rpc 0.0.0.0:8080 -metrics 0.0.0.0:9090 -redis-addr 9.134.93.168:6380 -redis-password SDZsdz2000 -redis-db 0"
-#   networks:
-#     - mini-router-net
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -41,9 +14,9 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
     network_mode: host
-  etcd:
+  etcd0:
     image: quay.io/coreos/etcd
-    container_name: etcd
+    container_name: etcd0
     command: >
       /usr/local/bin/etcd
       --name s1
@@ -51,8 +24,46 @@ services:
       --listen-client-urls http://0.0.0.0:2379
       --advertise-client-urls http://0.0.0.0:2379
       --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls: http://127.0.0.1:2380
+      --initial-cluster: etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
+      --initial-cluster-state: new
+      --initial-cluster-token: etcd-cluster      
       --listen-metrics-urls http://0.0.0.0:2381
-      --metrics extensive
+      --metrics basic
+    network_mode: host
+  etcd1:
+    image: quay.io/coreos/etcd
+    container_name: etcd1
+    command: >
+      /usr/local/bin/etcd
+      --name s1
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2479
+      --advertise-client-urls http://0.0.0.0:2479
+      --listen-peer-urls http://0.0.0.0:2480
+      --initial-advertise-peer-urls: http://127.0.0.1:2480
+      --initial-cluster: etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
+      --initial-cluster-state: new
+      --initial-cluster-token: etcd-cluster      
+      --listen-metrics-urls http://0.0.0.0:2481
+      --metrics basic
+    network_mode: host
+  etcd2:
+    image: quay.io/coreos/etcd
+    container_name: etcd2
+    command: >
+      /usr/local/bin/etcd
+      --name s1
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2579
+      --advertise-client-urls http://0.0.0.0:2579
+      --listen-peer-urls http://0.0.0.0:2580
+      --initial-advertise-peer-urls: http://127.0.0.1:2580
+      --initial-cluster: etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
+      --initial-cluster-state: new
+      --initial-cluster-token: etcd-cluster      
+      --listen-metrics-urls http://0.0.0.0:2581
+      --metrics basic
     network_mode: host
 
 volumes:
