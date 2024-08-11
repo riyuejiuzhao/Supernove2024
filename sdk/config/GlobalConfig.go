@@ -24,8 +24,6 @@ type Config struct {
 			DefaultTTL    int64 `yaml:"DefaultTTL"`
 		} `yaml:"Register"`
 		Discovery struct {
-			//获取远程服务的时间间隔
-			DefaultTimeout int32 `yaml:"DefaultTimeout"`
 			//Service
 			DstService []string `yaml:"DstService"`
 		} `yaml:"Discovery"`
@@ -34,7 +32,7 @@ type Config struct {
 }
 
 var globalConfig *Config = nil
-var GlobalConfigFilePath = ""
+var GlobalConfigFilePath = "mini-router.yaml"
 
 func GlobalConfig() (*Config, error) {
 	if globalConfig != nil {

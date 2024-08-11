@@ -6,7 +6,6 @@ import (
 	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/sdk/metrics"
 	"context"
-	"errors"
 	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"time"
@@ -30,14 +29,8 @@ func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) (err error) {
 	if err != nil {
 		return
 	}
-	ch, err := client.KeepAlive(context.Background(), clientv3.LeaseID(argv.InstanceID))
+	_, err = client.KeepAliveOnce(context.Background(), clientv3.LeaseID(argv.InstanceID))
 	if err != nil {
-		return
-	}
-
-	ka, ok := <-ch
-	if !ok || ka == nil {
-		err = errors.New("实例已经超时")
 		return
 	}
 	return
