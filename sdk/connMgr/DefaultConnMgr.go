@@ -14,7 +14,7 @@ type DefaultConnManager struct {
 }
 
 func newAddressPoolDic(serviceConfig []config.InstanceConfig) (*clientv3.Client, error) {
-	addresses := util.Map(serviceConfig, func(t config.InstanceConfig) string {
+	addresses := util.SliceMap(serviceConfig, func(t config.InstanceConfig) string {
 		return util.Address(t.Host, t.Port)
 	})
 	client, err := clientv3.New(clientv3.Config{

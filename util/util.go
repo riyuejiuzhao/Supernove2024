@@ -23,7 +23,17 @@ func Address(host string, port int32) string {
 	return fmt.Sprintf("%s:%v", host, port)
 }
 
-func Map[T any, V any](list []T, fun func(T) V) []V {
+func DicMap[K0 comparable, V0 any, K1 comparable, V1 any](
+	m map[K0]V0, fun func(key K0, val V0) (K1, V1)) map[K1]V1 {
+	rt := make(map[K1]V1)
+	for k, v := range m {
+		k1, v1 := fun(k, v)
+		rt[k1] = v1
+	}
+	return rt
+}
+
+func SliceMap[T any, V any](list []T, fun func(T) V) []V {
 	rt := make([]V, 0, len(list))
 	for _, v := range list {
 		rt = append(rt, fun(v))

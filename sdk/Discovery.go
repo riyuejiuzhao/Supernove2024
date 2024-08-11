@@ -146,15 +146,15 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterRes
 }
 
 type DefaultDstService struct {
-	serviceName string
-	instances   []*pb.InstanceInfo
+	ServiceName string
+	Instances   []*pb.InstanceInfo
 }
 
 func (d *DefaultDstService) GetServiceName() string {
-	return d.serviceName
+	return d.ServiceName
 }
 func (d *DefaultDstService) GetInstance() []*pb.InstanceInfo {
-	return d.instances
+	return d.Instances
 }
 
 type DstService interface {
