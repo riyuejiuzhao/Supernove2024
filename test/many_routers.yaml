@@ -1,0 +1,26 @@
+Global:
+  Etcd:
+    - Host: 127.0.0.1
+      Port: 2379
+    - Host: 127.0.0.1
+      Port: 2479
+    - Host: 127.0.0.1
+      Port: 2579
+  Register:
+    DefaultWeight: 10
+    DefaultTTL: 200000
+  Discovery:
+    DefaultTimeout: 10
+    DstService:
+      - testDiscovery0
+      - testDiscovery1
+      - testDiscovery2
+      - testDiscovery3
+      - testDiscovery4
+      - testDiscovery5
+      - testDiscovery6
+      - testDiscovery7
+      - testDiscovery8
+      - testDiscovery9
+  Metrics: 127.0.0.1:10000
+

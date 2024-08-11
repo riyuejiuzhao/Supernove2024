@@ -3,6 +3,9 @@ test:
 	go test -run TestHealthSvr
 	go test -run TestDiscoverSvr
 
+many-router:
+	go test -run TestManyRouter -timeout 30m
+
 many-instance:
 	go test -run TestManyInstance
 

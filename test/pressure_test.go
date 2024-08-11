@@ -63,7 +63,7 @@ func (c *MiniDiscoveryClient) Start() {
 		return
 	}
 
-	dmgr := dataMgr.NewDefaultServiceMgr(globalConfig, conn)
+	dmgr := dataMgr.NewDefaultServiceMgr(globalConfig, conn, c.mt)
 
 	registerAPI := sdk.NewRegisterAPIStandalone(globalConfig, conn, dmgr, c.mt)
 	reply, err := registerAPI.Register(&sdk.RegisterArgv{
@@ -134,8 +134,8 @@ func TestManyDiscovery(t *testing.T) {
 	mt := metrics.NewMetricsMgr(cfg)
 
 	serviceName := "testDiscovery"
-	serviceNum := 10
-	instanceNum := 300
+	serviceNum := 100
+	instanceNum := 100
 	testData := make([]*MiniDiscoveryClient, 0)
 	var wg sync.WaitGroup
 
@@ -170,7 +170,4 @@ func TestManyDiscovery(t *testing.T) {
 	}
 
 	wg.Wait()
-}
-
-func TestManyRouter(t *testing.T) {
 }
