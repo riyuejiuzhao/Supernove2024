@@ -1,4 +1,4 @@
-package test
+package unit_test
 
 import (
 	"Supernove2024/sdk"

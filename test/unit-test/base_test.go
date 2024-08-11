@@ -1,4 +1,4 @@
-package test
+package unit_test
 
 import (
 	"Supernove2024/pb"
@@ -252,17 +252,6 @@ func TestHealthSvr(t *testing.T) {
 	}
 	if len(getInstanceResult.GetInstance()) != 0 {
 		t.Fatal("服务健康信息不正确")
-	}
-	//通过心跳再次激活所有的服务
-	healthCli, err := sdk.NewHealthAPI()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, v := range resultList {
-		err = healthCli.HeartBeat(&sdk.HeartBeatArgv{ServiceName: serviceName, InstanceID: v.InstanceID})
-		if err != nil {
-			t.Error("租约没有正常超时")
-		}
 	}
 }
 

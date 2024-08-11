@@ -1,0 +1,11 @@
+Global:
+  Etcd:
+    - Host: 127.0.0.1
+      Port: 2379
+  Register:
+    DefaultWeight: 10
+    DefaultTTL: 10
+  Discovery:
+    DstService:
+      - B
+  Metrics: 127.0.0.1:10000
