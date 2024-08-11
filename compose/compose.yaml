@@ -14,6 +14,14 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
     network_mode: host
+  jaeger:
+    image: jaegertracing/all-in-one:1.22
+    container_name: jaeger
+    environment:
+      QUERY_PORT: 16686
+      AGENT_COMPACT_PORT: 6831
+      AGENT_BINARY_PORT: 6832
+    network_mode: host
   etcd0:
     image: quay.io/coreos/etcd
     container_name: etcd0
