@@ -19,16 +19,16 @@ services:
     container_name: etcd0
     command: >
       /usr/local/bin/etcd
-      --name s1
-      --data-dir /etcd-data
-      --listen-client-urls http://0.0.0.0:2379
-      --advertise-client-urls http://0.0.0.0:2379
-      --listen-peer-urls http://0.0.0.0:2380
-      --initial-advertise-peer-urls: http://127.0.0.1:2380
-      --initial-cluster: etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
-      --initial-cluster-state: new
-      --initial-cluster-token: etcd-cluster      
-      --listen-metrics-urls http://0.0.0.0:2381
+      --name                        etcd0
+      --data-dir                    /etcd-data
+      --listen-client-urls          http://0.0.0.0:2379
+      --advertise-client-urls       http://0.0.0.0:2379
+      --listen-peer-urls            http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://127.0.0.1:2380
+      --initial-cluster             etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
+      --initial-cluster-state       new
+      --initial-cluster-token       etcd-cluster      
+      --listen-metrics-urls         http://0.0.0.0:2381
       --metrics basic
     network_mode: host
   etcd1:
@@ -36,34 +36,34 @@ services:
     container_name: etcd1
     command: >
       /usr/local/bin/etcd
-      --name s1
-      --data-dir /etcd-data
-      --listen-client-urls http://0.0.0.0:2479
-      --advertise-client-urls http://0.0.0.0:2479
-      --listen-peer-urls http://0.0.0.0:2480
-      --initial-advertise-peer-urls: http://127.0.0.1:2480
-      --initial-cluster: etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
-      --initial-cluster-state: new
-      --initial-cluster-token: etcd-cluster      
-      --listen-metrics-urls http://0.0.0.0:2481
-      --metrics basic
+      --name                         etcd1
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2479
+      --advertise-client-urls        http://0.0.0.0:2479
+      --listen-peer-urls             http://0.0.0.0:2480
+      --initial-advertise-peer-urls  http://127.0.0.1:2480
+      --initial-cluster              etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
+      --initial-cluster-state        new
+      --initial-cluster-token        etcd-cluster      
+      --listen-metrics-urls          http://0.0.0.0:2481
+      --metrics                      basic
     network_mode: host
   etcd2:
     image: quay.io/coreos/etcd
     container_name: etcd2
     command: >
       /usr/local/bin/etcd
-      --name s1
-      --data-dir /etcd-data
-      --listen-client-urls http://0.0.0.0:2579
-      --advertise-client-urls http://0.0.0.0:2579
-      --listen-peer-urls http://0.0.0.0:2580
-      --initial-advertise-peer-urls: http://127.0.0.1:2580
-      --initial-cluster: etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
-      --initial-cluster-state: new
-      --initial-cluster-token: etcd-cluster      
-      --listen-metrics-urls http://0.0.0.0:2581
-      --metrics basic
+      --name                         etcd2
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2579
+      --advertise-client-urls        http://0.0.0.0:2579
+      --listen-peer-urls             http://0.0.0.0:2580
+      --initial-advertise-peer-urls  http://127.0.0.1:2580
+      --initial-cluster              etcd0=http://127.0.0.1:2380,etcd1=http://127.0.0.1:2480,etcd2=http://127.0.0.1:2580
+      --initial-cluster-state        new
+      --initial-cluster-token        etcd-cluster      
+      --listen-metrics-urls          http://0.0.0.0:2581
+      --metrics                      basic
     network_mode: host
 
 volumes:
