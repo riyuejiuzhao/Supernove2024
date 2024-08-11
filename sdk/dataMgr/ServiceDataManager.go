@@ -4,6 +4,7 @@ import (
 	"Supernove2024/pb"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/metrics"
 )
 
 type ServiceDataManager interface {
@@ -28,7 +29,11 @@ func Instance() (ServiceDataManager, error) {
 		if err != nil {
 			return nil, err
 		}
-		serviceDataMgr = NewServiceDataManager(cfg, conn)
+		mt, err := metrics.Instance()
+		if err != nil {
+			return nil, err
+		}
+		serviceDataMgr = NewServiceDataManager(cfg, conn, mt)
 	}
 	return serviceDataMgr, nil
 }

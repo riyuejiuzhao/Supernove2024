@@ -21,29 +21,26 @@ type HeartBeatArgv struct {
 	InstanceID  int64
 }
 
-var heartBeat = prometheus.Labels{"Method": "HeartBeat"}
-
-func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) error {
+func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) (err error) {
 	begin := time.Now()
 	defer func() {
-		duration := time.Since(begin).Milliseconds()
-		c.Metrics.MethodTime.With(addKVRouterLabel).Observe(float64(duration))
-		c.Metrics.MethodCounter.With(addKVRouterLabel).Inc()
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "HeartBeat"}, err)
 	}()
 	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
-		return err
+		return
 	}
 	ch, err := client.KeepAlive(context.Background(), clientv3.LeaseID(argv.InstanceID))
 	if err != nil {
-		return err
+		return
 	}
 
 	ka, ok := <-ch
 	if !ok || ka == nil {
-		return errors.New("实例已经超时")
+		err = errors.New("实例已经超时")
+		return
 	}
-	return nil
+	return
 }
 
 // HealthAPI 功能：

@@ -5,10 +5,12 @@ import (
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
 	"log"
 	"sync"
+	"time"
 )
 
 type KVRouterBuffer interface {
@@ -148,6 +150,30 @@ func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, SrcInstanceID
 	delete(b.TargetRouterDic, SrcInstanceID)
 }
 
+func (m *DefaultServiceMgr) handleKVRouterDelete(serviceName string, ev *clientv3.Event) {
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "KVRouterDelete"}, nil)
+	}()
+	key := util.KVRouterKey2Key(string(ev.Kv.Key), serviceName)
+	m.RemoveKVRouter(serviceName, key)
+}
+
+func (m *DefaultServiceMgr) handleKVRouterPut(serviceName string, ev *clientv3.Event) (err error) {
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "KVRouterPut"}, err)
+	}()
+	info := &pb.KVRouterInfo{}
+	err = proto.Unmarshal(ev.Kv.Value, info)
+	if err != nil {
+		util.Error("err %v", err)
+		return
+	}
+	m.AddKVRouter(serviceName, info)
+	return
+}
+
 func (m *DefaultServiceMgr) handleWatchKVRouter(serviceName string) {
 	cli, err := m.connManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
@@ -159,16 +185,11 @@ func (m *DefaultServiceMgr) handleWatchKVRouter(serviceName string) {
 		for _, ev := range wresp.Events {
 			switch ev.Type {
 			case clientv3.EventTypePut:
-				info := &pb.KVRouterInfo{}
-				err = proto.Unmarshal(ev.Kv.Value, info)
+				err = m.handleKVRouterPut(serviceName, ev)
 				if err != nil {
-					util.Error("err %v", err)
-					continue
+					util.Error("kv router err: %v", err)
 				}
-				m.AddKVRouter(serviceName, info)
 			case clientv3.EventTypeDelete:
-				key := util.KVRouterKey2Key(string(ev.Kv.Key), serviceName)
-				m.RemoveKVRouter(serviceName, key)
 			}
 		}
 	}

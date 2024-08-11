@@ -4,12 +4,15 @@ import (
 	"Supernove2024/pb"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
 	"log"
 	"sync"
+	"time"
 )
 
 type SyncContainer[T any] struct {
@@ -26,6 +29,7 @@ type ServiceInfoBuffer struct {
 type DefaultServiceMgr struct {
 	config      *config.Config
 	connManager connMgr.ConnManager
+	mt          *metrics.MetricsManager
 
 	serviceBuffer *SyncContainer[map[string]*ServiceInfoBuffer]
 	routerBuffer  *SyncContainer[map[string]*ServiceRouterBuffer]
@@ -121,6 +125,30 @@ func (m *DefaultServiceMgr) GetInstanceInfo(serviceName string, instanceID int64
 	return info, ok
 }
 
+func (m *DefaultServiceMgr) handleInstancePut(serviceName string, ev *clientv3.Event) (err error) {
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "InstanceKeyPut"}, err)
+	}()
+	info := &pb.InstanceInfo{}
+	err = proto.Unmarshal(ev.Kv.Value, info)
+	if err != nil {
+		util.Error("err %v", err)
+		return
+	}
+	m.AddInstance(serviceName, info)
+	return
+}
+
+func (m *DefaultServiceMgr) handleInstanceDelete(serviceName string, ev *clientv3.Event) {
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "InstanceKeyDelete"}, nil)
+	}()
+	address := util.InstanceKey2Address(string(ev.Kv.Key), serviceName)
+	m.RemoveInstanceByAddress(serviceName, address)
+}
+
 func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
 	cli, err := m.connManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
@@ -132,16 +160,12 @@ func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
 		for _, ev := range wresp.Events {
 			switch ev.Type {
 			case clientv3.EventTypePut:
-				info := &pb.InstanceInfo{}
-				err = proto.Unmarshal(ev.Kv.Value, info)
+				err = m.handleInstancePut(serviceName, ev)
 				if err != nil {
-					util.Error("err %v", err)
-					continue
+					util.Error("Put err: %v", err)
 				}
-				m.AddInstance(serviceName, info)
 			case clientv3.EventTypeDelete:
-				address := util.InstanceKey2Address(string(ev.Kv.Key), serviceName)
-				m.RemoveInstanceByAddress(serviceName, address)
+				m.handleInstanceDelete(serviceName, ev)
 			}
 		}
 	}
@@ -176,10 +200,15 @@ func (m *DefaultServiceMgr) startFlushInfo() {
 	}
 }
 
-func NewDefaultServiceMgr(config *config.Config, manager connMgr.ConnManager) *DefaultServiceMgr {
+func NewDefaultServiceMgr(
+	config *config.Config,
+	manager connMgr.ConnManager,
+	mt *metrics.MetricsManager,
+) *DefaultServiceMgr {
 	mgr := &DefaultServiceMgr{
 		config:      config,
 		connManager: manager,
+		mt:          mt,
 
 		serviceBuffer: &SyncContainer[map[string]*ServiceInfoBuffer]{
 			Value: make(map[string]*ServiceInfoBuffer),

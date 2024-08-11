@@ -37,14 +37,10 @@ type DeregisterArgv struct {
 	InstanceID  int64
 }
 
-var registerLabel = prometheus.Labels{"Method": "Register"}
-
-func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
+func (c *RegisterCli) Register(service *RegisterArgv) (result *RegisterResult, err error) {
 	begin := time.Now()
 	defer func() {
-		duration := time.Since(begin).Milliseconds()
-		c.Metrics.MethodTime.With(registerLabel).Observe(float64(duration))
-		c.Metrics.MethodCounter.With(registerLabel).Inc()
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "Register"}, err)
 	}()
 	key := util.InstanceKey(service.ServiceName, service.Host, service.Port)
 	var weight int32
@@ -63,11 +59,11 @@ func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 
 	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
-		return nil, err
+		return
 	}
 	resp, err := client.Grant(context.Background(), ttl)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	instanceInfo := &pb.InstanceInfo{
@@ -80,33 +76,30 @@ func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
 
 	bytes, err := proto.Marshal(instanceInfo)
 	if err != nil {
-		return nil, err
+		return
 	}
 	_, err = client.Put(context.Background(), key, string(bytes), clientv3.WithLease(resp.ID))
 	if err != nil {
-		return nil, err
+		return
 	}
-	return &RegisterResult{InstanceID: instanceInfo.InstanceID}, nil
+	result = &RegisterResult{InstanceID: instanceInfo.InstanceID}
+	return
 }
 
-var deregisterLabel = prometheus.Labels{"Method": "Deregister"}
-
-func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
+func (c *RegisterCli) Deregister(service *DeregisterArgv) (err error) {
 	begin := time.Now()
 	defer func() {
-		duration := time.Since(begin).Milliseconds()
-		c.Metrics.MethodTime.With(deregisterLabel).Observe(float64(duration))
-		c.Metrics.MethodCounter.With(deregisterLabel).Inc()
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "Deregister"}, err)
 	}()
 	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
-		return err
+		return
 	}
 	_, err = client.Revoke(context.Background(), clientv3.LeaseID(service.InstanceID))
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+	return
 }
 
 type AddTargetRouterArgv struct {
@@ -123,23 +116,19 @@ type AddKVRouterArgv struct {
 	Timeout        int64
 }
 
-var addTargetRouterLabel = prometheus.Labels{"Method": "AddTargetRouter"}
-
-func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
+func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (err error) {
 	begin := time.Now()
 	defer func() {
-		duration := time.Since(begin).Milliseconds()
-		c.Metrics.MethodTime.With(addTargetRouterLabel).Observe(float64(duration))
-		c.Metrics.MethodCounter.With(addTargetRouterLabel).Inc()
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddTargetRouter"}, err)
 	}()
 	key := util.RouterTargetInfoKey(argv.DstServiceName, argv.SrcInstanceID)
 	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
-		return err
+		return
 	}
 	resp, err := client.Grant(context.Background(), argv.Timeout)
 	if err != nil {
-		return err
+		return
 	}
 
 	info := &pb.TargetRouterInfo{
@@ -152,32 +141,28 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
 
 	bytes, err := proto.Marshal(info)
 	if err != nil {
-		return err
+		return
 	}
 	_, err = client.Put(context.Background(), key, string(bytes), clientv3.WithLease(resp.ID))
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+	return
 }
 
-var addKVRouterLabel = prometheus.Labels{"Method": "AddKVRouter"}
-
-func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) error {
+func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (err error) {
 	begin := time.Now()
 	defer func() {
-		duration := time.Since(begin).Milliseconds()
-		c.Metrics.MethodTime.With(addKVRouterLabel).Observe(float64(duration))
-		c.Metrics.MethodCounter.With(addKVRouterLabel).Inc()
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddKVRouter"}, err)
 	}()
 	key := util.RouterKVInfoKey(argv.DstServiceName, argv.Key)
 	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
 	if err != nil {
-		return err
+		return
 	}
 	resp, err := client.Grant(context.Background(), argv.Timeout)
 	if err != nil {
-		return err
+		return
 	}
 
 	info := &pb.KVRouterInfo{
@@ -190,13 +175,13 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) error {
 
 	bytes, err := proto.Marshal(info)
 	if err != nil {
-		return err
+		return
 	}
 	_, err = client.Put(context.Background(), key, string(bytes), clientv3.WithLease(resp.ID))
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+	return
 }
 
 // RegisterAPI 功能：

@@ -6,12 +6,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	"time"
 )
 
 type MetricsManager struct {
 	//Metrics
 	MethodCounter *prometheus.CounterVec
 	MethodTime    *prometheus.SummaryVec
+	MethodFailed  *prometheus.CounterVec
 }
 
 var (
@@ -33,13 +35,23 @@ func NewMetricsMgr(cfg *config.Config) *MetricsManager {
 			},
 			[]string{"Method"},
 		),
+		MethodFailed: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "MethodFailed_count",
+			},
+			[]string{"Method"},
+		),
 	}
 
 	go func() {
 		if cfg.Global.Metrics == "" {
 			return
 		}
-		prometheus.MustRegister(mMgr.MethodCounter, mMgr.MethodTime)
+		prometheus.MustRegister(
+			mMgr.MethodCounter,
+			mMgr.MethodTime,
+			mMgr.MethodFailed,
+		)
 		http.Handle("/metrics", promhttp.Handler())
 		err := http.ListenAndServe(cfg.Global.Metrics, nil)
 		if err != nil {
@@ -58,4 +70,13 @@ func Instance() (*MetricsManager, error) {
 		metricsMgr = NewMetricsMgr(cfg)
 	}
 	return metricsMgr, nil
+}
+
+func (mt *MetricsManager) MetricsUpload(begin time.Time, label prometheus.Labels, err error) {
+	duration := time.Since(begin).Milliseconds()
+	mt.MethodTime.With(label).Observe(float64(duration))
+	mt.MethodCounter.With(label).Inc()
+	if err != nil {
+		mt.MethodFailed.With(label).Inc()
+	}
 }

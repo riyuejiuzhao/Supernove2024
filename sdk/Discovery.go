@@ -8,6 +8,7 @@ import (
 	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"errors"
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"stathat.com/c/consistent"
 	"strconv"
@@ -35,23 +36,21 @@ type DiscoveryCli struct {
 	*APIContext
 }
 
-var getInstancesLabel = prometheus.Labels{"Method": "GetInstances"}
-
-func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (*GetInstancesResult, error) {
+func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (result *GetInstancesResult, err error) {
 	begin := time.Now()
 	defer func() {
-		duration := time.Since(begin).Milliseconds()
-		c.Metrics.MethodTime.With(getInstancesLabel).Observe(float64(duration))
-		c.Metrics.MethodCounter.With(getInstancesLabel).Inc()
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "GetInstances"}, err)
 	}()
 	//在缓存数据中查找
 	service, ok := c.DataMgr.GetServiceInfo(argv.ServiceName)
 	if !ok {
-		return nil, errors.New("不存在该服务")
+		result = nil
+		err = errors.New("不存在该服务")
+		return
 	}
-	result := &GetInstancesResult{ServiceName: argv.ServiceName,
+	result = &GetInstancesResult{ServiceName: argv.ServiceName,
 		Instances: service.Instances}
-	return result, nil
+	return
 }
 
 func (c *DiscoveryCli) processConsistentRouter(srcInstanceID int64, dstInstances []*pb.InstanceInfo) (*ProcessRouterResult, error) {
@@ -108,21 +107,20 @@ func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string) (*Pr
 	return &ProcessRouterResult{DstInstance: instance}, nil
 }
 
-var processRouterLabel = prometheus.Labels{"Method": "ProcessRouter"}
-
 // ProcessRouter 如果没有提供可选的Instance，那么自动从缓冲中获取
-func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (*ProcessRouterResult, error) {
+func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (result *ProcessRouterResult, err error) {
 	begin := time.Now()
 	defer func() {
-		duration := time.Since(begin).Milliseconds()
-		c.Metrics.MethodTime.With(processRouterLabel).Observe(float64(duration))
-		c.Metrics.MethodCounter.With(processRouterLabel).Inc()
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "ProcessRouter"}, err)
 	}()
 	instances := argv.DstService.GetInstance()
 	if instances == nil || len(instances) == 0 {
 		service, ok := c.DataMgr.GetServiceInfo(argv.DstService.GetServiceName())
 		if !ok {
-			return nil, errors.New("不存在目标服务")
+			err = errors.New(fmt.Sprintf(
+				"不存在目标服务 %s",
+				argv.DstService.GetServiceName()))
+			return
 		}
 		instances = service.Instances
 	}
