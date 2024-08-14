@@ -1,0 +1,106 @@
+version: "3.9"
+services:
+  etcd0:
+    image: quay.io/coreos/etcd
+    container_name: etcd0
+    command: >
+      /usr/local/bin/etcd
+      --name                        etcd0
+      --data-dir                    /etcd-data
+      --listen-client-urls          http://0.0.0.0:2301
+      --advertise-client-urls       http://0.0.0.0:2301
+      --listen-peer-urls            http://0.0.0.0:2302
+      --listen-metrics-urls         http://0.0.0.0:2303
+      --metrics basic
+    network_mode: host
+  etcd1:
+    image: quay.io/coreos/etcd
+    container_name: etcd1
+    command: >
+      /usr/local/bin/etcd
+      --name                         etcd1
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2311
+      --advertise-client-urls        http://0.0.0.0:2311
+      --listen-peer-urls             http://0.0.0.0:2312
+      --listen-metrics-urls          http://0.0.0.0:2313
+      --metrics                      basic
+    network_mode: host
+  etcd2:
+    image: quay.io/coreos/etcd
+    container_name: etcd2
+    command: >
+      /usr/local/bin/etcd
+      --name                         etcd2
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2321
+      --advertise-client-urls        http://0.0.0.0:2321
+      --listen-peer-urls             http://0.0.0.0:2322
+      --listen-metrics-urls          http://0.0.0.0:2323
+      --metrics                      basic
+    network_mode: host
+  etcd3:
+    image: quay.io/coreos/etcd
+    container_name: etcd3
+    command: >
+      /usr/local/bin/etcd
+      --name                         etcd3
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2331
+      --advertise-client-urls        http://0.0.0.0:2331
+      --listen-peer-urls             http://0.0.0.0:2332
+      --listen-metrics-urls          http://0.0.0.0:2333
+      --metrics                      basic
+    network_mode: host
+  etcd4:
+    image: quay.io/coreos/etcd
+    container_name: etcd4
+    command: >
+      /usr/local/bin/etcd
+      --name                         etcd4
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2341
+      --advertise-client-urls        http://0.0.0.0:2341
+      --listen-peer-urls             http://0.0.0.0:2342
+      --listen-metrics-urls          http://0.0.0.0:2343
+      --metrics                      basic
+    network_mode: host
+  etcd5:
+    image: quay.io/coreos/etcd
+    container_name: etcd5
+    command: >
+      /usr/local/bin/etcd
+      --name                         etcd5
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2351
+      --advertise-client-urls        http://0.0.0.0:2351
+      --listen-peer-urls             http://0.0.0.0:2352
+      --listen-metrics-urls          http://0.0.0.0:2353
+      --metrics                      basic
+    network_mode: host
+  etcd6:
+    image: quay.io/coreos/etcd
+    container_name: etcd6
+    command: >
+      /usr/local/bin/etcd
+      --name                         etcd6
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2361
+      --advertise-client-urls        http://0.0.0.0:2361
+      --listen-peer-urls             http://0.0.0.0:2362
+      --listen-metrics-urls          http://0.0.0.0:2363
+      --metrics                      basic
+    network_mode: host
+  etcd7:
+    image: quay.io/coreos/etcd
+    container_name: etcd7
+    command: >
+      /usr/local/bin/etcd
+      --name                         etcd7
+      --data-dir                     /etcd-data
+      --listen-client-urls           http://0.0.0.0:2371
+      --advertise-client-urls        http://0.0.0.0:2371
+      --listen-peer-urls             http://0.0.0.0:2372
+      --listen-metrics-urls          http://0.0.0.0:2373
+      --metrics                      basic
+    network_mode: host
