@@ -18,12 +18,12 @@ func InstancePrefix(serviceName string) string {
 	return fmt.Sprintf("%s.%s.", ServiceHashKey, serviceName)
 }
 
-func InstanceKey2Address(key string, service string) string {
+func InstanceKey2InstanceID(key string, service string) string {
 	return strings.TrimPrefix(key, InstancePrefix(service))
 }
 
-func InstanceKey(serviceName string, host string, port int32) string {
-	return fmt.Sprintf("%s.%s.%s:%v", ServiceHashKey, serviceName, host, port)
+func InstanceKey(serviceName string, id int64) string {
+	return fmt.Sprintf("%s.%s.%v", ServiceHashKey, serviceName, id)
 }
 
 func KVRouterKey2Key(key string, service string) string {

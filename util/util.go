@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"sync"
 )
 
 const (
@@ -78,4 +79,32 @@ func Error(format string, a ...any) {
 
 func Warn(format string, a ...any) {
 	slog.Warn(fmt.Sprintf(format, a...))
+}
+
+type ServiceInfo struct {
+	Name      string
+	Instances []DstInstanceInfo
+}
+
+func (s *ServiceInfo) GetServiceName() string {
+	return s.Name
+}
+func (s *ServiceInfo) GetInstance() []DstInstanceInfo {
+	return s.Instances
+}
+
+type DstService interface {
+	GetServiceName() string
+	GetInstance() []DstInstanceInfo
+}
+
+type DstInstanceInfo interface {
+	GetInstanceID() int64
+	GetWeight() int32
+	GetHost() string
+	GetPort() int32
+}
+type SyncContainer[T any] struct {
+	Mutex sync.Mutex
+	Value T
 }
