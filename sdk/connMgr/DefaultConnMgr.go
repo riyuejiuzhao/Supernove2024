@@ -5,7 +5,6 @@ import (
 	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"errors"
-	"fmt"
 	"github.com/howeyc/crc16"
 	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -14,7 +13,7 @@ import (
 
 type ClientInfo struct {
 	*clientv3.Client
-	Address string
+	Name string
 }
 
 type DefaultConnManager struct {
@@ -29,21 +28,23 @@ func getHashSlot(key string) int {
 	return int(hashValue % HashSlots)
 }
 
-func newAddressPoolDic(serviceConfig []config.InstanceConfig) (cli []*ClientInfo, err error) {
-	cli = make([]*ClientInfo, 0)
+func newAddressPoolDic(serviceConfig []config.ClusterConfig) (cli []*ClientInfo, err error) {
+	cli = make([]*ClientInfo, 0, len(serviceConfig))
 	for _, cfg := range serviceConfig {
 		var client *clientv3.Client
-		address := util.Address(cfg.Host, cfg.Port)
+		address := util.SliceMap(cfg.Pod, func(t config.PodConfig) string {
+			return util.Address(t.Host, t.Port)
+		})
 		client, err = clientv3.New(clientv3.Config{
-			Endpoints:   []string{address},
+			Endpoints:   address,
 			DialTimeout: 5 * time.Second,
 		})
 		if err != nil {
 			return
 		}
 		cli = append(cli, &ClientInfo{
-			Client:  client,
-			Address: address,
+			Client: client,
+			Name:   cfg.Name,
 		})
 	}
 	return
@@ -81,31 +82,20 @@ func (m *DefaultConnManager) GetAllServiceConn(service ServiceType) []*clientv3.
 // GetServiceConn 指定服务的链接
 // key用来一致性哈希
 func (m *DefaultConnManager) GetServiceConn(service ServiceType, key string) (cli *clientv3.Client, err error) {
-	var connAddress string
+	var connName string
 	defer func() {
-		m.mt.ConnCount.With(prometheus.Labels{"Address": connAddress}).Inc()
+		m.mt.ConnCount.With(prometheus.Labels{"Name": connName}).Inc()
 	}()
 	if service >= ServiceTypeCount {
 		err = errors.New("指定的服务不存在")
 		return
 	}
 	p := m.poolDic[service]
-	switch service {
-	case InstancesEtcd:
-		rt := util.RandomItem(p)
-		cli = rt.Client
-		connAddress = rt.Address
-		return //util.RandomItem(p).Client, nil
-	case RoutersEtcd:
-		slot := getHashSlot(key)
-		cliInfo := hashSlot2Client(slot, p)
-		connAddress = cliInfo.Address
-		cli = cliInfo.Client
-		return
-	default:
-		err = fmt.Errorf("不支持的连接类型")
-		return
-	}
+	slot := getHashSlot(key)
+	cliInfo := hashSlot2Client(slot, p)
+	connName = cliInfo.Name
+	cli = cliInfo.Client
+	return
 }
 
 // 我们假定slot在不同的集群上分布是均匀的

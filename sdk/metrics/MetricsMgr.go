@@ -48,7 +48,7 @@ func NewMetricsMgr(cfg *config.Config) *MetricsManager {
 			prometheus.CounterOpts{
 				Name: "Conn_count",
 			},
-			[]string{"Address"},
+			[]string{"Name"},
 		),
 	}
 

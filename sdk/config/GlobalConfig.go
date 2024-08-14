@@ -8,19 +8,24 @@ import (
 	"sync"
 )
 
-type InstanceConfig struct {
+type ClusterConfig struct {
+	Name string      `yaml:"Name"`
+	Pod  []PodConfig `yaml:"Pod"`
+}
+
+type PodConfig struct {
 	Host string `yaml:"Host"`
 	Port int32  `yaml:"Port"`
 }
 
-func (s InstanceConfig) String() string {
+func (s PodConfig) String() string {
 	return fmt.Sprintf("%s:%v", s.Host, s.Port)
 }
 
 type Config struct {
 	SDK struct {
-		InstancesEtcd []InstanceConfig `yaml:"InstancesEtcd"`
-		RouterEtcd    []InstanceConfig `yaml:"RouterEtcd"`
+		InstancesEtcd []ClusterConfig `yaml:"InstancesEtcd"`
+		RouterEtcd    []ClusterConfig `yaml:"RouterEtcd"`
 		Register      struct {
 			DefaultWeight     int32 `yaml:"DefaultWeight"`
 			DefaultServiceTTL int64 `yaml:"DefaultServiceTTL"`
