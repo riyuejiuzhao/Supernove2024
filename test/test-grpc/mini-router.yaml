@@ -1,0 +1,17 @@
+SDK:
+  InstancesEtcd:
+    - Host: 127.0.0.1
+      Port: 2301
+  RouterEtcd:
+    - Host: 127.0.0.1
+      Port: 2311
+    - Host: 127.0.0.1
+      Port: 2321
+  Register:
+    DefaultWeight: 10
+    DefaultServiceTTL: 100
+    DefaultRouterTTL: 100
+  Discovery:
+    DstService:
+      - EchoService
+  Metrics: 127.0.0.1:10000
