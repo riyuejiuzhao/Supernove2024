@@ -5,10 +5,13 @@ import (
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/sdk/metrics"
+	"Supernove2024/util"
+	"sync"
 )
 
 type ServiceDataManager interface {
-	GetServiceInfo(serviceName string) (*pb.ServiceInfo, bool)
+	GetServiceInfo(serviceName string) (*util.ServiceInfo, bool)
+	WatchServiceInfo(serviceName string) (<-chan *util.ServiceInfo, error)
 	GetInstanceInfo(serviceName string, instanceID int64) (*pb.InstanceInfo, bool)
 	GetTargetRouter(ServiceName string, SrcInstanceID int64) (*pb.TargetRouterInfo, bool)
 	GetKVRouter(ServiceName string, Key string) (*pb.KVRouterInfo, bool)
@@ -19,7 +22,11 @@ var (
 	NewServiceDataManager                    = NewDefaultServiceMgr
 )
 
+var dataMgrMutex sync.Mutex
+
 func Instance() (ServiceDataManager, error) {
+	dataMgrMutex.Lock()
+	defer dataMgrMutex.Unlock()
 	if serviceDataMgr == nil {
 		cfg, err := config.GlobalConfig()
 		if err != nil {

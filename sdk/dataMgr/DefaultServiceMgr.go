@@ -11,19 +11,14 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 )
 
-type SyncContainer[T any] struct {
-	Mutex sync.Mutex
-	Value T
-}
-
 type ServiceInfoBuffer struct {
 	Mutex       sync.Mutex
 	InstanceDic map[int64]*pb.InstanceInfo
-	AddressDic  map[string]*pb.InstanceInfo
 }
 
 type DefaultServiceMgr struct {
@@ -31,11 +26,13 @@ type DefaultServiceMgr struct {
 	connManager connMgr.ConnManager
 	mt          *metrics.MetricsManager
 
-	serviceBuffer *SyncContainer[map[string]*ServiceInfoBuffer]
-	routerBuffer  *SyncContainer[map[string]*ServiceRouterBuffer]
+	serviceBuffer *util.SyncContainer[map[string]*ServiceInfoBuffer]
+	routerBuffer  *util.SyncContainer[map[string]*ServiceRouterBuffer]
+
+	watchChan *util.SyncContainer[map[string]*util.SyncContainer[[]chan<- *util.ServiceInfo]]
 }
 
-func (m *DefaultServiceMgr) RemoveInstanceByAddress(serviceName string, address string) {
+func (m *DefaultServiceMgr) RemoveInstance(serviceName string, instanceID int64) {
 	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
 		m.serviceBuffer.Mutex.Lock()
 		defer m.serviceBuffer.Mutex.Unlock()
@@ -49,12 +46,8 @@ func (m *DefaultServiceMgr) RemoveInstanceByAddress(serviceName string, address 
 		return
 	}
 	defer service.Mutex.Unlock()
-	instanceInfo, ok := service.AddressDic[address]
-	if !ok {
-		return
-	}
-	delete(service.AddressDic, address)
-	delete(service.InstanceDic, instanceInfo.InstanceID)
+	delete(service.InstanceDic, instanceID)
+	util.Info("Remove %s Instance %v", serviceName, instanceID)
 }
 
 func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInfo) {
@@ -64,7 +57,6 @@ func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInf
 		service, ok := m.serviceBuffer.Value[serviceName]
 		if !ok {
 			service = &ServiceInfoBuffer{
-				AddressDic:  make(map[string]*pb.InstanceInfo),
 				InstanceDic: make(map[int64]*pb.InstanceInfo),
 			}
 			m.serviceBuffer.Value[serviceName] = service
@@ -73,17 +65,15 @@ func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInf
 		return
 	}()
 	defer service.Mutex.Unlock()
-	address := util.Address(info.Host, info.Port)
-	nowInfo, ok := service.AddressDic[address]
+	nowInfo, ok := service.InstanceDic[info.InstanceID]
 	if ok && nowInfo.CreateTime > info.CreateTime {
 		return
 	}
-	service.AddressDic[address] = info
 	service.InstanceDic[info.InstanceID] = info
-	util.Info("%s Add Instance %v %s", serviceName, info.InstanceID, address)
+	util.Info("%s Add Instance %v", serviceName, info.InstanceID)
 }
 
-func (m *DefaultServiceMgr) GetServiceInfo(serviceName string) (*pb.ServiceInfo, bool) {
+func (m *DefaultServiceMgr) GetServiceInfo(serviceName string) (*util.ServiceInfo, bool) {
 	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
 		m.serviceBuffer.Mutex.Lock()
 		defer m.serviceBuffer.Mutex.Unlock()
@@ -97,9 +87,9 @@ func (m *DefaultServiceMgr) GetServiceInfo(serviceName string) (*pb.ServiceInfo,
 		return nil, false
 	}
 	defer service.Mutex.Unlock()
-	info := &pb.ServiceInfo{
-		ServiceName: serviceName,
-		Instances:   make([]*pb.InstanceInfo, 0, len(service.InstanceDic)),
+	info := &util.ServiceInfo{
+		Name:      serviceName,
+		Instances: make([]util.DstInstanceInfo, 0, len(service.InstanceDic)),
 	}
 	for _, v := range service.InstanceDic {
 		info.Instances = append(info.Instances, v)
@@ -145,17 +135,30 @@ func (m *DefaultServiceMgr) handleInstanceDelete(serviceName string, ev *clientv
 	defer func() {
 		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "InstanceKeyDelete"}, nil)
 	}()
-	address := util.InstanceKey2Address(string(ev.Kv.Key), serviceName)
-	m.RemoveInstanceByAddress(serviceName, address)
+	id := util.InstanceKey2InstanceID(string(ev.Kv.Key), serviceName)
+	instanceID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		util.Error("remove instance error: %v", err)
+	} else {
+		m.RemoveInstance(serviceName, instanceID)
+	}
 }
 
 func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
-	cli, err := m.connManager.GetServiceConn(connMgr.Etcd)
+	cli, err := m.connManager.GetServiceConn(connMgr.InstancesEtcd, "")
 	if err != nil {
 		log.Fatal(err)
 	}
-	rch := cli.Watch(context.Background(), util.InstancePrefix(serviceName), clientv3.WithPrefix())
-	go m.InitInstanceInfo(serviceName)
+	m.tryAddServiceInfoChanList(serviceName)
+	revision, err := m.initInstanceInfo(serviceName)
+	if err != nil {
+		util.Error("获取全量数据失败：%v", err)
+	}
+	rch := cli.Watch(context.Background(),
+		util.InstancePrefix(serviceName),
+		clientv3.WithPrefix(),
+		clientv3.WithRev(revision),
+	)
 	for wresp := range rch {
 		for _, ev := range wresp.Events {
 			switch ev.Type {
@@ -168,36 +171,89 @@ func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
 				m.handleInstanceDelete(serviceName, ev)
 			}
 		}
+		m.sendServiceInfoAllChan(serviceName)
 	}
 }
 
-func (m *DefaultServiceMgr) InitInstanceInfo(serviceName string) {
-	cli, err := m.connManager.GetServiceConn(connMgr.Etcd)
+func (m *DefaultServiceMgr) tryAddServiceInfoChanList(serviceName string) *util.SyncContainer[[]chan<- *util.ServiceInfo] {
+	var chans *util.SyncContainer[[]chan<- *util.ServiceInfo] = nil
+	m.watchChan.Mutex.Lock()
+	defer m.watchChan.Mutex.Unlock()
+	if _, ok := m.watchChan.Value[serviceName]; ok {
+		chans = m.watchChan.Value[serviceName]
+	} else {
+		chans = &util.SyncContainer[[]chan<- *util.ServiceInfo]{
+			Value: make([]chan<- *util.ServiceInfo, 0),
+		}
+		m.watchChan.Value[serviceName] = chans
+	}
+	return chans
+}
+
+func (m *DefaultServiceMgr) sendServiceInfoAllChan(serviceName string) {
+	var chanList *util.SyncContainer[[]chan<- *util.ServiceInfo]
+	var ok bool
+	func() {
+		m.watchChan.Mutex.Lock()
+		defer m.watchChan.Mutex.Unlock()
+		chanList, ok = m.watchChan.Value[serviceName]
+		if !ok {
+			return
+		}
+		chanList.Mutex.Lock()
+	}()
+	if !ok {
+		return
+	}
+	defer chanList.Mutex.Unlock()
+	service, ok := m.GetServiceInfo(serviceName)
+	if !ok {
+		return
+	}
+	for _, ch := range chanList.Value {
+		ch <- service
+	}
+}
+
+func (m *DefaultServiceMgr) initInstanceInfo(serviceName string) (revision int64, err error) {
+	cli, err := m.connManager.GetServiceConn(connMgr.InstancesEtcd, "")
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	resp, err := cli.Get(context.Background(), util.InstancePrefix(serviceName), clientv3.WithPrefix())
 	if err != nil {
-		util.Error("%v", err)
 		return
 	}
 	for _, kv := range resp.Kvs {
 		info := &pb.InstanceInfo{}
 		err = proto.Unmarshal(kv.Value, info)
 		if err != nil {
-			util.Error("%v", err)
 			continue
 		}
 		m.AddInstance(serviceName, info)
 	}
+	revision = resp.Header.Revision
+	return
 }
 
 func (m *DefaultServiceMgr) startFlushInfo() {
-	for _, serviceName := range m.config.Global.Discovery.DstService {
+	clis := m.connManager.GetAllServiceConn(connMgr.RoutersEtcd)
+	for _, serviceName := range m.config.SDK.Discovery.DstService {
 		go m.handleWatchService(serviceName)
-		go m.handleWatchKVRouter(serviceName)
-		go m.handleWatchTargetRouter(serviceName)
+		for _, cli := range clis {
+			go m.handleWatchKVRouter(cli, serviceName)
+			go m.handleWatchTargetRouter(cli, serviceName)
+		}
 	}
+}
+
+func (m *DefaultServiceMgr) WatchServiceInfo(serviceName string) (<-chan *util.ServiceInfo, error) {
+	serviceChan := m.tryAddServiceInfoChanList(serviceName)
+	serviceChan.Mutex.Lock()
+	defer serviceChan.Mutex.Unlock()
+	ch := make(chan *util.ServiceInfo)
+	serviceChan.Value = append(serviceChan.Value, ch)
+	return ch, nil
 }
 
 func NewDefaultServiceMgr(
@@ -210,11 +266,14 @@ func NewDefaultServiceMgr(
 		connManager: manager,
 		mt:          mt,
 
-		serviceBuffer: &SyncContainer[map[string]*ServiceInfoBuffer]{
+		serviceBuffer: &util.SyncContainer[map[string]*ServiceInfoBuffer]{
 			Value: make(map[string]*ServiceInfoBuffer),
 		},
-		routerBuffer: &SyncContainer[map[string]*ServiceRouterBuffer]{
+		routerBuffer: &util.SyncContainer[map[string]*ServiceRouterBuffer]{
 			Value: make(map[string]*ServiceRouterBuffer),
+		},
+		watchChan: &util.SyncContainer[map[string]*util.SyncContainer[[]chan<- *util.ServiceInfo]]{
+			Value: make(map[string]*util.SyncContainer[[]chan<- *util.ServiceInfo]),
 		},
 	}
 	mgr.startFlushInfo()

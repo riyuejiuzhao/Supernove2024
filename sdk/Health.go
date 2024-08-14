@@ -25,7 +25,29 @@ func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) (err error) {
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "HeartBeat"}, err)
 	}()
-	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
+
+	client, err := c.ConnManager.GetServiceConn(connMgr.InstancesEtcd, "")
+	if err != nil {
+		return
+	}
+	ch, err := client.KeepAlive(context.Background(), clientv3.LeaseID(argv.InstanceID))
+	if err != nil {
+		return
+	}
+	go func() {
+		for _ = range ch {
+		}
+	}()
+	return
+}
+
+func (c *HealthCli) HeartBeatOnce(argv *HeartBeatArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "HeartBeatOnce"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(connMgr.InstancesEtcd, "")
 	if err != nil {
 		return
 	}
@@ -36,10 +58,37 @@ func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) (err error) {
 	return
 }
 
+type KeepRouterAliveArgv struct {
+	RouterID int64
+}
+
+func (c *HealthCli) KeepRouterAlive(argv *KeepRouterAliveArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "KeepRouterAlive"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(connMgr.InstancesEtcd, "")
+	if err != nil {
+		return
+	}
+	ch, err := client.KeepAlive(context.Background(), clientv3.LeaseID(argv.RouterID))
+	if err != nil {
+		return
+	}
+	go func() {
+		for _ = range ch {
+		}
+	}()
+	return
+}
+
 // HealthAPI 功能：
 // 发送心跳
 type HealthAPI interface {
-	HeartBeat(*HeartBeatArgv) error
+	HeartBeatOnce(*HeartBeatArgv) error
+	HeartBeat(argv *HeartBeatArgv) error
+	KeepRouterAlive(argv *KeepRouterAliveArgv) error
 }
 
 func NewHealthAPIStandalone(

@@ -2,13 +2,11 @@ package dataMgr
 
 import (
 	"Supernove2024/pb"
-	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
-	"log"
 	"sync"
 	"time"
 )
@@ -174,18 +172,21 @@ func (m *DefaultServiceMgr) handleKVRouterPut(serviceName string, ev *clientv3.E
 	return
 }
 
-func (m *DefaultServiceMgr) handleWatchKVRouter(serviceName string) {
-	cli, err := m.connManager.GetServiceConn(connMgr.Etcd)
+func (m *DefaultServiceMgr) handleWatchKVRouter(cli *clientv3.Client, serviceName string) {
+	revision, err := m.initKVRouter(cli, serviceName)
 	if err != nil {
-		log.Fatal(err)
+		util.Error("KV路由获取错误", err)
 	}
-	rch := cli.Watch(context.Background(), util.RouterKVPrefix(serviceName), clientv3.WithPrefix())
-	go m.InitKVRouter(serviceName)
+	rch := cli.Watch(context.Background(),
+		util.RouterKVPrefix(serviceName),
+		clientv3.WithPrefix(),
+		clientv3.WithRev(revision),
+	)
 	for wresp := range rch {
 		for _, ev := range wresp.Events {
 			switch ev.Type {
 			case clientv3.EventTypePut:
-				err = m.handleKVRouterPut(serviceName, ev)
+				err := m.handleKVRouterPut(serviceName, ev)
 				if err != nil {
 					util.Error("kv router err: %v", err)
 				}
@@ -195,19 +196,21 @@ func (m *DefaultServiceMgr) handleWatchKVRouter(serviceName string) {
 	}
 }
 
-func (m *DefaultServiceMgr) handleWatchTargetRouter(serviceName string) {
-	cli, err := m.connManager.GetServiceConn(connMgr.Etcd)
+func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, serviceName string) {
+	revision, err := m.initTargetRouter(cli, serviceName)
 	if err != nil {
-		log.Fatal(err)
+		util.Error("获取全量TargetRouter出错", err)
 	}
-	rch := cli.Watch(context.Background(), util.RouterTargetPrefix(serviceName), clientv3.WithPrefix())
-	go m.InitTargetRouter(serviceName)
+	rch := cli.Watch(context.Background(),
+		util.RouterTargetPrefix(serviceName),
+		clientv3.WithPrefix(),
+		clientv3.WithRev(revision))
 	for wresp := range rch {
 		for _, ev := range wresp.Events {
 			switch ev.Type {
 			case clientv3.EventTypePut:
 				info := &pb.TargetRouterInfo{}
-				err = proto.Unmarshal(ev.Kv.Value, info)
+				err := proto.Unmarshal(ev.Kv.Value, info)
 				if err != nil {
 					util.Error("err %v", err)
 					continue
@@ -225,14 +228,9 @@ func (m *DefaultServiceMgr) handleWatchTargetRouter(serviceName string) {
 	}
 }
 
-func (m *DefaultServiceMgr) InitKVRouter(serviceName string) {
-	cli, err := m.connManager.GetServiceConn(connMgr.Etcd)
-	if err != nil {
-		log.Fatal(err)
-	}
+func (m *DefaultServiceMgr) initKVRouter(cli *clientv3.Client, serviceName string) (revision int64, err error) {
 	resp, err := cli.Get(context.Background(), util.RouterKVPrefix(serviceName), clientv3.WithPrefix())
 	if err != nil {
-		util.Error("%v", err)
 		return
 	}
 	for _, kv := range resp.Kvs {
@@ -244,16 +242,14 @@ func (m *DefaultServiceMgr) InitKVRouter(serviceName string) {
 		}
 		m.AddKVRouter(serviceName, info)
 	}
+	err = nil
+	revision = resp.Header.Revision
+	return
 }
 
-func (m *DefaultServiceMgr) InitTargetRouter(serviceName string) {
-	cli, err := m.connManager.GetServiceConn(connMgr.Etcd)
-	if err != nil {
-		log.Fatal(err)
-	}
+func (m *DefaultServiceMgr) initTargetRouter(cli *clientv3.Client, serviceName string) (revision int64, err error) {
 	resp, err := cli.Get(context.Background(), util.RouterTargetPrefix(serviceName), clientv3.WithPrefix())
 	if err != nil {
-		util.Error("%v", err)
 		return
 	}
 	for _, kv := range resp.Kvs {
@@ -265,4 +261,7 @@ func (m *DefaultServiceMgr) InitTargetRouter(serviceName string) {
 		}
 		m.AddTargetRouter(serviceName, info)
 	}
+	err = nil
+	revision = resp.Header.Revision
+	return
 }

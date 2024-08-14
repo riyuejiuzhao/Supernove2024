@@ -1,8 +1,9 @@
-package unit_test
+package test_router_test
 
 import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
+	"Supernove2024/test/unit-test"
 	"Supernove2024/util"
 	"context"
 	"fmt"
@@ -40,7 +41,7 @@ func TestManyRouter(t *testing.T) {
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		for j := 0; j < instanceNum; j++ {
-			nowData := RandomRegisterArgv(nowServiceName, instanceNum)
+			nowData := unit.RandomRegisterArgv(nowServiceName, instanceNum)
 			testData[nowServiceName] = util.DicMap(nowData,
 				func(key string, val *sdk.RegisterArgv) (string, *InstanceRegisterInfo) {
 					return key, &InstanceRegisterInfo{
@@ -56,10 +57,10 @@ func TestManyRouter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.Global.Discovery.DstService = make([]string, 0)
+	cfg.SDK.Discovery.DstService = make([]string, 0)
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
-		cfg.Global.Discovery.DstService = append(cfg.Global.Discovery.DstService, nowServiceName)
+		cfg.SDK.Discovery.DstService = append(cfg.SDK.Discovery.DstService, nowServiceName)
 	}
 
 	registerAPI, err := sdk.NewRegisterAPI()
@@ -100,11 +101,12 @@ func TestManyRouter(t *testing.T) {
 			nowKey := fmt.Sprintf("%s_%v", nowServiceName, j)
 			dst := util.RandomDicValue(nowMap)
 			go func() {
-				err := registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
+				timeout := int64(60 * 60 * 10)
+				_, err := registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
 					Key:            nowKey,
 					DstServiceName: nowServiceName,
 					DstInstanceID:  dst.InstanceID,
-					Timeout:        60 * 60 * 10,
+					Timeout:        &timeout,
 				})
 				if err != nil {
 					t.Error(err)

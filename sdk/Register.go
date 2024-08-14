@@ -8,6 +8,7 @@ import (
 	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"context"
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
@@ -42,22 +43,21 @@ func (c *RegisterCli) Register(service *RegisterArgv) (result *RegisterResult, e
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "Register"}, err)
 	}()
-	key := util.InstanceKey(service.ServiceName, service.Host, service.Port)
 	var weight int32
 	if service.Weight != nil {
 		weight = *service.Weight
 	} else {
-		weight = c.Config.Global.Register.DefaultWeight
+		weight = c.Config.SDK.Register.DefaultWeight
 	}
 
 	var ttl int64
 	if service.TTL != nil {
 		ttl = *service.TTL
 	} else {
-		ttl = c.Config.Global.Register.DefaultTTL
+		ttl = c.Config.SDK.Register.DefaultServiceTTL
 	}
 
-	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
+	client, err := c.ConnManager.GetServiceConn(connMgr.InstancesEtcd, "")
 	if err != nil {
 		return
 	}
@@ -74,6 +74,7 @@ func (c *RegisterCli) Register(service *RegisterArgv) (result *RegisterResult, e
 		CreateTime: time.Now().Unix(),
 	}
 
+	key := util.InstanceKey(service.ServiceName, instanceInfo.InstanceID)
 	bytes, err := proto.Marshal(instanceInfo)
 	if err != nil {
 		return
@@ -91,7 +92,7 @@ func (c *RegisterCli) Deregister(service *DeregisterArgv) (err error) {
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "Deregister"}, err)
 	}()
-	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
+	client, err := c.ConnManager.GetServiceConn(connMgr.InstancesEtcd, "")
 	if err != nil {
 		return
 	}
@@ -106,27 +107,34 @@ type AddTargetRouterArgv struct {
 	SrcInstanceID  int64
 	DstServiceName string
 	DstInstanceID  int64
-	Timeout        int64
+	Timeout        *int64
 }
 
 type AddKVRouterArgv struct {
 	Key            string
 	DstServiceName string
 	DstInstanceID  int64
-	Timeout        int64
+	Timeout        *int64
 }
 
-func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (err error) {
+func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRouterResult, err error) {
 	begin := time.Now()
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddTargetRouter"}, err)
 	}()
 	key := util.RouterTargetInfoKey(argv.DstServiceName, argv.SrcInstanceID)
-	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
+	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd,
+		fmt.Sprintf("%s-%v", argv.DstServiceName, argv.DstInstanceID))
 	if err != nil {
 		return
 	}
-	resp, err := client.Grant(context.Background(), argv.Timeout)
+	var timeout int64
+	if argv.Timeout != nil {
+		timeout = *argv.Timeout
+	} else {
+		timeout = c.Config.SDK.Register.DefaultRouterTTL
+	}
+	resp, err := client.Grant(context.Background(), timeout)
 	if err != nil {
 		return
 	}
@@ -135,7 +143,7 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (err error) {
 		RouterID:      int64(resp.ID),
 		SrcInstanceID: argv.SrcInstanceID,
 		DstInstanceID: argv.DstInstanceID,
-		Timeout:       argv.Timeout,
+		Timeout:       *argv.Timeout,
 		CreateTime:    time.Now().Unix(),
 	}
 
@@ -147,20 +155,32 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (err error) {
 	if err != nil {
 		return
 	}
+	result = &AddRouterResult{RouterID: int64(resp.ID)}
 	return
 }
 
-func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (err error) {
+type AddRouterResult struct {
+	RouterID int64
+}
+
+func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResult, err error) {
 	begin := time.Now()
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddKVRouter"}, err)
 	}()
+	var timeout int64
+	if argv.Timeout == nil {
+		timeout = c.Config.SDK.Register.DefaultRouterTTL
+	} else {
+		timeout = *argv.Timeout
+	}
 	key := util.RouterKVInfoKey(argv.DstServiceName, argv.Key)
-	client, err := c.ConnManager.GetServiceConn(connMgr.Etcd)
+	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd,
+		fmt.Sprintf("%s-%s", argv.DstServiceName, argv.Key))
 	if err != nil {
 		return
 	}
-	resp, err := client.Grant(context.Background(), argv.Timeout)
+	resp, err := client.Grant(context.Background(), timeout)
 	if err != nil {
 		return
 	}
@@ -169,7 +189,7 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (err error) {
 		RouterID:      int64(resp.ID),
 		Key:           argv.Key,
 		DstInstanceID: argv.DstInstanceID,
-		Timeout:       argv.Timeout,
+		Timeout:       timeout,
 		CreateTime:    time.Now().Unix(),
 	}
 
@@ -181,6 +201,7 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (err error) {
 	if err != nil {
 		return
 	}
+	result = &AddRouterResult{RouterID: int64(resp.ID)}
 	return
 }
 
@@ -189,8 +210,8 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (err error) {
 type RegisterAPI interface {
 	Register(service *RegisterArgv) (*RegisterResult, error)
 	Deregister(service *DeregisterArgv) error
-	AddTargetRouter(*AddTargetRouterArgv) error
-	AddKVRouter(argv *AddKVRouterArgv) error
+	AddTargetRouter(*AddTargetRouterArgv) (result *AddRouterResult, err error)
+	AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResult, err error)
 }
 
 func NewRegisterAPIStandalone(

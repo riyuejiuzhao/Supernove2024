@@ -2,11 +2,6 @@ syntax = "proto3";
 
 option go_package=".;pb";
 
-message ServiceInfo {
-  string ServiceName = 1;
-  repeated InstanceInfo Instances = 2;
-}
-
 message InstanceInfo {
   int64 InstanceID = 1;
   string Host = 2;

@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -14,6 +15,8 @@ type MetricsManager struct {
 	MethodCounter *prometheus.CounterVec
 	MethodTime    *prometheus.SummaryVec
 	MethodFailed  *prometheus.CounterVec
+	// 统计每个链接连接次数
+	ConnCount *prometheus.CounterVec
 }
 
 var (
@@ -41,19 +44,26 @@ func NewMetricsMgr(cfg *config.Config) *MetricsManager {
 			},
 			[]string{"Method"},
 		),
+		ConnCount: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "Conn_count",
+			},
+			[]string{"Address"},
+		),
 	}
 
 	go func() {
-		if cfg.Global.Metrics == "" {
+		if cfg.SDK.Metrics == "" {
 			return
 		}
 		prometheus.MustRegister(
 			mMgr.MethodCounter,
 			mMgr.MethodTime,
 			mMgr.MethodFailed,
+			mMgr.ConnCount,
 		)
 		http.Handle("/metrics", promhttp.Handler())
-		err := http.ListenAndServe(cfg.Global.Metrics, nil)
+		err := http.ListenAndServe(cfg.SDK.Metrics, nil)
 		if err != nil {
 			util.Error("%v", err)
 		}
@@ -61,7 +71,11 @@ func NewMetricsMgr(cfg *config.Config) *MetricsManager {
 	return mMgr
 }
 
+var metricsMutex sync.Mutex
+
 func Instance() (*MetricsManager, error) {
+	metricsMutex.Lock()
+	defer metricsMutex.Unlock()
 	if metricsMgr == nil {
 		cfg, err := config.GlobalConfig()
 		if err != nil {

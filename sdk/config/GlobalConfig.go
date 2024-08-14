@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
+	"sync"
 )
 
 type InstanceConfig struct {
@@ -17,24 +18,29 @@ func (s InstanceConfig) String() string {
 }
 
 type Config struct {
-	Global struct {
-		EtcdService []InstanceConfig `yaml:"Etcd"`
-		Register    struct {
-			DefaultWeight int32 `yaml:"DefaultWeight"`
-			DefaultTTL    int64 `yaml:"DefaultTTL"`
+	SDK struct {
+		InstancesEtcd []InstanceConfig `yaml:"InstancesEtcd"`
+		RouterEtcd    []InstanceConfig `yaml:"RouterEtcd"`
+		Register      struct {
+			DefaultWeight     int32 `yaml:"DefaultWeight"`
+			DefaultServiceTTL int64 `yaml:"DefaultServiceTTL"`
+			DefaultRouterTTL  int64 `yaml:"DefaultRouterTTL"`
 		} `yaml:"Register"`
 		Discovery struct {
-			//Service
 			DstService []string `yaml:"DstService"`
 		} `yaml:"Discovery"`
 		Metrics string `yaml:"Metrics"`
-	} `yaml:"Global"`
+	} `yaml:"SDK"`
 }
 
 var globalConfig *Config = nil
 var GlobalConfigFilePath = "mini-router.yaml"
 
+var configMutex sync.Mutex
+
 func GlobalConfig() (*Config, error) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	if globalConfig != nil {
 		return globalConfig, nil
 	}

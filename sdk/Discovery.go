@@ -1,7 +1,6 @@
 package sdk
 
 import (
-	"Supernove2024/pb"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/sdk/dataMgr"
@@ -20,16 +19,15 @@ type GetInstancesArgv struct {
 }
 
 type GetInstancesResult struct {
-	ServiceName string
-	Instances   []*pb.InstanceInfo
+	Service *util.ServiceInfo
 }
 
 func (r *GetInstancesResult) GetServiceName() string {
-	return r.ServiceName
+	return r.Service.Name
 }
 
-func (r *GetInstancesResult) GetInstance() []*pb.InstanceInfo {
-	return r.Instances
+func (r *GetInstancesResult) GetInstance() []util.DstInstanceInfo {
+	return r.Service.Instances
 }
 
 type DiscoveryCli struct {
@@ -48,16 +46,20 @@ func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (result *GetInstance
 		err = errors.New("不存在该服务")
 		return
 	}
-	result = &GetInstancesResult{ServiceName: argv.ServiceName,
-		Instances: service.Instances}
+	result = &GetInstancesResult{
+		Service: &util.ServiceInfo{
+			Name:      argv.ServiceName,
+			Instances: service.Instances,
+		},
+	}
 	return
 }
 
-func (c *DiscoveryCli) processConsistentRouter(srcInstanceID int64, dstInstances []*pb.InstanceInfo) (*ProcessRouterResult, error) {
+func (c *DiscoveryCli) processConsistentRouter(srcInstanceID int64, dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
 	hash := consistent.New()
-	dict := make(map[string]*pb.InstanceInfo)
+	dict := make(map[string]util.DstInstanceInfo)
 	for _, v := range dstInstances {
-		address := util.Address(v.Host, v.Port)
+		address := util.Address(v.GetHost(), v.GetPort())
 		dict[address] = v
 		hash.Add(address)
 	}
@@ -68,15 +70,15 @@ func (c *DiscoveryCli) processConsistentRouter(srcInstanceID int64, dstInstances
 	return &ProcessRouterResult{DstInstance: dict[dstInstanceID]}, err
 }
 
-func (c *DiscoveryCli) processRandomRouter(dstInstances []*pb.InstanceInfo) (*ProcessRouterResult, error) {
+func (c *DiscoveryCli) processRandomRouter(dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
 	instance := util.RandomItem(dstInstances)
 	return &ProcessRouterResult{DstInstance: instance}, nil
 }
 
-func (c *DiscoveryCli) processWeightRouter(dstInstances []*pb.InstanceInfo) (*ProcessRouterResult, error) {
+func (c *DiscoveryCli) processWeightRouter(dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
 	maxWeight := dstInstances[0]
 	for _, v := range dstInstances {
-		if v.Weight > maxWeight.Weight {
+		if v.GetWeight() > maxWeight.GetWeight() {
 			maxWeight = v
 		}
 	}
@@ -95,16 +97,18 @@ func (c *DiscoveryCli) processTargetRouter(srcInstanceID int64, dstService strin
 	return &ProcessRouterResult{DstInstance: instance}, nil
 }
 
-func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string) (*ProcessRouterResult, error) {
+func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string, instances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
 	v, ok := c.DataMgr.GetKVRouter(dstService, key)
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
-	instance, ok := c.DataMgr.GetInstanceInfo(dstService, v.DstInstanceID)
-	if !ok {
-		return nil, errors.New("没有目标实例")
+	for _, i := range instances {
+		if i.GetInstanceID() != v.DstInstanceID {
+			continue
+		}
+		return &ProcessRouterResult{DstInstance: i}, nil
 	}
-	return &ProcessRouterResult{DstInstance: instance}, nil
+	return nil, errors.New("没有目标实例")
 }
 
 // ProcessRouter 如果没有提供可选的Instance，那么自动从缓冲中获取
@@ -132,7 +136,7 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (result *ProcessRo
 		if argv.Key == "" {
 			return nil, errors.New("使用键值对路由但是缺少Key")
 		}
-		return c.processKeyValueRouter(argv.Key, argv.DstService.GetServiceName())
+		return c.processKeyValueRouter(argv.Key, argv.DstService.GetServiceName(), instances)
 	case util.ConsistentRouterType:
 		return c.processConsistentRouter(argv.SrcInstanceID, instances)
 	case util.RandomRouterType:
@@ -143,38 +147,43 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (result *ProcessRo
 	return nil, errors.New("不支持的路由算法类型")
 }
 
+func (c *DiscoveryCli) WatchService(argv *WatchServiceArgv) (<-chan *util.ServiceInfo, error) {
+	return c.DataMgr.WatchServiceInfo(argv.ServiceName)
+}
+
 type DefaultDstService struct {
 	ServiceName string
-	Instances   []*pb.InstanceInfo
+	Instances   []util.DstInstanceInfo
 }
 
 func (d *DefaultDstService) GetServiceName() string {
 	return d.ServiceName
 }
-func (d *DefaultDstService) GetInstance() []*pb.InstanceInfo {
+func (d *DefaultDstService) GetInstance() []util.DstInstanceInfo {
 	return d.Instances
-}
-
-type DstService interface {
-	GetServiceName() string
-	GetInstance() []*pb.InstanceInfo
 }
 
 type ProcessRouterArgv struct {
 	Method        int32
 	SrcInstanceID int64
-	DstService    DstService
+
+	DstService util.DstService
 	//可选的，只有kv需要
 	Key string
 }
 
 type ProcessRouterResult struct {
-	DstInstance *pb.InstanceInfo
+	DstInstance util.DstInstanceInfo
+}
+
+type WatchServiceArgv struct {
+	ServiceName string
 }
 
 type DiscoveryAPI interface {
 	GetInstances(argv *GetInstancesArgv) (*GetInstancesResult, error)
 	ProcessRouter(*ProcessRouterArgv) (*ProcessRouterResult, error)
+	WatchService(argv *WatchServiceArgv) (<-chan *util.ServiceInfo, error)
 }
 
 func NewDiscoveryAPIStandalone(
