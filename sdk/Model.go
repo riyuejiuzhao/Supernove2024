@@ -12,8 +12,6 @@ type APIContext struct {
 	Config *config.Config
 	//连接管理
 	ConnManager connMgr.ConnManager
-	//缓存
-	DataMgr dataMgr.ServiceDataManager
 
 	Metrics *metrics.MetricsManager
 }
@@ -27,8 +25,8 @@ func NewAPIContextStandalone(
 	return &APIContext{
 		Config:      config,
 		ConnManager: conn,
-		DataMgr:     dataManger,
-		Metrics:     mt,
+		//DataMgr:     dataManger,
+		Metrics: mt,
 	}
 }
 
@@ -41,10 +39,6 @@ func NewAPIContext() (*APIContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	mgr, err := dataMgr.Instance()
-	if err != nil {
-		return nil, err
-	}
 
 	metricsMgr, err := metrics.Instance()
 	if err != nil {
@@ -54,8 +48,8 @@ func NewAPIContext() (*APIContext, error) {
 	api := APIContext{
 		ConnManager: connManager,
 		Config:      globalConfig,
-		DataMgr:     mgr,
-		Metrics:     metricsMgr,
+		//DataMgr:     mgr,
+		Metrics: metricsMgr,
 	}
 
 	return &api, nil

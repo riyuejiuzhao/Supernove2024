@@ -32,6 +32,7 @@ func (r *GetInstancesResult) GetInstance() []util.DstInstanceInfo {
 
 type DiscoveryCli struct {
 	*APIContext
+	DataMgr dataMgr.ServiceDataManager
 }
 
 func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (result *GetInstancesResult, err error) {
@@ -203,5 +204,10 @@ func NewDiscoveryAPI() (DiscoveryAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DiscoveryCli{ctx}, nil
+	mgr, err := dataMgr.Instance()
+	if err != nil {
+		return nil, err
+	}
+
+	return &DiscoveryCli{ctx, mgr}, nil
 }
