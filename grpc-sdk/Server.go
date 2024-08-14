@@ -152,9 +152,9 @@ func (srv *Server) routerRegister() {
 			continue
 		}
 		result, err := srv.RegisterAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-			Key:            router.Key,
-			DstServiceName: router.ServiceName,
-			DstInstanceID:  instanceID,
+			Key:             router.Key,
+			DstServiceName:  router.ServiceName,
+			DstInstanceName: instanceID,
 		})
 		if err != nil {
 			util.Error("grpc注册路由失败：%v", err)

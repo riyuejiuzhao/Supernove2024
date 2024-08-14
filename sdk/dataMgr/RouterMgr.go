@@ -21,10 +21,10 @@ type KVRouterBuffer interface {
 type ServiceRouterBuffer struct {
 	Mutex           sync.Mutex
 	KvRouterDic     map[string]*pb.KVRouterInfo
-	TargetRouterDic map[int64]*pb.TargetRouterInfo
+	TargetRouterDic map[string]*pb.TargetRouterInfo
 }
 
-func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceID int64) (*pb.TargetRouterInfo, bool) {
+func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceName string) (*pb.TargetRouterInfo, bool) {
 	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -39,7 +39,7 @@ func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceID in
 		return nil, false
 	}
 	defer b.Mutex.Unlock()
-	info, ok := b.TargetRouterDic[SrcInstanceID]
+	info, ok := b.TargetRouterDic[SrcInstanceName]
 	return info, ok
 }
 
@@ -70,7 +70,7 @@ func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetR
 		if !ok {
 			b = &ServiceRouterBuffer{
 				KvRouterDic:     make(map[string]*pb.KVRouterInfo),
-				TargetRouterDic: make(map[int64]*pb.TargetRouterInfo),
+				TargetRouterDic: make(map[string]*pb.TargetRouterInfo),
 			}
 			m.routerBuffer.Value[serviceName] = b
 		}
@@ -78,12 +78,12 @@ func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetR
 		return
 	}()
 	defer b.Mutex.Unlock()
-	nowInfo, ok := b.TargetRouterDic[info.SrcInstanceID]
+	nowInfo, ok := b.TargetRouterDic[info.SrcInstanceName]
 	//保留更新的那个
 	if ok && nowInfo.CreateTime > info.CreateTime {
 		return
 	}
-	b.TargetRouterDic[info.SrcInstanceID] = info
+	b.TargetRouterDic[info.SrcInstanceName] = info
 	util.Info("%s Add Router %s", serviceName, info)
 }
 
@@ -95,7 +95,7 @@ func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInf
 		if !ok {
 			b = &ServiceRouterBuffer{
 				KvRouterDic:     make(map[string]*pb.KVRouterInfo),
-				TargetRouterDic: make(map[int64]*pb.TargetRouterInfo),
+				TargetRouterDic: make(map[string]*pb.TargetRouterInfo),
 			}
 			m.routerBuffer.Value[serviceName] = b
 		}
@@ -130,7 +130,7 @@ func (m *DefaultServiceMgr) RemoveKVRouter(ServiceName string, Key string) {
 	delete(b.KvRouterDic, Key)
 }
 
-func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, SrcInstanceID int64) {
+func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, SrcInstanceName string) {
 	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -145,7 +145,7 @@ func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, SrcInstanceID
 		return
 	}
 	defer b.Mutex.Unlock()
-	delete(b.TargetRouterDic, SrcInstanceID)
+	delete(b.TargetRouterDic, SrcInstanceName)
 }
 
 func (m *DefaultServiceMgr) handleKVRouterDelete(serviceName string, ev *clientv3.Event) {
@@ -217,11 +217,7 @@ func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, servic
 				}
 				m.AddTargetRouter(serviceName, info)
 			case clientv3.EventTypeDelete:
-				id, err := util.TargetRouterKey2InstanceID(string(ev.Kv.Key), serviceName)
-				if err != nil {
-					util.Error("err %v", err)
-					continue
-				}
+				id := util.TargetRouterKey2InstanceID(string(ev.Kv.Key), serviceName)
 				m.RemoveTargetRouter(serviceName, id)
 			}
 		}

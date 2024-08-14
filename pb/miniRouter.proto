@@ -4,16 +4,17 @@ option go_package=".;pb";
 
 message InstanceInfo {
   int64 InstanceID = 1;
-  string Host = 2;
-  int32 Port = 3;
-  int32 Weight = 4;
+  string Name = 2;
+  string Host = 3;
+  int32 Port = 4;
+  int32 Weight = 5;
   int64 CreateTime = 6;
 }
 
 message TargetRouterInfo{
   int64 RouterID = 1;
-  int64 SrcInstanceID = 2;
-  int64 DstInstanceID = 3;
+  string SrcInstanceName = 2;
+  string DstInstanceName = 3;
   int64 Timeout = 4;
   int64 CreateTime = 6;
 }
@@ -21,7 +22,7 @@ message TargetRouterInfo{
 message KVRouterInfo{
   int64 RouterID = 1;
   string Key = 2;
-  int64 DstInstanceID = 3;
+  string DstInstanceName = 3;
   int64 Timeout = 4;
   int64 CreateTime = 6;
 }

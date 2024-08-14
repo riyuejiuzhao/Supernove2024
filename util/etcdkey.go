@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -34,10 +33,9 @@ func RouterKVPrefix(serviceName string) string {
 	return fmt.Sprintf("%s.KV.%s.", RouterHashKey, serviceName)
 }
 
-func TargetRouterKey2InstanceID(key string, service string) (int64, error) {
+func TargetRouterKey2InstanceID(key string, service string) string {
 	idstr := strings.TrimPrefix(key, RouterTargetPrefix(service))
-	rt, err := strconv.ParseInt(idstr, 10, 64)
-	return rt, err
+	return idstr
 }
 
 func RouterTargetPrefix(serviceName string) string {
@@ -48,6 +46,6 @@ func RouterKVInfoKey(serviceName string, key string) string {
 	return fmt.Sprintf("%s.KV.%s.%s", RouterHashKey, serviceName, key)
 }
 
-func RouterTargetInfoKey(serviceName string, srcInstanceID int64) string {
-	return fmt.Sprintf("%s.Dst.%s.%v", RouterHashKey, serviceName, srcInstanceID)
+func RouterTargetInfoKey(serviceName string, srcInstanceID string) string {
+	return fmt.Sprintf("%s.Dst.%s.%s", RouterHashKey, serviceName, srcInstanceID)
 }

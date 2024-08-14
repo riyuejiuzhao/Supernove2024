@@ -104,17 +104,17 @@ func (c *RegisterCli) Deregister(service *DeregisterArgv) (err error) {
 }
 
 type AddTargetRouterArgv struct {
-	SrcInstanceID  int64
-	DstServiceName string
-	DstInstanceID  int64
-	Timeout        *int64
+	SrcInstanceName string
+	DstServiceName  string
+	DstInstanceName string
+	Timeout         *int64
 }
 
 type AddKVRouterArgv struct {
-	Key            string
-	DstServiceName string
-	DstInstanceID  int64
-	Timeout        *int64
+	Key             string
+	DstServiceName  string
+	DstInstanceName string
+	Timeout         *int64
 }
 
 func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRouterResult, err error) {
@@ -122,9 +122,9 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRou
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddTargetRouter"}, err)
 	}()
-	key := util.RouterTargetInfoKey(argv.DstServiceName, argv.SrcInstanceID)
+	key := util.RouterTargetInfoKey(argv.DstServiceName, argv.SrcInstanceName)
 	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd,
-		fmt.Sprintf("%s-%v", argv.DstServiceName, argv.DstInstanceID))
+		fmt.Sprintf("%s-%v", argv.DstServiceName, argv.DstInstanceName))
 	if err != nil {
 		return
 	}
@@ -140,11 +140,11 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRou
 	}
 
 	info := &pb.TargetRouterInfo{
-		RouterID:      int64(resp.ID),
-		SrcInstanceID: argv.SrcInstanceID,
-		DstInstanceID: argv.DstInstanceID,
-		Timeout:       *argv.Timeout,
-		CreateTime:    time.Now().Unix(),
+		RouterID:        int64(resp.ID),
+		SrcInstanceName: argv.SrcInstanceName,
+		DstInstanceName: argv.DstInstanceName,
+		Timeout:         *argv.Timeout,
+		CreateTime:      time.Now().Unix(),
 	}
 
 	bytes, err := proto.Marshal(info)
@@ -186,11 +186,11 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResul
 	}
 
 	info := &pb.KVRouterInfo{
-		RouterID:      int64(resp.ID),
-		Key:           argv.Key,
-		DstInstanceID: argv.DstInstanceID,
-		Timeout:       timeout,
-		CreateTime:    time.Now().Unix(),
+		RouterID:        int64(resp.ID),
+		Key:             argv.Key,
+		DstInstanceName: argv.DstInstanceName,
+		Timeout:         timeout,
+		CreateTime:      time.Now().Unix(),
 	}
 
 	bytes, err := proto.Marshal(info)

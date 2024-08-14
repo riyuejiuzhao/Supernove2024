@@ -86,16 +86,18 @@ func (c *DiscoveryCli) processWeightRouter(dstInstances []util.DstInstanceInfo) 
 	return &ProcessRouterResult{DstInstance: maxWeight}, nil
 }
 
-func (c *DiscoveryCli) processTargetRouter(srcInstanceID int64, dstService string) (*ProcessRouterResult, error) {
-	target, ok := c.DataMgr.GetTargetRouter(dstService, srcInstanceID)
+func (c *DiscoveryCli) processTargetRouter(srcInstanceName string, dstService string, instance []util.DstInstanceInfo) (*ProcessRouterResult, error) {
+	target, ok := c.DataMgr.GetTargetRouter(dstService, srcInstanceName)
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
-	instance, ok := c.DataMgr.GetInstanceInfo(dstService, target.DstInstanceID)
-	if !ok {
-		return nil, errors.New("没有目标实例")
+	for _, i := range instance {
+		if i.GetName() != target.GetDstInstanceName() {
+			continue
+		}
+		return &ProcessRouterResult{DstInstance: i}, nil
 	}
-	return &ProcessRouterResult{DstInstance: instance}, nil
+	return nil, errors.New("没有目标实例")
 }
 
 func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string, instances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
@@ -104,7 +106,7 @@ func (c *DiscoveryCli) processKeyValueRouter(key string, dstService string, inst
 		return nil, errors.New("没有目标路由")
 	}
 	for _, i := range instances {
-		if i.GetInstanceID() != v.DstInstanceID {
+		if i.GetName() != v.DstInstanceName {
 			continue
 		}
 		return &ProcessRouterResult{DstInstance: i}, nil
@@ -132,14 +134,14 @@ func (c *DiscoveryCli) ProcessRouter(argv *ProcessRouterArgv) (result *ProcessRo
 
 	switch argv.Method {
 	case util.TargetRouterType:
-		return c.processTargetRouter(argv.SrcInstanceID, argv.DstService.GetServiceName())
+		return c.processTargetRouter(argv.SrcInstanceName, argv.DstService.GetServiceName(), instances)
 	case util.KVRouterType:
 		if argv.Key == "" {
 			return nil, errors.New("使用键值对路由但是缺少Key")
 		}
 		return c.processKeyValueRouter(argv.Key, argv.DstService.GetServiceName(), instances)
 	case util.ConsistentRouterType:
-		return c.processConsistentRouter(argv.SrcInstanceID, instances)
+		return c.processConsistentRouter(argv.SrcInstanceName, instances)
 	case util.RandomRouterType:
 		return c.processRandomRouter(instances)
 	case util.WeightedRouterType:
@@ -165,8 +167,8 @@ func (d *DefaultDstService) GetInstance() []util.DstInstanceInfo {
 }
 
 type ProcessRouterArgv struct {
-	Method        int32
-	SrcInstanceID int64
+	Method          int32
+	SrcInstanceName string
 
 	DstService util.DstService
 	//可选的，只有kv需要

@@ -35,6 +35,9 @@ type BalancerInstanceInfo struct {
 	Instance util.DstInstanceInfo
 }
 
+func (r *BalancerInstanceInfo) GetName() string {
+	return r.Instance.GetName()
+}
 func (r *BalancerInstanceInfo) GetInstanceID() int64 {
 	return r.Instance.GetInstanceID()
 }
@@ -121,10 +124,10 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 		util.Warn("路由方法指定了多次，将使用首次指定的结果")
 	}
 	argv := &sdk.ProcessRouterArgv{
-		Method:        0,
-		SrcInstanceID: 0,
-		DstService:    p.serviceInfo,
-		Key:           "",
+		Method:          0,
+		SrcInstanceName: 0,
+		DstService:      p.serviceInfo,
+		Key:             "",
 	}
 	switch routerTypes[0] {
 	case ConsistentRouterType:

@@ -100,6 +100,7 @@ type DstService interface {
 
 type DstInstanceInfo interface {
 	GetInstanceID() int64
+	GetName() string
 	GetWeight() int32
 	GetHost() string
 	GetPort() int32
