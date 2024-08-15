@@ -142,6 +142,7 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRou
 	}
 
 	info := &pb.TargetRouterInfo{
+		RouterID:        int64(resp.ID),
 		SrcInstanceName: argv.SrcInstanceName,
 		DstInstanceName: argv.DstInstanceName,
 		Timeout:         *argv.Timeout,
@@ -204,6 +205,7 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResul
 	}
 
 	info := &pb.KVRouterInfo{
+		RouterID:        int64(resp.ID),
 		Key:             keys,
 		Val:             vals,
 		DstInstanceName: argv.DstInstanceName,

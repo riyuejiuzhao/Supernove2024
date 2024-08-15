@@ -123,7 +123,7 @@ func TestRouter(t *testing.T) {
 	// src0 -> dst1
 	// key:key0 -> dst2
 	timeout := int64(100)
-	_, err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{
+	targetReply, err := registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{
 		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
 		DstServiceName:  dstService,
 		DstInstanceName: dstServices.GetInstance()[1].GetName(),
@@ -132,7 +132,7 @@ func TestRouter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
+	kvReply, err := registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
 		Dic:             map[string]string{"key": "key0"},
 		DstServiceName:  dstService,
 		DstInstanceName: []string{dstServices.GetInstance()[2].GetName()},
@@ -169,6 +169,46 @@ func TestRouter(t *testing.T) {
 	if processResult.DstInstance.GetInstanceID() != dstServices.GetInstance()[2].GetInstanceID() {
 		t.Fatalf("路由错误")
 	}
+
+	err = registerapi.RemoveKVRouter(&sdk.RemoveKVRouterArgv{
+		RouterID:       kvReply.RouterID,
+		DstServiceName: dstService,
+		Dic:            map[string]string{"key": "key0"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = registerapi.RemoveTargetRouter(&sdk.RemoveTargetRouterArgv{
+		RouterID:    targetReply.RouterID,
+		DstService:  dstService,
+		SrcInstance: srcServices.GetInstance()[0].GetName(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:          util.KVRouterType,
+		SrcInstanceName: srcServices.GetInstance()[2].GetName(), //"src2",
+		DstService:      dstServices.GetServiceName(),
+		Key:             map[string]string{"key": "key0"},
+	})
+	if err == nil {
+		t.Fatal("没有删除路由")
+	}
+
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:          util.TargetRouterType,
+		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
+		DstService:      dstServices.GetServiceName(),
+	})
+	if err == nil {
+		t.Fatal("没有删除路由")
+	}
+
 }
 
 func TestHealthSvr(t *testing.T) {

@@ -20,9 +20,13 @@ type KVRouterBuffer interface {
 }
 
 type ServiceRouterBuffer struct {
-	Mutex           sync.Mutex
-	KvRouterDic     map[string]*pb.KVRouterInfo
-	TargetRouterDic map[string]*pb.TargetRouterInfo
+	Mutex sync.Mutex
+
+	KvRouterIdDic map[int64]*pb.KVRouterInfo
+	KvRouterDic   map[string]*pb.KVRouterInfo
+
+	TargetRouterIdDic map[int64]*pb.TargetRouterInfo
+	TargetRouterDic   map[string]*pb.TargetRouterInfo
 }
 
 func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceName string) (*pb.TargetRouterInfo, bool) {
@@ -70,8 +74,10 @@ func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetR
 		b, ok := m.routerBuffer.Value[serviceName]
 		if !ok {
 			b = &ServiceRouterBuffer{
-				KvRouterDic:     make(map[string]*pb.KVRouterInfo),
-				TargetRouterDic: make(map[string]*pb.TargetRouterInfo),
+				KvRouterDic:       make(map[string]*pb.KVRouterInfo),
+				KvRouterIdDic:     make(map[int64]*pb.KVRouterInfo),
+				TargetRouterDic:   make(map[string]*pb.TargetRouterInfo),
+				TargetRouterIdDic: make(map[int64]*pb.TargetRouterInfo),
 			}
 			m.routerBuffer.Value[serviceName] = b
 		}
@@ -84,7 +90,11 @@ func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetR
 	if ok && nowInfo.CreateTime > info.CreateTime {
 		return
 	}
+	if ok {
+		delete(b.TargetRouterIdDic, nowInfo.RouterID)
+	}
 	b.TargetRouterDic[info.SrcInstanceName] = info
+	b.TargetRouterIdDic[info.RouterID] = info
 	util.Info("%s Add Router %s", serviceName, info)
 }
 
@@ -95,8 +105,10 @@ func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInf
 		b, ok := m.routerBuffer.Value[serviceName]
 		if !ok {
 			b = &ServiceRouterBuffer{
-				KvRouterDic:     make(map[string]*pb.KVRouterInfo),
-				TargetRouterDic: make(map[string]*pb.TargetRouterInfo),
+				KvRouterDic:       make(map[string]*pb.KVRouterInfo),
+				KvRouterIdDic:     make(map[int64]*pb.KVRouterInfo),
+				TargetRouterDic:   make(map[string]*pb.TargetRouterInfo),
+				TargetRouterIdDic: make(map[int64]*pb.TargetRouterInfo),
 			}
 			m.routerBuffer.Value[serviceName] = b
 		}
@@ -119,11 +131,15 @@ func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInf
 	if ok && nowInfo.CreateTime > info.CreateTime {
 		return
 	}
+	if ok {
+		delete(b.KvRouterIdDic, nowInfo.RouterID)
+	}
 	b.KvRouterDic[jss] = info
+	b.KvRouterIdDic[info.RouterID] = info
 	util.Info("%s Add Router %s", serviceName, info)
 }
 
-func (m *DefaultServiceMgr) RemoveKVRouter(ServiceName string, Key string) {
+func (m *DefaultServiceMgr) RemoveKVRouter(ServiceName string, RouterID int64) {
 	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -138,10 +154,23 @@ func (m *DefaultServiceMgr) RemoveKVRouter(ServiceName string, Key string) {
 		return
 	}
 	defer b.Mutex.Unlock()
-	delete(b.KvRouterDic, Key)
+	info, ok := b.KvRouterIdDic[RouterID]
+	dic := make(map[string]string)
+	for i := 0; i < len(info.Key); i++ {
+		dic[info.Key[i]] = info.Val[i]
+	}
+	js, err := json.Marshal(dic)
+	if err != nil {
+		util.Error("remove kv router failed", err)
+		return
+	}
+	jss := string(js)
+	delete(b.KvRouterDic, jss)
+	delete(b.KvRouterIdDic, RouterID)
+	util.Info("%s Delete KV Router %s", ServiceName, jss)
 }
 
-func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, SrcInstanceName string) {
+func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, RouterID int64) {
 	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -156,7 +185,13 @@ func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, SrcInstanceNa
 		return
 	}
 	defer b.Mutex.Unlock()
-	delete(b.TargetRouterDic, SrcInstanceName)
+	info, ok := b.TargetRouterIdDic[RouterID]
+	if !ok {
+		return
+	}
+	delete(b.TargetRouterIdDic, RouterID)
+	delete(b.TargetRouterDic, info.SrcInstanceName)
+	util.Info("%s Delete Target Router %s", ServiceName, info.SrcInstanceName)
 }
 
 func (m *DefaultServiceMgr) handleKVRouterDelete(serviceName string, ev *clientv3.Event) {
@@ -164,7 +199,11 @@ func (m *DefaultServiceMgr) handleKVRouterDelete(serviceName string, ev *clientv
 	defer func() {
 		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "KVRouterDelete"}, nil)
 	}()
-	key := util.KVRouterKey2Key(string(ev.Kv.Key), serviceName)
+	key, err := util.KVRouterKey2RouterID(string(ev.Kv.Key), serviceName)
+	if err != nil {
+		util.Error("%s delete kv router err %v", serviceName, err)
+		return
+	}
 	m.RemoveKVRouter(serviceName, key)
 }
 
@@ -203,7 +242,10 @@ func (m *DefaultServiceMgr) handleWatchKVRouter(cli *clientv3.Client, serviceNam
 						util.Error("kv router err: %v", err)
 					}
 				case clientv3.EventTypeDelete:
-					id := util.KVRouterKey2InstanceID(string(ev.Kv.Key), serviceName)
+					id, err := util.KVRouterKey2RouterID(string(ev.Kv.Key), serviceName)
+					if err != nil {
+						util.Error("kv router delete err: %v", err)
+					}
 					m.RemoveKVRouter(serviceName, id)
 				}
 			}
@@ -234,7 +276,11 @@ func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, servic
 					}
 					m.AddTargetRouter(serviceName, info)
 				case clientv3.EventTypeDelete:
-					id := util.TargetRouterKey2InstanceID(string(ev.Kv.Key), serviceName)
+					id, err := util.TargetRouterKey2RouterID(string(ev.Kv.Key), serviceName)
+					if err != nil {
+						util.Error("解析RouterID err: %v", err)
+						continue
+					}
 					m.RemoveTargetRouter(serviceName, id)
 				}
 			}

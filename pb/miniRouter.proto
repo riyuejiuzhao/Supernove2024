@@ -12,6 +12,8 @@ message InstanceInfo {
 }
 
 message TargetRouterInfo{
+  int64 RouterID =1;
+
   string SrcInstanceName = 2;
   string DstInstanceName = 3;
   int64 Timeout = 4;
@@ -19,6 +21,8 @@ message TargetRouterInfo{
 }
 
 message KVRouterInfo{
+  int64 RouterID =1;
+
   repeated string Key = 2;
   repeated string Val = 3;
 
