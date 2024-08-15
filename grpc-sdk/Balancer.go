@@ -54,6 +54,8 @@ func (r *BalancerInstanceInfo) GetPort() int32 {
 type MiniRouterBalancer struct {
 	discoveryAPI sdk.DiscoveryAPI
 	cc           balancer.ClientConn
+
+	nowPicker util.SyncContainer[*MiniRouterPicker]
 }
 
 func (b *MiniRouterBalancer) Build(cc balancer.ClientConn, _ balancer.BuildOptions) balancer.Balancer {
@@ -74,6 +76,8 @@ func (b *MiniRouterBalancer) ResolverError(err error) {
 func (b *MiniRouterBalancer) UpdateClientConnState(s balancer.ClientConnState) error {
 	serviceName := s.ResolverState.Attributes.Value("Name")
 	routerInfos := make([]util.DstInstanceInfo, 0, len(s.ResolverState.Addresses))
+	states := make(map[balancer.SubConn]connectivity.State)
+
 	for _, addr := range s.ResolverState.Addresses {
 		instanceInfo := addr.Attributes.Value("Info").(util.DstInstanceInfo)
 		sc, err := b.cc.NewSubConn([]resolver.Address{addr}, balancer.NewSubConnOptions{})
@@ -84,6 +88,7 @@ func (b *MiniRouterBalancer) UpdateClientConnState(s balancer.ClientConnState) e
 			SubConn:  sc,
 			Instance: instanceInfo,
 		})
+		states[sc] = connectivity.Idle
 		sc.Connect()
 	}
 
@@ -93,14 +98,25 @@ func (b *MiniRouterBalancer) UpdateClientConnState(s balancer.ClientConnState) e
 			Name:      serviceName.(string),
 			Instances: routerInfos,
 		},
+		states: states,
 	}
-	b.cc.UpdateState(balancer.State{ConnectivityState: connectivity.Ready, Picker: picker})
 
+	func() {
+		b.nowPicker.Mutex.Lock()
+		defer b.nowPicker.Mutex.Unlock()
+		b.nowPicker.Value = picker
+	}()
+
+	b.cc.UpdateState(balancer.State{ConnectivityState: connectivity.Ready, Picker: picker})
 	return nil
 }
 
 func (b *MiniRouterBalancer) UpdateSubConnState(sc balancer.SubConn, state balancer.SubConnState) {
-	util.Info("SubConn state changed: %v, %v\n", sc, state)
+	b.nowPicker.Mutex.Lock()
+	defer b.nowPicker.Mutex.Unlock()
+	b.nowPicker.Value.states[sc] = state.ConnectivityState
+	b.cc.UpdateState(balancer.State{ConnectivityState: connectivity.Ready, Picker: b.nowPicker.Value})
+	return
 }
 
 func (b *MiniRouterBalancer) Close() {}
@@ -108,6 +124,8 @@ func (b *MiniRouterBalancer) Close() {}
 type MiniRouterPicker struct {
 	discoveryAPI sdk.DiscoveryAPI
 	serviceInfo  util.DstService
+
+	states map[balancer.SubConn]connectivity.State
 }
 
 func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
@@ -155,5 +173,8 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 		return balancer.PickResult{}, err
 	}
 	bInfo := result.DstInstance.(*BalancerInstanceInfo)
+	if p.states[bInfo.SubConn] != connectivity.Ready {
+		return balancer.PickResult{}, fmt.Errorf("对映实例尚未连接完成")
+	}
 	return balancer.PickResult{SubConn: bInfo.SubConn}, nil
 }

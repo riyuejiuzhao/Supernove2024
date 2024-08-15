@@ -20,6 +20,7 @@ type KVRouterOption struct {
 type serverOptions struct {
 	GrpcOption []grpc.ServerOption
 
+	InstanceName   string
 	KVRouterOption []KVRouterOption
 	Weight         *int32
 	TTL            *int64
@@ -27,10 +28,9 @@ type serverOptions struct {
 
 type ServerOption func(*serverOptions)
 
-// WithKVRouter 标识哪些Key会被发送到本服务器
-func WithKVRouter(routers []KVRouterOption) ServerOption {
+func WithInstanceName(name string) ServerOption {
 	return func(options *serverOptions) {
-		options.KVRouterOption = routers
+		options.InstanceName = name
 	}
 }
 
@@ -94,7 +94,8 @@ func NewServer(opts ...ServerOption) (srv *Server, err error) {
 		RegisterAPI:  reg,
 		HealthAPI:    health,
 
-		options: options,
+		options:       options,
+		InstanceIdDic: make(map[string]int64),
 	}
 
 	return
@@ -122,6 +123,7 @@ func (srv *Server) doRegister(lis net.Listener) (err error) {
 			ServiceName: name,
 			Host:        host,
 			Port:        port,
+			Name:        srv.options.InstanceName,
 
 			Weight: srv.options.Weight,
 			TTL:    srv.options.TTL,
@@ -148,6 +150,7 @@ func (srv *Server) Serve(lis net.Listener) (err error) {
 	if err != nil {
 		return err
 	}
+	//srv.routerRegister()
 
 	go func() {
 		c := make(chan os.Signal, 1)

@@ -24,6 +24,7 @@ func (r *MiniRouterResolver) start() {
 	}
 	go func() {
 		for msg := range ch {
+			util.Info("resolver trigger %v", msg)
 			err := r.doResolveOnce(service, msg.Instances)
 			if err != nil {
 				util.Error("resolver更新地址失败, err: %v", err)

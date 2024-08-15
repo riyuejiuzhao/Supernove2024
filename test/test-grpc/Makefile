@@ -8,3 +8,6 @@ all: $(PROTO_SRC)
 
 clean:
 	find -name "*.go" -delete
+
+test:
+	go test -run TestGrpc -timeout 30m

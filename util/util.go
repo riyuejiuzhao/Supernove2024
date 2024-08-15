@@ -137,16 +137,17 @@ func GenerateRandomString(length int) string {
 	return string(b)
 }
 
-func ClearEtcd(addr string, t *testing.T) {
-	//连接数据库
+func ClearEtcd(address string, t *testing.T) {
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"127.0.0.1:2301"},
+		Endpoints:   []string{address},
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = client.Delete(context.Background(), "", clientv3.WithPrefix())
+
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	_, err = client.Delete(ctx, "", clientv3.WithPrefix())
 	if err != nil {
 		t.Fatal(err)
 	}

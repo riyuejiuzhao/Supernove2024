@@ -2,10 +2,10 @@ package test_grpc
 
 import (
 	grpc_sdk "Supernove2024/grpc-sdk"
+	"Supernove2024/sdk"
 	"Supernove2024/util"
 	"context"
 	"fmt"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -57,28 +57,15 @@ func EchoSetup(selfKey, otherKey, address string, opts ...grpc_sdk.ServerOption)
 	client := NewEchoServiceClient(conn)
 	count := 0
 	for {
-		_, err = client.Echo(context.Background(), &Request{Content: fmt.Sprintf("%s-%v", selfKey, count)})
+		util.Info("%s send %s-%v", selfKey, selfKey, count)
+		ctx, _ := context.WithTimeout(context.Background(), 1000*time.Second)
+		_, err = client.Echo(ctx, &Request{Content: fmt.Sprintf("%s-%v", selfKey, count)})
 		if err != nil {
 			util.Error("%v", err)
+		} else {
+			count += 1
 		}
-		count += 1
 		time.Sleep(1 * time.Second)
-	}
-}
-
-func ClearEtcd(address string, t *testing.T) {
-	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{address},
-		DialTimeout: 5 * time.Second,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-	_, err = client.Delete(ctx, "", clientv3.WithPrefix())
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -88,33 +75,54 @@ func TestGrpc(t *testing.T) {
 		"127.0.0.1:2311",
 		"127.0.0.1:2321",
 	} {
-		ClearEtcd(addr, t)
+		util.ClearEtcd(addr, t)
+	}
+
+	///通过另一个控制台添加路由
+	registerAPI, err := sdk.NewRegisterAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
+		Key:             "AKey",
+		DstServiceName:  "EchoService",
+		DstInstanceName: "AKey",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
+		Key:             "BKey",
+		DstServiceName:  "EchoService",
+		DstInstanceName: "BKey",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
+		Key:             "CKey",
+		DstServiceName:  "EchoService",
+		DstInstanceName: "CKey",
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		EchoSetup("AKey", "BKey", "127.0.0.1:20000",
-			grpc_sdk.WithKVRouter([]grpc_sdk.KVRouterOption{
-				{ServiceName: "EchoService", Key: "AKey"},
-			}))
+		EchoSetup("AKey", "BKey", "127.0.0.1:20000", grpc_sdk.WithInstanceName("AKey"))
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		EchoSetup("BKey", "CKey", "127.0.0.1:20001",
-			grpc_sdk.WithKVRouter([]grpc_sdk.KVRouterOption{
-				{ServiceName: "EchoService", Key: "BKey"},
-			}))
+		EchoSetup("BKey", "CKey", "127.0.0.1:20001", grpc_sdk.WithInstanceName("BKey"))
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		EchoSetup("CKey", "AKey", "127.0.0.1:20002",
-			grpc_sdk.WithKVRouter([]grpc_sdk.KVRouterOption{
-				{ServiceName: "EchoService", Key: "CKey"},
-			}))
+		EchoSetup("CKey", "AKey", "127.0.0.1:20002", grpc_sdk.WithInstanceName("CKey"))
 	}()
 	wg.Wait()
 }
