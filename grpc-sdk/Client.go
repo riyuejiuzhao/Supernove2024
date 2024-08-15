@@ -14,9 +14,6 @@ type ClientConn struct {
 }
 
 type clientOptions struct {
-	DefaultRouterKey  string
-	DefaultRouterType string
-
 	DialOpt []grpc.DialOption
 }
 
@@ -28,17 +25,20 @@ func WithGrpcDialOption(opts ...grpc.DialOption) ClientOption {
 	}
 }
 
+/*
 func WithDefaultRouterType(rt string) ClientOption {
 	return func(options *clientOptions) {
 		options.DefaultRouterType = rt
 	}
 }
-
+*/
+/*
 func WithDefaultRouterKey(key string) ClientOption {
 	return func(options *clientOptions) {
 		options.DefaultRouterKey = key
 	}
 }
+*/
 
 // injectCallerInfo 将主调方信息写入 grpc 请求的 header 中
 func injectCallerInfo(options *clientOptions) grpc.UnaryClientInterceptor {
@@ -50,27 +50,29 @@ func injectCallerInfo(options *clientOptions) grpc.UnaryClientInterceptor {
 			md = metadata.MD{}
 		}
 
-		routerTypes := md.Get(RouterTypeHeader)
-		var routerType string
-		if options.DefaultRouterType != "" {
-			if routerTypes == nil || len(routerTypes) == 0 {
-				routerTypes = []string{options.DefaultRouterType}
-				md.Set(RouterTypeHeader, routerTypes...)
-				routerType = routerTypes[0]
-			} else {
-				routerType = routerTypes[0]
-			}
-		}
-
-		if routerType == KVRouterType {
-			routerKeys := md.Get(RouterKeyHeader)
-			if options.DefaultRouterKey != "" {
-				if routerKeys == nil || len(routerTypes) == 0 {
-					routerKeys = []string{options.DefaultRouterKey}
-					md.Set(RouterKeyHeader, routerKeys...)
+		/*
+			routerTypes := md.Get(RouterTypeHeader)
+			var routerType string
+				if options.DefaultRouterType != "" {
+					if routerTypes == nil || len(routerTypes) == 0 {
+						routerTypes = []string{options.DefaultRouterType}
+						md.Set(RouterTypeHeader, routerTypes...)
+						routerType = routerTypes[0]
+					} else {
+						routerType = routerTypes[0]
+					}
 				}
-			}
-		}
+
+				if routerType == KVRouterType {
+					routerKeys := md.Get(RouterKeyHeader)
+					if options.DefaultRouterKey != "" {
+						if routerKeys == nil || len(routerTypes) == 0 {
+							routerKeys = []string{options.DefaultRouterKey}
+							md.Set(RouterKeyHeader, routerKeys...)
+						}
+					}
+				}
+		*/
 
 		ctx = metadata.NewOutgoingContext(ctx, md)
 		return invoker(ctx, method, req, reply, cc, opts...)

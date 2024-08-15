@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"log"
 	"net"
 	"sync"
@@ -45,8 +46,6 @@ func EchoSetup(selfKey, otherKey, address string, opts ...grpc_sdk.ServerOption)
 	}()
 
 	conn, err := grpc_sdk.NewClient("EchoService",
-		grpc_sdk.WithDefaultRouterType(grpc_sdk.KVRouterType),
-		grpc_sdk.WithDefaultRouterKey(otherKey),
 		grpc_sdk.WithGrpcDialOption(
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		))
@@ -59,6 +58,10 @@ func EchoSetup(selfKey, otherKey, address string, opts ...grpc_sdk.ServerOption)
 	for {
 		util.Info("%s send %s-%v", selfKey, selfKey, count)
 		ctx, _ := context.WithTimeout(context.Background(), 1000*time.Second)
+		md := metadata.MD{}
+		md.Set(grpc_sdk.RouterTypeHeader, grpc_sdk.KVRouterType)
+		md.Set(grpc_sdk.RouterKeyHeader, fmt.Sprintf(`{"Key":"%s"}`, otherKey))
+		ctx = metadata.NewOutgoingContext(ctx, md)
 		_, err = client.Echo(ctx, &Request{Content: fmt.Sprintf("%s-%v", selfKey, count)})
 		if err != nil {
 			util.Error("%v", err)
@@ -84,25 +87,28 @@ func TestGrpc(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-		Key:             "AKey",
+		Dic:             map[string]string{"Key": "AKey"},
 		DstServiceName:  "EchoService",
-		DstInstanceName: "AKey",
+		DstInstanceName: []string{"AKey"},
+		NextRouterType:  util.ConsistentRouterType,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-		Key:             "BKey",
+		Dic:             map[string]string{"Key": "BKey"},
 		DstServiceName:  "EchoService",
-		DstInstanceName: "BKey",
+		DstInstanceName: []string{"BKey"},
+		NextRouterType:  util.ConsistentRouterType,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-		Key:             "CKey",
+		Dic:             map[string]string{"Key": "CKey"},
 		DstServiceName:  "EchoService",
-		DstInstanceName: "CKey",
+		DstInstanceName: []string{"CKey"},
+		NextRouterType:  util.ConsistentRouterType,
 	})
 	if err != nil {
 		t.Fatal(err)

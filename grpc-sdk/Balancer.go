@@ -3,6 +3,7 @@ package grpc_sdk
 import (
 	"Supernove2024/sdk"
 	"Supernove2024/util"
+	"encoding/json"
 	"fmt"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
@@ -74,9 +75,9 @@ func (b *MiniRouterBalancer) ResolverError(err error) {
 }
 
 func (b *MiniRouterBalancer) UpdateClientConnState(s balancer.ClientConnState) error {
-	serviceName := s.ResolverState.Attributes.Value("Name")
-	routerInfos := make([]util.DstInstanceInfo, 0, len(s.ResolverState.Addresses))
+	serviceName := s.ResolverState.Attributes.Value("Name").(string)
 	states := make(map[balancer.SubConn]connectivity.State)
+	infos := make(map[int64]balancer.SubConn)
 
 	for _, addr := range s.ResolverState.Addresses {
 		instanceInfo := addr.Attributes.Value("Info").(util.DstInstanceInfo)
@@ -84,21 +85,16 @@ func (b *MiniRouterBalancer) UpdateClientConnState(s balancer.ClientConnState) e
 		if err != nil {
 			return err
 		}
-		routerInfos = append(routerInfos, &BalancerInstanceInfo{
-			SubConn:  sc,
-			Instance: instanceInfo,
-		})
 		states[sc] = connectivity.Idle
+		infos[instanceInfo.GetInstanceID()] = sc
 		sc.Connect()
 	}
 
 	picker := &MiniRouterPicker{
 		discoveryAPI: b.discoveryAPI,
-		serviceInfo: &util.ServiceInfo{
-			Name:      serviceName.(string),
-			Instances: routerInfos,
-		},
-		states: states,
+		serviceName:  serviceName,
+		states:       states,
+		infos:        infos,
 	}
 
 	func() {
@@ -115,7 +111,7 @@ func (b *MiniRouterBalancer) UpdateSubConnState(sc balancer.SubConn, state balan
 	b.nowPicker.Mutex.Lock()
 	defer b.nowPicker.Mutex.Unlock()
 	b.nowPicker.Value.states[sc] = state.ConnectivityState
-	b.cc.UpdateState(balancer.State{ConnectivityState: connectivity.Ready, Picker: b.nowPicker.Value})
+	b.cc.UpdateState(balancer.State{ConnectivityState: state.ConnectivityState, Picker: b.nowPicker.Value})
 	return
 }
 
@@ -123,8 +119,9 @@ func (b *MiniRouterBalancer) Close() {}
 
 type MiniRouterPicker struct {
 	discoveryAPI sdk.DiscoveryAPI
-	serviceInfo  util.DstService
+	serviceName  string //util.DstService
 
+	infos  map[int64]balancer.SubConn
 	states map[balancer.SubConn]connectivity.State
 }
 
@@ -135,8 +132,8 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 	}
 	routerTypes, ok := md[RouterTypeHeader]
 	if !ok {
-		bInfo := util.RandomItem(p.serviceInfo.GetInstance()).(*BalancerInstanceInfo)
-		return balancer.PickResult{SubConn: bInfo.SubConn}, nil
+		bInfo := util.RandomDicValue(p.infos)
+		return balancer.PickResult{SubConn: bInfo}, nil
 	}
 	if len(routerTypes) > 1 {
 		util.Warn("路由方法指定了多次，将使用首次指定的结果")
@@ -144,8 +141,8 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 	argv := &sdk.ProcessRouterArgv{
 		Method:          0,
 		SrcInstanceName: "",
-		DstService:      p.serviceInfo,
-		Key:             "",
+		DstService:      p.serviceName,
+		Key:             make(map[string]string),
 	}
 	switch routerTypes[0] {
 	case ConsistentRouterType:
@@ -160,21 +157,25 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 		argv.Method = util.KVRouterType
 		routerKey, ok := md[RouterKeyHeader]
 		if !ok {
-			bInfo := util.RandomItem(p.serviceInfo.GetInstance()).(*BalancerInstanceInfo)
-			return balancer.PickResult{SubConn: bInfo.SubConn}, fmt.Errorf("报文头缺少Key")
+			return balancer.PickResult{}, fmt.Errorf("报文头缺少Key")
 		}
 		if len(routerKey) > 1 {
 			util.Warn("Key指定了多个，将使用首个")
 		}
-		argv.Key = routerKey[0]
+		var dic map[string]string
+		err := json.Unmarshal([]byte(routerKey[0]), &dic)
+		if err != nil {
+			return balancer.PickResult{}, fmt.Errorf("报文头缺少Key")
+		}
+		argv.Key = dic
 	}
 	result, err := p.discoveryAPI.ProcessRouter(argv)
 	if err != nil {
 		return balancer.PickResult{}, err
 	}
-	bInfo := result.DstInstance.(*BalancerInstanceInfo)
-	if p.states[bInfo.SubConn] != connectivity.Ready {
+	bInfo := p.infos[result.DstInstance.GetInstanceID()] //result.DstInstance.(*BalancerInstanceInfo)
+	if p.states[bInfo] != connectivity.Ready {
 		return balancer.PickResult{}, fmt.Errorf("对映实例尚未连接完成")
 	}
-	return balancer.PickResult{SubConn: bInfo.SubConn}, nil
+	return balancer.PickResult{SubConn: bInfo}, nil
 }
