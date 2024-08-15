@@ -173,7 +173,7 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 	if err != nil {
 		return balancer.PickResult{}, err
 	}
-	bInfo := p.infos[result.DstInstance.GetInstanceID()] //result.DstInstance.(*BalancerInstanceInfo)
+	bInfo := p.infos[result.DstInstance.GetInstanceID()] //result.SrcInstance.(*BalancerInstanceInfo)
 	if p.states[bInfo] != connectivity.Ready {
 		return balancer.PickResult{}, fmt.Errorf("对映实例尚未连接完成")
 	}

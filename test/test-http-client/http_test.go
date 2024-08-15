@@ -91,9 +91,9 @@ func SetupClient(
 
 	timeout := int64(10000000)
 	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-		Key:             selfKey,
+		Dic:             map[string]string{"Key": selfKey},
 		DstServiceName:  service,
-		DstInstanceName: selfKey,
+		DstInstanceName: []string{selfKey},
 		Timeout:         &timeout,
 	})
 	if err != nil {
@@ -113,11 +113,8 @@ func SetupClient(
 				router, err = discoveryAPI.ProcessRouter(&sdk.ProcessRouterArgv{
 					Method:          util.KVRouterType,
 					SrcInstanceName: selfKey,
-					DstService: &sdk.DefaultDstService{
-						ServiceName: targetService,
-						Instances:   nil,
-					},
-					Key: targetKey,
+					DstService:      targetService,
+					Key:             map[string]string{"Key": targetKey},
 				})
 
 				if router == nil {

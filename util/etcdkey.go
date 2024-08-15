@@ -54,3 +54,11 @@ func RouterKVInfoKey(serviceName string, routerID int64) string {
 func RouterTargetInfoKey(serviceName string, routerID int64) string {
 	return fmt.Sprintf("%s.Dst.%s.%v", RouterHashKey, serviceName, routerID)
 }
+
+func KvRouterHashSlotKey(dstService string, dic map[string]string) string {
+	return fmt.Sprintf("%s-%s", dstService, dic)
+}
+
+func TargetRouterHashSlotKey(dstServiceName string, srcInstanceName string) string {
+	return fmt.Sprintf("%s-%s", dstServiceName, srcInstanceName)
+}

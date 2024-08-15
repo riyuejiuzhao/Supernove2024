@@ -126,7 +126,7 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRou
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddTargetRouter"}, err)
 	}()
 	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd,
-		fmt.Sprintf("%s-%v", argv.DstServiceName, argv.DstInstanceName))
+		util.TargetRouterHashSlotKey(argv.DstServiceName, argv.SrcInstanceName))
 	if err != nil {
 		return
 	}
@@ -184,8 +184,9 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResul
 		return nil, fmt.Errorf("不支持的NextRouterType:%v", argv.NextRouterType)
 	}
 
-	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd,
-		fmt.Sprintf("%s-%s", argv.DstServiceName, argv.Dic))
+	client, err := c.ConnManager.GetServiceConn(
+		connMgr.RoutersEtcd,
+		util.KvRouterHashSlotKey(argv.DstServiceName, argv.Dic))
 	if err != nil {
 		return
 	}
@@ -224,6 +225,57 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResul
 	return
 }
 
+type RemoveKVRouterArgv struct {
+	RouterID       int64
+	DstServiceName string
+	Dic            map[string]string
+}
+
+func (c *RegisterCli) RemoveKVRouter(argv *RemoveKVRouterArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "RemoveKVRouter"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(
+		connMgr.RoutersEtcd,
+		util.KvRouterHashSlotKey(argv.DstServiceName, argv.Dic))
+	if err != nil {
+		return
+	}
+
+	_, err = client.Revoke(context.Background(), clientv3.LeaseID(argv.RouterID))
+	if err != nil {
+		return
+	}
+	return
+}
+
+type RemoveTargetRouterArgv struct {
+	RouterID    int64
+	DstService  string
+	SrcInstance string
+}
+
+func (c *RegisterCli) RemoveTargetRouter(argv *RemoveTargetRouterArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "RemoveKVRouter"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(
+		connMgr.RoutersEtcd,
+		util.TargetRouterHashSlotKey(argv.DstService, argv.SrcInstance))
+	if err != nil {
+		return
+	}
+	_, err = client.Revoke(context.Background(), clientv3.LeaseID(argv.RouterID))
+	if err != nil {
+		return
+	}
+	return
+}
+
 // RegisterAPI 功能：
 // 服务注册
 type RegisterAPI interface {
@@ -231,6 +283,8 @@ type RegisterAPI interface {
 	Deregister(service *DeregisterArgv) error
 	AddTargetRouter(*AddTargetRouterArgv) (result *AddRouterResult, err error)
 	AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResult, err error)
+	RemoveKVRouter(argv *RemoveKVRouterArgv) error
+	RemoveTargetRouter(argv *RemoveTargetRouterArgv) error
 }
 
 func NewRegisterAPIStandalone(
