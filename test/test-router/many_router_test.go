@@ -6,9 +6,8 @@ import (
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/util"
+	"encoding/json"
 	"fmt"
-	"github.com/armon/go-radix"
-	"google.golang.org/protobuf/proto"
 	"math/rand"
 	"testing"
 	"time"
@@ -26,10 +25,10 @@ func Generate(serviceName string, serviceNum int, routerCount int) (rt map[strin
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		for j := 0; j < routerCount; j++ {
 			nowKey := fmt.Sprintf("%s_%v", nowServiceName, j)
+			nowVal := util.GenerateRandomString(10)
 			nowList = append(nowList, &pb.KVRouterInfo{
-				RouterID: rand.Int63(),
-				Key:      nowKey,
-				//DstInstanceID: rand.Int63(),
+				Key:        []string{nowKey},
+				Val:        []string{nowVal},
 				Timeout:    rand.Int63(),
 				CreateTime: rand.Int63(),
 			})
@@ -37,54 +36,6 @@ func Generate(serviceName string, serviceNum int, routerCount int) (rt map[strin
 		rt[nowServiceName] = nowList
 	}
 	return
-}
-
-func doTestMemoryForTree(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
-	tree := radix.New()
-	for nowServiceName, nowList := range generate {
-		tree.Insert(nowServiceName, radix.New())
-		for _, info := range nowList {
-			now, ok := tree.Get(nowServiceName)
-			if !ok {
-				t.Fatal("没找到树")
-			}
-			nowTree := now.(*radix.Tree)
-			nowTree.Insert(info.Key, info)
-		}
-	}
-}
-
-func TestMemoryForTree(t *testing.T) {
-	serviceName := "testDiscovery"
-	serviceNum := 100
-	serviceRouterCount := 100000
-	result := Generate(serviceName, serviceNum, serviceRouterCount)
-	doTestMemoryForTree(result, t)
-}
-
-func doTestMemoryForByteMap(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
-	routerBuffer := util.SyncContainer[map[string]map[string][]byte]{
-		Value: make(map[string]map[string][]byte),
-	}
-	for nowServiceName, nowList := range generate {
-		//nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
-		routerBuffer.Value[nowServiceName] = make(map[string][]byte)
-		for _, info := range nowList {
-			bb, err := proto.Marshal(info)
-			if err != nil {
-				t.Error(err)
-			}
-			routerBuffer.Value[nowServiceName][info.Key] = bb
-		}
-	}
-}
-
-func TestMemoryForByteMap(t *testing.T) {
-	serviceName := "testDiscovery"
-	serviceNum := 100
-	serviceRouterCount := 100000
-	result := Generate(serviceName, serviceNum, serviceRouterCount)
-	doTestMemoryForByteMap(result, t)
 }
 
 func doTestMemoryForMap(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
@@ -95,13 +46,11 @@ func doTestMemoryForMap(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
 			TargetRouterDic: make(map[string]*pb.TargetRouterInfo),
 		}
 		for _, info := range nowList {
-			routerBuffer.Value[nowServiceName].KvRouterDic[info.Key] = &pb.KVRouterInfo{
-				RouterID:        rand.Int63(),
-				Key:             info.Key,
-				DstInstanceName: util.GenerateRandomString(5),
-				Timeout:         rand.Int63(),
-				CreateTime:      rand.Int63(),
+			js, err := json.Marshal(info)
+			if err != nil {
+				t.Fatal(err)
 			}
+			routerBuffer.Value[nowServiceName].KvRouterDic[string(js)] = info
 		}
 	}
 }
@@ -161,6 +110,7 @@ func doTestManyRouter(t *testing.T, configFile string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	sdk.NewDiscoveryAPI()
 
 	//生成路由
 	//每个服务路由个数
@@ -169,12 +119,13 @@ func doTestManyRouter(t *testing.T, configFile string) {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		for j := 0; j < serviceRouterCount; j++ {
 			nowKey := util.GenerateRandomString(5)
+			nowVal := util.GenerateRandomString(5)
 			go func() {
 				timeout := int64(60 * 60 * 10)
 				_, err := registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-					Key:             nowKey,
+					Dic:             map[string]string{nowKey: nowVal},
 					DstServiceName:  nowServiceName,
-					DstInstanceName: util.GenerateRandomString(5),
+					DstInstanceName: []string{util.GenerateRandomString(5)},
 					Timeout:         &timeout,
 				})
 				if err != nil {

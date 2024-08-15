@@ -19,6 +19,7 @@ import (
 type ServiceInfoBuffer struct {
 	Mutex       sync.Mutex
 	InstanceDic map[int64]*pb.InstanceInfo
+	NameDic     map[string]*pb.InstanceInfo
 }
 
 type DefaultServiceMgr struct {
@@ -46,7 +47,12 @@ func (m *DefaultServiceMgr) RemoveInstance(serviceName string, instanceID int64)
 		return
 	}
 	defer service.Mutex.Unlock()
+	info, ok := service.InstanceDic[instanceID]
+	if !ok {
+		return
+	}
 	delete(service.InstanceDic, instanceID)
+	delete(service.NameDic, info.Name)
 	util.Info("Remove %s Instance %v", serviceName, instanceID)
 }
 
@@ -58,6 +64,7 @@ func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInf
 		if !ok {
 			service = &ServiceInfoBuffer{
 				InstanceDic: make(map[int64]*pb.InstanceInfo),
+				NameDic:     make(map[string]*pb.InstanceInfo),
 			}
 			m.serviceBuffer.Value[serviceName] = service
 		}
@@ -70,6 +77,7 @@ func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInf
 		return
 	}
 	service.InstanceDic[info.InstanceID] = info
+	service.NameDic[info.Name] = info
 	util.Info("%s Add Instance %v", serviceName, info.InstanceID)
 }
 
@@ -261,6 +269,24 @@ func (m *DefaultServiceMgr) startFlushInfo() {
 		}
 	}
 	wg.Wait()
+}
+
+func (m *DefaultServiceMgr) GetInstanceInfoByName(serviceName string, name string) (*pb.InstanceInfo, bool) {
+	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
+		m.serviceBuffer.Mutex.Lock()
+		defer m.serviceBuffer.Mutex.Unlock()
+		service, ok = m.serviceBuffer.Value[serviceName]
+		if ok {
+			service.Mutex.Lock()
+		}
+		return
+	}()
+	if !ok {
+		return nil, false
+	}
+	defer service.Mutex.Unlock()
+	info, ok := service.NameDic[name]
+	return info, ok
 }
 
 func (m *DefaultServiceMgr) WatchServiceInfo(serviceName string) (<-chan *util.ServiceInfo, error) {

@@ -113,10 +113,11 @@ type AddTargetRouterArgv struct {
 }
 
 type AddKVRouterArgv struct {
-	Key             string
+	Dic             map[string]string
 	DstServiceName  string
-	DstInstanceName string
+	DstInstanceName []string
 	Timeout         *int64
+	NextRouterType  int32
 }
 
 func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRouterResult, err error) {
@@ -124,7 +125,6 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRou
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddTargetRouter"}, err)
 	}()
-	key := util.RouterTargetInfoKey(argv.DstServiceName, argv.SrcInstanceName)
 	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd,
 		fmt.Sprintf("%s-%v", argv.DstServiceName, argv.DstInstanceName))
 	if err != nil {
@@ -142,7 +142,6 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRou
 	}
 
 	info := &pb.TargetRouterInfo{
-		RouterID:        int64(resp.ID),
 		SrcInstanceName: argv.SrcInstanceName,
 		DstInstanceName: argv.DstInstanceName,
 		Timeout:         *argv.Timeout,
@@ -153,6 +152,7 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRou
 	if err != nil {
 		return
 	}
+	key := util.RouterTargetInfoKey(argv.DstServiceName, int64(resp.ID))
 	_, err = client.Put(context.Background(), key, string(bytes), clientv3.WithLease(resp.ID))
 	if err != nil {
 		return
@@ -170,30 +170,47 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResul
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddKVRouter"}, err)
 	}()
+
 	var timeout int64
 	if argv.Timeout == nil {
 		timeout = c.Config.SDK.Register.DefaultRouterTTL
 	} else {
 		timeout = *argv.Timeout
 	}
-	key := util.RouterKVInfoKey(argv.DstServiceName, argv.Key)
+
+	if argv.NextRouterType != util.RandomRouterType &&
+		argv.NextRouterType != util.WeightedRouterType &&
+		argv.NextRouterType != util.ConsistentRouterType {
+		return nil, fmt.Errorf("不支持的NextRouterType:%v", argv.NextRouterType)
+	}
+
 	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd,
-		fmt.Sprintf("%s-%s", argv.DstServiceName, argv.Key))
+		fmt.Sprintf("%s-%s", argv.DstServiceName, argv.Dic))
 	if err != nil {
 		return
 	}
+
 	resp, err := client.Grant(context.Background(), timeout)
 	if err != nil {
 		return
 	}
 
+	keys := make([]string, 0)
+	vals := make([]string, 0)
+	for k, v := range argv.Dic {
+		keys = append(keys, k)
+		vals = append(vals, v)
+	}
+
 	info := &pb.KVRouterInfo{
-		RouterID:        int64(resp.ID),
-		Key:             argv.Key,
+		Key:             keys,
+		Val:             vals,
 		DstInstanceName: argv.DstInstanceName,
 		Timeout:         timeout,
 		CreateTime:      time.Now().Unix(),
+		RouterType:      argv.NextRouterType,
 	}
+	key := util.RouterKVInfoKey(argv.DstServiceName, int64(resp.ID))
 
 	bytes, err := proto.Marshal(info)
 	if err != nil {

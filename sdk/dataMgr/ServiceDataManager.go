@@ -13,6 +13,7 @@ type ServiceDataManager interface {
 	GetServiceInfo(serviceName string) (*util.ServiceInfo, bool)
 	WatchServiceInfo(serviceName string) (<-chan *util.ServiceInfo, error)
 	GetInstanceInfo(serviceName string, instanceID int64) (*pb.InstanceInfo, bool)
+	GetInstanceInfoByName(serviceName string, name string) (*pb.InstanceInfo, bool)
 	GetTargetRouter(ServiceName string, SrcInstanceName string) (*pb.TargetRouterInfo, bool)
 	GetKVRouter(ServiceName string, Key string) (*pb.KVRouterInfo, bool)
 }

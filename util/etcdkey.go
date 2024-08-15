@@ -38,14 +38,19 @@ func TargetRouterKey2InstanceID(key string, service string) string {
 	return idstr
 }
 
+func KVRouterKey2InstanceID(key string, service string) string {
+	idstr := strings.TrimPrefix(key, RouterKVPrefix(service))
+	return idstr
+}
+
 func RouterTargetPrefix(serviceName string) string {
 	return fmt.Sprintf("%s.Dst.%s.", RouterHashKey, serviceName)
 }
 
-func RouterKVInfoKey(serviceName string, key string) string {
-	return fmt.Sprintf("%s.KV.%s.%s", RouterHashKey, serviceName, key)
+func RouterKVInfoKey(serviceName string, routerID int64) string {
+	return fmt.Sprintf("%s.KV.%s.%v", RouterHashKey, serviceName, routerID)
 }
 
-func RouterTargetInfoKey(serviceName string, srcInstanceID string) string {
-	return fmt.Sprintf("%s.Dst.%s.%s", RouterHashKey, serviceName, srcInstanceID)
+func RouterTargetInfoKey(serviceName string, routerID int64) string {
+	return fmt.Sprintf("%s.Dst.%s.%v", RouterHashKey, serviceName, routerID)
 }

@@ -42,18 +42,8 @@ func TestRouter(t *testing.T) {
 	srcData := RandomRegisterArgv(srcService, instanceNum)
 	dstData := RandomRegisterArgv(dstService, instanceNum)
 
-	//链接并清空数据库
-	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"127.0.0.1:2301"},
-		DialTimeout: 5 * time.Second,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = client.Delete(context.Background(), "", clientv3.WithPrefix())
-	if err != nil {
-		t.Fatal(err)
-	}
+	util.ClearEtcd("127.0.0.1:2311", t)
+	util.ClearEtcd("127.0.0.1:2301", t)
 
 	config.GlobalConfigFilePath = "router_test.yaml"
 	// 注册
@@ -95,7 +85,7 @@ func TestRouter(t *testing.T) {
 	processResult, err := discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:          util.ConsistentRouterType,
 		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
-		DstService:      dstServices,
+		DstService:      dstServices.GetServiceName(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +94,7 @@ func TestRouter(t *testing.T) {
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:          util.RandomRouterType,
 		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
-		DstService:      dstServices,
+		DstService:      dstServices.GetServiceName(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -113,7 +103,7 @@ func TestRouter(t *testing.T) {
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:          util.WeightedRouterType,
 		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
-		DstService:      dstServices,
+		DstService:      dstServices.GetServiceName(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -143,21 +133,22 @@ func TestRouter(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
-		Key:             "key0",
+		Dic:             map[string]string{"key": "key0"},
 		DstServiceName:  dstService,
-		DstInstanceName: dstServices.GetInstance()[2].GetName(),
+		DstInstanceName: []string{dstServices.GetInstance()[2].GetName()},
 		Timeout:         &timeout,
+		NextRouterType:  util.RandomRouterType,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:          util.TargetRouterType,
 		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
-		DstService:      dstServices,
+		DstService:      dstServices.GetServiceName(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -169,8 +160,8 @@ func TestRouter(t *testing.T) {
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
 		Method:          util.KVRouterType,
 		SrcInstanceName: srcServices.GetInstance()[2].GetName(), //"src2",
-		DstService:      dstServices,
-		Key:             "key0",
+		DstService:      dstServices.GetServiceName(),
+		Key:             map[string]string{"key": "key0"},
 	})
 	if err != nil {
 		t.Fatal(err)

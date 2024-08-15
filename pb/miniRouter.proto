@@ -12,7 +12,6 @@ message InstanceInfo {
 }
 
 message TargetRouterInfo{
-  int64 RouterID = 1;
   string SrcInstanceName = 2;
   string DstInstanceName = 3;
   int64 Timeout = 4;
@@ -20,9 +19,13 @@ message TargetRouterInfo{
 }
 
 message KVRouterInfo{
-  int64 RouterID = 1;
-  string Key = 2;
-  string DstInstanceName = 3;
-  int64 Timeout = 4;
+  repeated string Key = 2;
+  repeated string Val = 3;
+
+  repeated string DstInstanceName = 4;
+
+  int64 Timeout = 5;
   int64 CreateTime = 6;
+  //如果有多个，那么允许指定更进一步的筛选方式
+  int32 RouterType = 7;
 }

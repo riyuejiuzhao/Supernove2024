@@ -4,6 +4,7 @@ import (
 	"Supernove2024/pb"
 	"Supernove2024/util"
 	"context"
+	"encoding/json"
 	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
@@ -103,12 +104,22 @@ func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInf
 		return
 	}()
 	defer b.Mutex.Unlock()
-	nowInfo, ok := b.KvRouterDic[info.Key]
+	dic := make(map[string]string)
+	for i := 0; i < len(info.Key); i++ {
+		dic[info.Key[i]] = info.Val[i]
+	}
+	js, err := json.Marshal(dic)
+	if err != nil {
+		util.Error("add kv router failed", err)
+		return
+	}
+	jss := string(js)
+	nowInfo, ok := b.KvRouterDic[jss]
 	//保留更新的那个
 	if ok && nowInfo.CreateTime > info.CreateTime {
 		return
 	}
-	b.KvRouterDic[info.Key] = info
+	b.KvRouterDic[jss] = info
 	util.Info("%s Add Router %s", serviceName, info)
 }
 
@@ -192,6 +203,8 @@ func (m *DefaultServiceMgr) handleWatchKVRouter(cli *clientv3.Client, serviceNam
 						util.Error("kv router err: %v", err)
 					}
 				case clientv3.EventTypeDelete:
+					id := util.KVRouterKey2InstanceID(string(ev.Kv.Key), serviceName)
+					m.RemoveKVRouter(serviceName, id)
 				}
 			}
 		}

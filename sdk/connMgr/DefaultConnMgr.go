@@ -17,13 +17,14 @@ type ClientInfo struct {
 }
 
 type DefaultConnManager struct {
+	cfg     *config.Config
 	mt      *metrics.MetricsManager
 	poolDic map[ServiceType][]*ClientInfo
 }
 
 const HashSlots = 16384
 
-func getHashSlot(key string) int {
+func GetHashSlot(key string) int {
 	hashValue := crc16.ChecksumIBM([]byte(key))
 	return int(hashValue % HashSlots)
 }
@@ -69,7 +70,7 @@ func newDefaultConnManager(cfg *config.Config) (ConnManager, error) {
 		return nil, err
 	}
 	dic[RoutersEtcd] = p
-	return &DefaultConnManager{poolDic: dic, mt: mt}, nil
+	return &DefaultConnManager{cfg: cfg, poolDic: dic, mt: mt}, nil
 }
 
 func (m *DefaultConnManager) GetAllServiceConn(service ServiceType) []*clientv3.Client {
@@ -91,14 +92,14 @@ func (m *DefaultConnManager) GetServiceConn(service ServiceType, key string) (cl
 		return
 	}
 	p := m.poolDic[service]
-	slot := getHashSlot(key)
-	cliInfo := hashSlot2Client(slot, p)
+	slot := GetHashSlot(key)
+	cliInfo := HashSlot2Client(slot, p)
 	connName = cliInfo.Name
 	cli = cliInfo.Client
 	return
 }
 
 // 我们假定slot在不同的集群上分布是均匀的
-func hashSlot2Client(slot int, infos []*ClientInfo) *ClientInfo {
+func HashSlot2Client(slot int, infos []*ClientInfo) *ClientInfo {
 	return infos[slot%len(infos)]
 }
