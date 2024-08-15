@@ -1,10 +1,18 @@
-Global:
-  Etcd:
-    - Host: 127.0.0.1
-      Port: 2379
+SDK:
+  InstancesEtcd:
+    - Name: InstanceEtcd
+      Pod:
+      - Host: 127.0.0.1
+        Port: 2301
+  RouterEtcd:
+    - Name: RoutersEtcd
+      Pod:
+      - Host: 127.0.0.1
+        Port: 2311
   Register:
     DefaultWeight: 10
-    DefaultTTL: 20000
+    DefaultServiceTTL: 1000
+    DefaultRouterTTL: 1000
   Discovery:
     DefaultTimeout: 1
     DstService:

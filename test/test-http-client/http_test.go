@@ -58,6 +58,7 @@ func SetupClient(
 	}
 	reply, err := registerAPI.Register(&sdk.RegisterArgv{
 		ServiceName: service,
+		Name:        selfKey,
 		Host:        host,
 		Port:        port,
 	})
@@ -76,7 +77,7 @@ func SetupClient(
 			log.Fatalln(err)
 		}
 		for {
-			err = healthAPI.HeartBeat(&sdk.HeartBeatArgv{
+			err = healthAPI.HeartBeatOnce(&sdk.HeartBeatArgv{
 				ServiceName: service,
 				InstanceID:  reply.InstanceID,
 			})
@@ -88,11 +89,12 @@ func SetupClient(
 		}
 	}()
 
-	err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-		Key:            selfKey,
-		DstServiceName: service,
-		DstInstanceID:  reply.InstanceID,
-		Timeout:        10000000,
+	timeout := int64(10000000)
+	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
+		Key:             selfKey,
+		DstServiceName:  service,
+		DstInstanceName: selfKey,
+		Timeout:         &timeout,
 	})
 	if err != nil {
 		log.Fatalln(err)
@@ -109,8 +111,8 @@ func SetupClient(
 			time.Sleep(1 * time.Second)
 			func() {
 				router, err = discoveryAPI.ProcessRouter(&sdk.ProcessRouterArgv{
-					Method:        util.KVRouterType,
-					SrcInstanceID: 0,
+					Method:          util.KVRouterType,
+					SrcInstanceName: selfKey,
 					DstService: &sdk.DefaultDstService{
 						ServiceName: targetService,
 						Instances:   nil,
@@ -125,7 +127,7 @@ func SetupClient(
 				span := tracer.StartSpan("client-request")
 				defer span.Finish()
 
-				address := fmt.Sprintf("http://%s:%v", router.DstInstance.Host, router.DstInstance.Port)
+				address := fmt.Sprintf("http://%s:%v", router.DstInstance.GetHost(), router.DstInstance.GetPort())
 				req, err := http.NewRequest("GET", address, nil)
 				if err != nil {
 					util.Error("http get err: %v", err)
@@ -180,13 +182,13 @@ func TestHttp(t *testing.T) {
 	go SetupClient(
 		"A", "B", "client.yaml",
 		"127.0.0.1", 20001,
-		"keyA1", "keyB2")
+		"keyA1", "keyB0")
 	time.Sleep(50 * time.Millisecond)
 
 	go SetupClient(
 		"A", "B", "client.yaml",
 		"127.0.0.1", 20002,
-		"keyA2", "keyB3")
+		"keyA2", "keyB0")
 	time.Sleep(50 * time.Millisecond)
 
 	go SetupClient(

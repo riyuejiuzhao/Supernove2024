@@ -1,10 +1,14 @@
 package util
 
 import (
+	"context"
 	"fmt"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"log/slog"
 	"math/rand"
 	"sync"
+	"testing"
+	"time"
 )
 
 const (
@@ -108,4 +112,42 @@ type DstInstanceInfo interface {
 type SyncContainer[T any] struct {
 	Mutex sync.Mutex
 	Value T
+}
+
+func RandomIP() string {
+	return fmt.Sprintf("%v.%v.%v.%v",
+		rand.Intn(256),
+		rand.Intn(256),
+		rand.Intn(256),
+		rand.Intn(256),
+	)
+}
+
+func RandomPort() int32 {
+	return rand.Int31n(65535)
+}
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func GenerateRandomString(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func ClearEtcd(addr string, t *testing.T) {
+	//连接数据库
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{"127.0.0.1:2301"},
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Delete(context.Background(), "", clientv3.WithPrefix())
+	if err != nil {
+		t.Fatal(err)
+	}
 }

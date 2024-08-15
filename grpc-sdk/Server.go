@@ -95,8 +95,6 @@ func NewServer(opts ...ServerOption) (srv *Server, err error) {
 		HealthAPI:    health,
 
 		options: options,
-
-		InstanceIdDic: make(map[string]int64),
 	}
 
 	return
@@ -145,36 +143,11 @@ func (srv *Server) doRegister(lis net.Listener) (err error) {
 	return
 }
 
-func (srv *Server) routerRegister() {
-	for _, router := range srv.options.KVRouterOption {
-		instanceID, ok := srv.InstanceIdDic[router.ServiceName]
-		if !ok {
-			continue
-		}
-		result, err := srv.RegisterAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-			Key:             router.Key,
-			DstServiceName:  router.ServiceName,
-			DstInstanceName: instanceID,
-		})
-		if err != nil {
-			util.Error("grpc注册路由失败：%v", err)
-			continue
-		}
-		err = srv.HealthAPI.KeepRouterAlive(&sdk.KeepRouterAliveArgv{RouterID: result.RouterID})
-		if err != nil {
-			util.Error("路由保活失败: %v", err)
-			continue
-		}
-	}
-
-}
-
 func (srv *Server) Serve(lis net.Listener) (err error) {
 	err = srv.doRegister(lis)
 	if err != nil {
 		return err
 	}
-	srv.routerRegister()
 
 	go func() {
 		c := make(chan os.Signal, 1)

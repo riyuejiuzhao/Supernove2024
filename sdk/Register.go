@@ -23,6 +23,7 @@ type RegisterArgv struct {
 	ServiceName string
 	Host        string
 	Port        int32
+	Name        string
 
 	//optional
 	Weight *int32
@@ -68,6 +69,7 @@ func (c *RegisterCli) Register(service *RegisterArgv) (result *RegisterResult, e
 
 	instanceInfo := &pb.InstanceInfo{
 		InstanceID: int64(resp.ID),
+		Name:       service.Name,
 		Host:       service.Host,
 		Port:       service.Port,
 		Weight:     weight,

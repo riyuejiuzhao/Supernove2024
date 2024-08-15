@@ -159,20 +159,22 @@ func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
 		clientv3.WithPrefix(),
 		clientv3.WithRev(revision),
 	)
-	for wresp := range rch {
-		for _, ev := range wresp.Events {
-			switch ev.Type {
-			case clientv3.EventTypePut:
-				err = m.handleInstancePut(serviceName, ev)
-				if err != nil {
-					util.Error("Put err: %v", err)
+	go func() {
+		for wresp := range rch {
+			for _, ev := range wresp.Events {
+				switch ev.Type {
+				case clientv3.EventTypePut:
+					err = m.handleInstancePut(serviceName, ev)
+					if err != nil {
+						util.Error("Put err: %v", err)
+					}
+				case clientv3.EventTypeDelete:
+					m.handleInstanceDelete(serviceName, ev)
 				}
-			case clientv3.EventTypeDelete:
-				m.handleInstanceDelete(serviceName, ev)
 			}
+			m.sendServiceInfoAllChan(serviceName)
 		}
-		m.sendServiceInfoAllChan(serviceName)
-	}
+	}()
 }
 
 func (m *DefaultServiceMgr) tryAddServiceInfoChanList(serviceName string) *util.SyncContainer[[]chan<- *util.ServiceInfo] {
@@ -238,13 +240,27 @@ func (m *DefaultServiceMgr) initInstanceInfo(serviceName string) (revision int64
 
 func (m *DefaultServiceMgr) startFlushInfo() {
 	clis := m.connManager.GetAllServiceConn(connMgr.RoutersEtcd)
+	var wg sync.WaitGroup
 	for _, serviceName := range m.config.SDK.Discovery.DstService {
-		go m.handleWatchService(serviceName)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m.handleWatchService(serviceName)
+		}()
 		for _, cli := range clis {
-			go m.handleWatchKVRouter(cli, serviceName)
-			go m.handleWatchTargetRouter(cli, serviceName)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				m.handleWatchKVRouter(cli, serviceName)
+			}()
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				m.handleWatchTargetRouter(cli, serviceName)
+			}()
 		}
 	}
+	wg.Wait()
 }
 
 func (m *DefaultServiceMgr) WatchServiceInfo(serviceName string) (<-chan *util.ServiceInfo, error) {

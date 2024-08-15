@@ -9,30 +9,6 @@ SDK:
       Pod:
       - Host: 127.0.0.1
         Port: 2311
-    - Name: R1
-      Pod:
-      - Host: 127.0.0.1
-        Port: 2321
-    - Name: R2
-      Pod:
-      - Host: 127.0.0.1
-        Port: 2331
-    - Name: R3
-      Pod:
-      - Host: 127.0.0.1
-        Port: 2341
-    - Name: R4
-      Pod:
-      - Host: 127.0.0.1
-        Port: 2351
-    - Name: R5
-      Pod:
-      - Host: 127.0.0.1
-        Port: 2361
-    - Name: R6
-      Pod:
-      - Host: 127.0.0.1
-        Port: 2371
   Register:
     DefaultWeight: 10
     DefaultServiceTTL: 1000

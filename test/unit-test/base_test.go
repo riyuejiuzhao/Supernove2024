@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"Supernove2024/pb"
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/util"
@@ -13,25 +12,11 @@ import (
 	"time"
 )
 
-// RandomServiceAddress
-// 随机生成服务地址
-func RandomIP() string {
-	return fmt.Sprintf("%v.%v.%v.%v",
-		rand.Intn(256),
-		rand.Intn(256),
-		rand.Intn(256),
-		rand.Intn(256))
-}
-
-func RandomPort() int32 {
-	return rand.Int31n(65536)
-}
-
 func RandomRegisterArgv(serviceName string, instanceNum int) map[string]*sdk.RegisterArgv {
 	testData := make(map[string]*sdk.RegisterArgv)
 	for len(testData) < instanceNum {
-		host := RandomIP()
-		port := RandomPort()
+		host := util.RandomIP()
+		port := util.RandomPort()
 		address := fmt.Sprintf("%s:%v", host, port)
 		_, ok := testData[address]
 		if ok {
@@ -40,6 +25,7 @@ func RandomRegisterArgv(serviceName string, instanceNum int) map[string]*sdk.Reg
 		weight := rand.Int31n(100) + 1
 		testData[address] = &sdk.RegisterArgv{
 			ServiceName: serviceName,
+			Name:        address,
 			Host:        host,
 			Port:        port,
 			Weight:      &weight, //保证权重不是0
@@ -58,7 +44,7 @@ func TestRouter(t *testing.T) {
 
 	//链接并清空数据库
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"127.0.0.1:2379"},
+		Endpoints:   []string{"127.0.0.1:2301"},
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
@@ -107,38 +93,38 @@ func TestRouter(t *testing.T) {
 	}
 	//先检测其他三种路由正不正常
 	processResult, err := discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
-		Method:        util.ConsistentRouterType,
-		SrcInstanceID: srcServices.Instances[0].InstanceID,
-		DstService:    dstServices,
+		Method:          util.ConsistentRouterType,
+		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
+		DstService:      dstServices,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("一致性哈希:%s", processResult.DstInstance)
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
-		Method:        util.RandomRouterType,
-		SrcInstanceID: srcServices.Instances[0].InstanceID,
-		DstService:    dstServices,
+		Method:          util.RandomRouterType,
+		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
+		DstService:      dstServices,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("随机:%s", processResult.DstInstance)
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
-		Method:        util.WeightedRouterType,
-		SrcInstanceID: srcServices.Instances[0].InstanceID,
-		DstService:    dstServices,
+		Method:          util.WeightedRouterType,
+		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
+		DstService:      dstServices,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	maxInstance := dstServices.Instances[0]
-	for _, v := range dstServices.Instances {
-		if v.Weight > maxInstance.Weight {
+	maxInstance := dstServices.GetInstance()[0]
+	for _, v := range dstServices.GetInstance() {
+		if v.GetWeight() > maxInstance.GetWeight() {
 			maxInstance = v
 		}
 	}
-	if maxInstance.InstanceID != processResult.DstInstance.InstanceID {
+	if maxInstance.GetInstanceID() != processResult.DstInstance.GetInstanceID() {
 		t.Fatal("权重不是最大的那个")
 	}
 	t.Logf("权重:%s", processResult.DstInstance)
@@ -146,49 +132,50 @@ func TestRouter(t *testing.T) {
 	//注册路由
 	// src0 -> dst1
 	// key:key0 -> dst2
-	err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{
-		SrcInstanceID:  srcServices.Instances[0].InstanceID,
-		DstServiceName: dstService,
-		DstInstanceID:  dstServices.Instances[1].InstanceID,
-		Timeout:        100,
+	timeout := int64(100)
+	_, err = registerapi.AddTargetRouter(&sdk.AddTargetRouterArgv{
+		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
+		DstServiceName:  dstService,
+		DstInstanceName: dstServices.GetInstance()[1].GetName(),
+		Timeout:         &timeout,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
-		Key:            "key0",
-		DstServiceName: dstService,
-		DstInstanceID:  dstServices.Instances[2].InstanceID,
-		Timeout:        100,
+	_, err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
+		Key:             "key0",
+		DstServiceName:  dstService,
+		DstInstanceName: dstServices.GetInstance()[2].GetName(),
+		Timeout:         &timeout,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(10 * time.Millisecond)
 
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
-		Method:        util.TargetRouterType,
-		SrcInstanceID: srcServices.Instances[0].InstanceID,
-		DstService:    dstServices,
+		Method:          util.TargetRouterType,
+		SrcInstanceName: srcServices.GetInstance()[0].GetName(),
+		DstService:      dstServices,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if processResult.DstInstance.InstanceID != dstServices.Instances[1].InstanceID {
+	if processResult.DstInstance.GetInstanceID() != dstServices.GetInstance()[1].GetInstanceID() {
 		t.Fatalf("路由错误")
 	}
 
 	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
-		Method:        util.KVRouterType,
-		SrcInstanceID: srcServices.Instances[2].InstanceID, //"src2",
-		DstService:    dstServices,
-		Key:           "key0",
+		Method:          util.KVRouterType,
+		SrcInstanceName: srcServices.GetInstance()[2].GetName(), //"src2",
+		DstService:      dstServices,
+		Key:             "key0",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if processResult.DstInstance.InstanceID != dstServices.Instances[2].InstanceID {
+	if processResult.DstInstance.GetInstanceID() != dstServices.GetInstance()[2].GetInstanceID() {
 		t.Fatalf("路由错误")
 	}
 }
@@ -199,7 +186,7 @@ func TestHealthSvr(t *testing.T) {
 	testData := RandomRegisterArgv(serviceName, instanceNum)
 	//连接数据库
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"127.0.0.1:2379"},
+		Endpoints:   []string{"127.0.0.1:2301"},
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
@@ -262,7 +249,7 @@ func TestDiscoverSvr(t *testing.T) {
 	testData := RandomRegisterArgv(serviceName, instanceNum)
 	//连接数据库
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"127.0.0.1:2379"},
+		Endpoints:   []string{"127.0.0.1:2301"},
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
@@ -288,6 +275,8 @@ func TestDiscoverSvr(t *testing.T) {
 		resultData[result.InstanceID] = v
 	}
 
+	time.Sleep(1 * time.Second)
+
 	discoveryAPI, err := sdk.NewDiscoveryAPI()
 	if err != nil {
 		t.Fatal(err)
@@ -298,23 +287,23 @@ func TestDiscoverSvr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	disDic := make(map[string]*pb.InstanceInfo)
+	disDic := make(map[string]util.DstInstanceInfo)
 	for _, v := range disRt.GetInstance() {
-		addrV := fmt.Sprintf("%s:%v", v.Host, v.Port)
+		addrV := fmt.Sprintf("%s:%v", v.GetHost(), v.GetPort())
 		disDic[addrV] = v
 	}
 	//确定双方不匹配的地方
 	for addr, v := range testData {
 		disV, ok := disDic[addr]
 		if !ok {
-			t.Errorf("discovery中缺少 Address:%s", addr)
+			t.Errorf("discovery中缺少 Name:%s", addr)
 		}
-		if disV.Weight != *v.Weight ||
-			disV.Host != v.Host ||
-			disV.Port != v.Port {
+		if disV.GetWeight() != *v.Weight ||
+			disV.GetHost() != v.Host ||
+			disV.GetPort() != v.Port {
 			t.Errorf("数据不匹配，发送数据为host:%s, port:%v, weight:%v, 发现数据为host:%s, port:%v, weight:%v",
 				v.Host, v.Port, v.Weight,
-				disV.Host, disV.Port, disV.Weight)
+				disV.GetHost(), disV.GetPort(), disV.GetWeight())
 		}
 	}
 
@@ -329,12 +318,12 @@ func TestDiscoverSvr(t *testing.T) {
 		if !ok {
 			t.Errorf("discovery中多出了Address:%s", addr)
 		}
-		if *testV.Weight != v.Weight ||
-			testV.Host != v.Host ||
-			testV.Port != v.Port {
+		if *testV.Weight != v.GetWeight() ||
+			testV.Host != v.GetHost() ||
+			testV.Port != v.GetPort() {
 			t.Errorf("数据不匹配，发送数据为host:%s, port:%v, weight:%v, 发现数据为host:%s, port:%v, weight:%v",
 				testV.Host, testV.Port, testV.Weight,
-				v.Host, v.Port, v.Weight)
+				v.GetHost(), v.GetPort(), v.GetWeight())
 		}
 	}
 }

@@ -1,13 +1,15 @@
 package test_router_test
 
 import (
+	"Supernove2024/pb"
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
-	"Supernove2024/test/unit-test"
+	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/util"
-	"context"
 	"fmt"
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"github.com/armon/go-radix"
+	"google.golang.org/protobuf/proto"
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -17,42 +19,134 @@ type InstanceRegisterInfo struct {
 	InstanceID int64
 }
 
-// 千万级别的路由
-func TestManyRouter(t *testing.T) {
-	//链接并清空数据库
-	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   []string{"127.0.0.1:2379"},
-		DialTimeout: 5 * time.Second,
-	})
-	if err != nil {
-		t.Fatal(err)
+func Generate(serviceName string, serviceNum int, routerCount int) (rt map[string][]*pb.KVRouterInfo) {
+	rt = make(map[string][]*pb.KVRouterInfo)
+	for i := 0; i < serviceNum; i++ {
+		nowList := make([]*pb.KVRouterInfo, 0)
+		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
+		for j := 0; j < routerCount; j++ {
+			nowKey := fmt.Sprintf("%s_%v", nowServiceName, j)
+			nowList = append(nowList, &pb.KVRouterInfo{
+				RouterID: rand.Int63(),
+				Key:      nowKey,
+				//DstInstanceID: rand.Int63(),
+				Timeout:    rand.Int63(),
+				CreateTime: rand.Int63(),
+			})
+		}
+		rt[nowServiceName] = nowList
 	}
+	return
+}
 
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-	_, err = client.Delete(ctx, "", clientv3.WithPrefix())
-	if err != nil {
-		t.Fatal(err)
+func doTestMemoryForTree(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
+	tree := radix.New()
+	for nowServiceName, nowList := range generate {
+		tree.Insert(nowServiceName, radix.New())
+		for _, info := range nowList {
+			now, ok := tree.Get(nowServiceName)
+			if !ok {
+				t.Fatal("没找到树")
+			}
+			nowTree := now.(*radix.Tree)
+			nowTree.Insert(info.Key, info)
+		}
 	}
+}
+
+func TestMemoryForTree(t *testing.T) {
+	serviceName := "testDiscovery"
+	serviceNum := 100
+	serviceRouterCount := 100000
+	result := Generate(serviceName, serviceNum, serviceRouterCount)
+	doTestMemoryForTree(result, t)
+}
+
+func doTestMemoryForByteMap(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
+	routerBuffer := util.SyncContainer[map[string]map[string][]byte]{
+		Value: make(map[string]map[string][]byte),
+	}
+	for nowServiceName, nowList := range generate {
+		//nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
+		routerBuffer.Value[nowServiceName] = make(map[string][]byte)
+		for _, info := range nowList {
+			bb, err := proto.Marshal(info)
+			if err != nil {
+				t.Error(err)
+			}
+			routerBuffer.Value[nowServiceName][info.Key] = bb
+		}
+	}
+}
+
+func TestMemoryForByteMap(t *testing.T) {
+	serviceName := "testDiscovery"
+	serviceNum := 100
+	serviceRouterCount := 100000
+	result := Generate(serviceName, serviceNum, serviceRouterCount)
+	doTestMemoryForByteMap(result, t)
+}
+
+func doTestMemoryForMap(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
+	routerBuffer := util.SyncContainer[map[string]*dataMgr.ServiceRouterBuffer]{Value: make(map[string]*dataMgr.ServiceRouterBuffer)}
+	for nowServiceName, nowList := range generate {
+		routerBuffer.Value[nowServiceName] = &dataMgr.ServiceRouterBuffer{
+			KvRouterDic:     make(map[string]*pb.KVRouterInfo),
+			TargetRouterDic: make(map[string]*pb.TargetRouterInfo),
+		}
+		for _, info := range nowList {
+			routerBuffer.Value[nowServiceName].KvRouterDic[info.Key] = &pb.KVRouterInfo{
+				RouterID:        rand.Int63(),
+				Key:             info.Key,
+				DstInstanceName: util.GenerateRandomString(5),
+				Timeout:         rand.Int63(),
+				CreateTime:      rand.Int63(),
+			}
+		}
+	}
+}
+
+func TestMemoryForMap(t *testing.T) {
+	serviceName := "testDiscovery"
+	serviceNum := 1
+	serviceRouterCount := 100000
+	result := Generate(serviceName, serviceNum, serviceRouterCount)
+	doTestMemoryForMap(result, t)
+}
+
+// 设置为只有一个Cluster的情况
+func TestForOneCluster(t *testing.T) {
+	for _, addr := range []string{
+		"127.0.0.1:2301",
+		"127.0.0.1:2311",
+	} {
+		util.ClearEtcd(addr, t)
+	}
+	doTestManyRouter(t, "routers0.yaml")
+}
+
+func TestManyRouter(t *testing.T) {
+	for _, addr := range []string{
+		"127.0.0.1:2301",
+		"127.0.0.1:2311",
+		"127.0.0.1:2321",
+		"127.0.0.1:2331",
+		"127.0.0.1:2341",
+		"127.0.0.1:2351",
+		"127.0.0.1:2361",
+		"127.0.0.1:2371",
+	} {
+		util.ClearEtcd(addr, t)
+	}
+	doTestManyRouter(t, "many_routers.yaml")
+}
+
+// 千万级别的路由
+func doTestManyRouter(t *testing.T, configFile string) {
 
 	serviceName := "testDiscovery"
 	serviceNum := 100
-	instanceNum := 100
-	testData := make(map[string]map[string]*InstanceRegisterInfo)
-	for i := 0; i < serviceNum; i++ {
-		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
-		for j := 0; j < instanceNum; j++ {
-			nowData := unit.RandomRegisterArgv(nowServiceName, instanceNum)
-			testData[nowServiceName] = util.DicMap(nowData,
-				func(key string, val *sdk.RegisterArgv) (string, *InstanceRegisterInfo) {
-					return key, &InstanceRegisterInfo{
-						RegisterArgv: val,
-						InstanceID:   0,
-					}
-				})
-		}
-	}
-
-	config.GlobalConfigFilePath = "many_routers.yaml"
+	config.GlobalConfigFilePath = configFile //
 	cfg, err := config.GlobalConfig()
 	if err != nil {
 		t.Fatal(err)
@@ -68,78 +162,32 @@ func TestManyRouter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	count := 0
-	for _, serviceV := range testData {
-		for _, v := range serviceV {
-			go func() {
-				reply, err := registerAPI.Register(v.RegisterArgv)
-				if err != nil {
-					t.Error(err)
-					return
-				}
-				v.InstanceID = reply.InstanceID
-			}()
-		}
-		count += 1
-		if count%5 == 0 {
-			time.Sleep(1 * time.Second)
-		}
-	}
-	util.Info("Register Finish")
-
 	//生成路由
 	//每个服务路由个数
 	serviceRouterCount := 100000
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
-		nowMap, ok := testData[nowServiceName]
-		if !ok {
-			t.Errorf("有服务居然没有对应的请求生成 %s", nowServiceName)
-			continue
-		}
 		for j := 0; j < serviceRouterCount; j++ {
-			nowKey := fmt.Sprintf("%s_%v", nowServiceName, j)
-			dst := util.RandomDicValue(nowMap)
+			nowKey := util.GenerateRandomString(5)
 			go func() {
 				timeout := int64(60 * 60 * 10)
 				_, err := registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-					Key:            nowKey,
-					DstServiceName: nowServiceName,
-					DstInstanceID:  dst.InstanceID,
-					Timeout:        &timeout,
+					Key:             nowKey,
+					DstServiceName:  nowServiceName,
+					DstInstanceName: util.GenerateRandomString(5),
+					Timeout:         &timeout,
 				})
 				if err != nil {
 					t.Error(err)
 					return
 				}
 			}()
-			if j%2000 == 0 {
+			if j%5000 == 0 {
 				time.Sleep(1 * time.Second)
-				util.Error("i:%v j:%v", i, j)
+				util.Info("i:%v j:%v", i, j)
 			}
 		}
 	}
-	util.Error("finish send")
+	util.Info("finish send")
 
-	//随机路由检测
-	discoveryAPI, err := sdk.NewDiscoveryAPI()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i < serviceNum; i++ {
-		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
-		for j := 0; j < serviceRouterCount; j++ {
-			nowKey := fmt.Sprintf("%s_%v", nowServiceName, j)
-			_, err = discoveryAPI.ProcessRouter(&sdk.ProcessRouterArgv{
-				Method:        util.KVRouterType,
-				SrcInstanceID: 0,
-				DstService:    &sdk.DefaultDstService{ServiceName: nowServiceName},
-				Key:           nowKey,
-			})
-			if err != nil {
-				t.Error(err)
-			}
-		}
-	}
-	time.Sleep(15 * time.Second)
 }

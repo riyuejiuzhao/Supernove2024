@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"stathat.com/c/consistent"
-	"strconv"
 	"time"
 )
 
@@ -56,7 +55,7 @@ func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (result *GetInstance
 	return
 }
 
-func (c *DiscoveryCli) processConsistentRouter(srcInstanceID int64, dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
+func (c *DiscoveryCli) processConsistentRouter(srcInstanceName string, dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
 	hash := consistent.New()
 	dict := make(map[string]util.DstInstanceInfo)
 	for _, v := range dstInstances {
@@ -64,7 +63,7 @@ func (c *DiscoveryCli) processConsistentRouter(srcInstanceID int64, dstInstances
 		dict[address] = v
 		hash.Add(address)
 	}
-	dstInstanceID, err := hash.Get(strconv.FormatInt(srcInstanceID, 10))
+	dstInstanceID, err := hash.Get(srcInstanceName)
 	if err != nil {
 		return nil, err
 	}

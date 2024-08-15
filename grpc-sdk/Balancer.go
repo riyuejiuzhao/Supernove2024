@@ -125,7 +125,7 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 	}
 	argv := &sdk.ProcessRouterArgv{
 		Method:          0,
-		SrcInstanceName: 0,
+		SrcInstanceName: "",
 		DstService:      p.serviceInfo,
 		Key:             "",
 	}

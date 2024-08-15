@@ -182,18 +182,21 @@ func (m *DefaultServiceMgr) handleWatchKVRouter(cli *clientv3.Client, serviceNam
 		clientv3.WithPrefix(),
 		clientv3.WithRev(revision),
 	)
-	for wresp := range rch {
-		for _, ev := range wresp.Events {
-			switch ev.Type {
-			case clientv3.EventTypePut:
-				err := m.handleKVRouterPut(serviceName, ev)
-				if err != nil {
-					util.Error("kv router err: %v", err)
+	go func() {
+		for wresp := range rch {
+			for _, ev := range wresp.Events {
+				switch ev.Type {
+				case clientv3.EventTypePut:
+					err := m.handleKVRouterPut(serviceName, ev)
+					if err != nil {
+						util.Error("kv router err: %v", err)
+					}
+				case clientv3.EventTypeDelete:
 				}
-			case clientv3.EventTypeDelete:
 			}
 		}
-	}
+	}()
+
 }
 
 func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, serviceName string) {
@@ -205,23 +208,25 @@ func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, servic
 		util.RouterTargetPrefix(serviceName),
 		clientv3.WithPrefix(),
 		clientv3.WithRev(revision))
-	for wresp := range rch {
-		for _, ev := range wresp.Events {
-			switch ev.Type {
-			case clientv3.EventTypePut:
-				info := &pb.TargetRouterInfo{}
-				err := proto.Unmarshal(ev.Kv.Value, info)
-				if err != nil {
-					util.Error("err %v", err)
-					continue
+	go func() {
+		for wresp := range rch {
+			for _, ev := range wresp.Events {
+				switch ev.Type {
+				case clientv3.EventTypePut:
+					info := &pb.TargetRouterInfo{}
+					err := proto.Unmarshal(ev.Kv.Value, info)
+					if err != nil {
+						util.Error("err %v", err)
+						continue
+					}
+					m.AddTargetRouter(serviceName, info)
+				case clientv3.EventTypeDelete:
+					id := util.TargetRouterKey2InstanceID(string(ev.Kv.Key), serviceName)
+					m.RemoveTargetRouter(serviceName, id)
 				}
-				m.AddTargetRouter(serviceName, info)
-			case clientv3.EventTypeDelete:
-				id := util.TargetRouterKey2InstanceID(string(ev.Kv.Key), serviceName)
-				m.RemoveTargetRouter(serviceName, id)
 			}
 		}
-	}
+	}()
 }
 
 func (m *DefaultServiceMgr) initKVRouter(cli *clientv3.Client, serviceName string) (revision int64, err error) {
