@@ -85,7 +85,7 @@ func (n *RouterMapNode) Remove(index int, Tags []string, Keys map[string]string)
 }
 
 type RouterMapRoot struct {
-	*pb.RouterTableInfo
+	Info *pb.RouterTableInfo
 	Root *RouterMapNode
 }
 
@@ -101,33 +101,37 @@ type ServiceRouterBuffer struct {
 }
 
 func (b *RouterMapRoot) findKVRouter(Keys map[string]string) (*pb.KVRouterInfo, bool) {
-	if b.Tags == nil {
+	if b.Info == nil {
 		util.Warn("查询路由缺少路由表")
 		return nil, false
 	}
-	return b.Root.Find(0, b.Tags, Keys)
+	return b.Root.Find(0, b.Info.Tags, Keys)
 }
 
 func (b *RouterMapRoot) removeKVRouter(Keys map[string]string) {
-	if b.Tags == nil {
+	if b.Info == nil {
 		util.Warn("删除路由缺少路由表")
 		return
 	}
-	b.Root.Remove(0, b.Tags, Keys)
+	b.Root.Remove(0, b.Info.Tags, Keys)
 }
 
 func (b *RouterMapRoot) addKVRouter(info *pb.KVRouterInfo) {
-	if b.Tags == nil {
+	if b.Info == nil {
 		util.Warn("添加路由缺少路由表")
+		return
 	}
-	b.Root.Add(0, b.Tags, info)
+	b.Root.Add(0, b.Info.Tags, info)
 }
 
 func newServiceRouterBuffer(info *pb.RouterTableInfo) (buffer *ServiceRouterBuffer) {
 	buffer = &ServiceRouterBuffer{
 		KvRouterTable: &RouterMapRoot{
-			RouterTableInfo: info,
-			Root:            nil,
+			Info: info,
+			Root: &RouterMapNode{
+				KVRouterInfo: nil,
+				Nodes:        make(map[string]*RouterMapNode),
+			},
 		},
 		KvRouterIdDic:     make(map[int64]*pb.KVRouterInfo),
 		TargetRouterDic:   make(map[string]*pb.TargetRouterInfo),
@@ -213,14 +217,16 @@ func (m *DefaultServiceMgr) AddRouterTable(info *pb.RouterTableInfo) {
 		return
 	}()
 	if !ok {
+		util.Info("添加路由表%s", info.ServiceName)
 		return
 	}
 	//原本存在需要重新加载一次路由了
 	defer b.Mutex.Unlock()
-	b.KvRouterTable.RouterTableInfo = info
+	b.KvRouterTable.Info = info
 	for _, kvInfo := range b.KvRouterIdDic {
 		b.KvRouterTable.addKVRouter(kvInfo)
 	}
+	util.Info("添加路由表%s", info.ServiceName)
 }
 
 func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInfo) {
@@ -265,7 +271,7 @@ func (m *DefaultServiceMgr) RemoveRouterTable(ServiceName string) {
 		return
 	}
 	defer b.Mutex.Unlock()
-	b.KvRouterTable.RouterTableInfo = nil
+	b.KvRouterTable.Info = nil
 	util.Info("%s Delete Router Table", ServiceName)
 }
 

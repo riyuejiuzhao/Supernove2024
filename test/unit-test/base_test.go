@@ -131,6 +131,13 @@ func TestRouter(t *testing.T) {
 	t.Logf("权重:%s weight:%v", processResult.DstInstance, processResult.DstInstance.GetWeight())
 
 	//注册路由
+	err = registerapi.AddTable(&sdk.AddTableArgv{
+		ServiceName: dstService,
+		Tags:        []string{"key0", "key1", "key2"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// src0 -> dst1
 	// key:key0 -> dst2
 	timeout := int64(100)
@@ -144,7 +151,27 @@ func TestRouter(t *testing.T) {
 		t.Fatal(err)
 	}
 	kvReply, err := registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
-		Dic:             map[string]string{"key": "key0"},
+		Dic:             map[string]string{"key0": "val0"},
+		DstServiceName:  dstService,
+		DstInstanceName: []string{dstServices.GetInstance()[0].GetName()},
+		Timeout:         &timeout,
+		NextRouterType:  util.RandomRouterType,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kvReply, err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
+		Dic:             map[string]string{"key0": "val0", "key1": "val1"},
+		DstServiceName:  dstService,
+		DstInstanceName: []string{dstServices.GetInstance()[1].GetName()},
+		Timeout:         &timeout,
+		NextRouterType:  util.RandomRouterType,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kvReply, err = registerapi.AddKVRouter(&sdk.AddKVRouterArgv{
+		Dic:             map[string]string{"key0": "val0", "key1": "val1", "key2": "val2"},
 		DstServiceName:  dstService,
 		DstInstanceName: []string{dstServices.GetInstance()[2].GetName()},
 		Timeout:         &timeout,
@@ -172,7 +199,46 @@ func TestRouter(t *testing.T) {
 		Method:          util.KVRouterType,
 		SrcInstanceName: srcServices.GetInstance()[2].GetName(), //"src2",
 		DstService:      dstServices.GetServiceName(),
-		Key:             map[string]string{"key": "key0"},
+		Key:             map[string]string{"key0": "val0"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if processResult.DstInstance.GetInstanceID() != dstServices.GetInstance()[0].GetInstanceID() {
+		t.Fatalf("路由错误")
+	}
+
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:          util.KVRouterType,
+		SrcInstanceName: srcServices.GetInstance()[2].GetName(), //"src2",
+		DstService:      dstServices.GetServiceName(),
+		Key:             map[string]string{"key0": "val0", "key1": "val1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if processResult.DstInstance.GetInstanceID() != dstServices.GetInstance()[1].GetInstanceID() {
+		t.Fatalf("路由错误")
+	}
+
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:          util.KVRouterType,
+		SrcInstanceName: srcServices.GetInstance()[2].GetName(), //"src2",
+		DstService:      dstServices.GetServiceName(),
+		Key:             map[string]string{"key0": "val0", "key1": "val2"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if processResult.DstInstance.GetInstanceID() != dstServices.GetInstance()[0].GetInstanceID() {
+		t.Fatalf("路由错误")
+	}
+
+	processResult, err = discoveryapi.ProcessRouter(&sdk.ProcessRouterArgv{
+		Method:          util.KVRouterType,
+		SrcInstanceName: srcServices.GetInstance()[2].GetName(), //"src2",
+		DstService:      dstServices.GetServiceName(),
+		Key:             map[string]string{"key0": "val0", "key1": "val1", "key2": "val2"},
 	})
 	if err != nil {
 		t.Fatal(err)

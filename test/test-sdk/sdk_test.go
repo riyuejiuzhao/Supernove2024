@@ -18,13 +18,13 @@ func Generate(serviceName string, serviceNum int, routerCount int) (rt map[strin
 		nowList := make([]*pb.KVRouterInfo, 0)
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		for j := 0; j < routerCount; j++ {
-			nowKey := fmt.Sprintf("%s_%v", nowServiceName, j)
+			nowKey := fmt.Sprintf("%s", nowServiceName)
 			nowVal := util.GenerateRandomString(10)
 			nowList = append(nowList, &pb.KVRouterInfo{
-				Key:        []string{nowKey},
-				Val:        []string{nowVal},
-				Timeout:    rand.Int63(),
-				CreateTime: rand.Int63(),
+				Dic:             map[string]string{nowKey: nowVal},
+				DstInstanceName: []string{nowServiceName},
+				Timeout:         rand.Int63(),
+				CreateTime:      rand.Int63(),
 			})
 		}
 		rt[nowServiceName] = nowList
@@ -32,7 +32,10 @@ func Generate(serviceName string, serviceNum int, routerCount int) (rt map[strin
 	return
 }
 
-func doTestMemoryForMap(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
+func doTestMemoryForMap(
+	generate map[string][]*pb.KVRouterInfo,
+	t *testing.T,
+) {
 	config.GlobalConfigFilePath = "sdk.yaml"
 	cfg, err := config.GlobalConfig()
 	if err != nil {
@@ -41,6 +44,10 @@ func doTestMemoryForMap(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
 	mt := metrics.NewMetricsMgr(cfg)
 	mgr := dataMgr.NewDefaultServiceMgr(cfg, nil, mt)
 	for s, vs := range generate {
+		mgr.AddRouterTable(&pb.RouterTableInfo{
+			ServiceName: s,
+			Tags:        []string{s},
+		})
 		for _, v := range vs {
 			mgr.AddKVRouter(s, v)
 		}
