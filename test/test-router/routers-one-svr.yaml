@@ -1,0 +1,10 @@
+  InstancesEtcd:
+    - Name: I
+      Pod:
+      - Host: 127.0.0.1
+        Port: 2301
+  RouterEtcd:
+    - Name: R0
+      Pod:
+      - Host: 127.0.0.1
+        Port: 2311

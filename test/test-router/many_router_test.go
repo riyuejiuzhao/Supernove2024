@@ -5,9 +5,11 @@ import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/dataMgr"
+	"Supernove2024/svr"
 	"Supernove2024/util"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"testing"
 	"time"
@@ -65,16 +67,40 @@ func TestMemoryForMap(t *testing.T) {
 
 // 设置为只有一个Cluster的情况
 func TestForOneCluster(t *testing.T) {
+	go func() {
+		srv, err := svr.NewConfigSvr("routers-one-svr.yaml")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if err = srv.Serve("127.0.0.1:30000"); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	//等服务器启动
+	time.Sleep(1 * time.Second)
+
 	for _, addr := range []string{
 		"127.0.0.1:2301",
 		"127.0.0.1:2311",
 	} {
 		util.ClearEtcd(addr, t)
 	}
-	doTestManyRouter(t, "routers0.yaml")
+	doTestManyRouter(t, "many_routers.yaml")
 }
 
 func TestManyRouter(t *testing.T) {
+	go func() {
+		srv, err := svr.NewConfigSvr("routers-many-svr.yaml")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if err = srv.Serve("127.0.0.1:30000"); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	//等服务器启动
+	time.Sleep(1 * time.Second)
+
 	for _, addr := range []string{
 		"127.0.0.1:2301",
 		"127.0.0.1:2311",
