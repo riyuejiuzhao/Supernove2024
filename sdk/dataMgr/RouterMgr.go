@@ -2,9 +2,9 @@ package dataMgr
 
 import (
 	"Supernove2024/pb"
+	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
 	"context"
-	"encoding/json"
 	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
@@ -12,21 +12,128 @@ import (
 	"time"
 )
 
-type KVRouterBuffer interface {
-	Add(info *pb.KVRouterInfo)
-	Get(key string) (*pb.KVRouterInfo, bool)
-	Remove(key string)
-	Clear()
+type RouterMapNode struct {
+	KVRouterInfo *pb.KVRouterInfo
+	Nodes        map[string]*RouterMapNode
+}
+
+func (n *RouterMapNode) Add(index int, Tags []string, info *pb.KVRouterInfo) {
+	if index >= len(Tags) {
+		n.KVRouterInfo = info
+		return
+	}
+	nowTag := Tags[index]
+	value, ok := info.Dic[nowTag]
+	if !ok {
+		n.KVRouterInfo = info
+		return
+	}
+	next, ok := n.Nodes[value]
+	if !ok {
+		next = &RouterMapNode{
+			KVRouterInfo: nil,
+			Nodes:        make(map[string]*RouterMapNode),
+		}
+		n.Nodes[value] = next
+	}
+	next.Add(index+1, Tags, info)
+}
+
+func (n *RouterMapNode) Find(index int, Tags []string, Keys map[string]string) (*pb.KVRouterInfo, bool) {
+	if index >= len(Tags) {
+		return n.KVRouterInfo, n.KVRouterInfo != nil
+	}
+
+	nowTag := Tags[index]
+	value, ok := Keys[nowTag]
+	if !ok {
+		return n.KVRouterInfo, n.KVRouterInfo != nil
+	}
+	next, ok := n.Nodes[value]
+	if !ok {
+		return n.KVRouterInfo, n.KVRouterInfo != nil
+	}
+	result, ok := next.Find(index+1, Tags, Keys)
+	if !ok {
+		return n.KVRouterInfo, n.KVRouterInfo != nil
+	}
+	return result, ok
+}
+
+// Remove 返回值通知父节点自身可否删除
+func (n *RouterMapNode) Remove(index int, Tags []string, Keys map[string]string) bool {
+	if index >= len(Tags) {
+		return n.KVRouterInfo != nil
+	}
+	nowTag := Tags[index]
+	value := Keys[nowTag]
+	next, ok := n.Nodes[value]
+	//没有能够完全匹配的，那就不删除任何路由
+	if !ok {
+		return false
+	}
+	ok = next.Remove(index+1, Tags, Keys)
+	//子路由存在不能删除的
+	//那么自身也不能删除
+	if !ok {
+		return false
+	}
+	//子路由可以删除，先删除子路由
+	delete(n.Nodes, value)
+	//下面没有任何子路由了，本身也不是路由就可以让父节点把自己也删掉
+	return len(n.Nodes) == 0 && n.KVRouterInfo == nil
+}
+
+type RouterMapRoot struct {
+	*pb.RouterTableInfo
+	Root *RouterMapNode
 }
 
 type ServiceRouterBuffer struct {
 	Mutex sync.Mutex
 
+	KvRouterTable *RouterMapRoot
+
 	KvRouterIdDic map[int64]*pb.KVRouterInfo
-	KvRouterDic   map[string]*pb.KVRouterInfo
 
 	TargetRouterIdDic map[int64]*pb.TargetRouterInfo
 	TargetRouterDic   map[string]*pb.TargetRouterInfo
+}
+
+func (b *RouterMapRoot) findKVRouter(Keys map[string]string) (*pb.KVRouterInfo, bool) {
+	if b.Tags == nil {
+		util.Warn("查询路由缺少路由表")
+		return nil, false
+	}
+	return b.Root.Find(0, b.Tags, Keys)
+}
+
+func (b *RouterMapRoot) removeKVRouter(Keys map[string]string) {
+	if b.Tags == nil {
+		util.Warn("删除路由缺少路由表")
+		return
+	}
+	b.Root.Remove(0, b.Tags, Keys)
+}
+
+func (b *RouterMapRoot) addKVRouter(info *pb.KVRouterInfo) {
+	if b.Tags == nil {
+		util.Warn("添加路由缺少路由表")
+	}
+	b.Root.Add(0, b.Tags, info)
+}
+
+func newServiceRouterBuffer(info *pb.RouterTableInfo) (buffer *ServiceRouterBuffer) {
+	buffer = &ServiceRouterBuffer{
+		KvRouterTable: &RouterMapRoot{
+			RouterTableInfo: info,
+			Root:            nil,
+		},
+		KvRouterIdDic:     make(map[int64]*pb.KVRouterInfo),
+		TargetRouterDic:   make(map[string]*pb.TargetRouterInfo),
+		TargetRouterIdDic: make(map[int64]*pb.TargetRouterInfo),
+	}
+	return
 }
 
 func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceName string) (*pb.TargetRouterInfo, bool) {
@@ -48,7 +155,7 @@ func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceName 
 	return info, ok
 }
 
-func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Key string) (*pb.KVRouterInfo, bool) {
+func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Keys map[string]string) (*pb.KVRouterInfo, bool) {
 	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -63,8 +170,7 @@ func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Key string) (*pb.KVR
 		return nil, false
 	}
 	defer b.Mutex.Unlock()
-	info, ok := b.KvRouterDic[Key]
-	return info, ok
+	return b.KvRouterTable.findKVRouter(Keys)
 }
 
 func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetRouterInfo) {
@@ -73,12 +179,7 @@ func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetR
 		defer m.routerBuffer.Mutex.Unlock()
 		b, ok := m.routerBuffer.Value[serviceName]
 		if !ok {
-			b = &ServiceRouterBuffer{
-				KvRouterDic:       make(map[string]*pb.KVRouterInfo),
-				KvRouterIdDic:     make(map[int64]*pb.KVRouterInfo),
-				TargetRouterDic:   make(map[string]*pb.TargetRouterInfo),
-				TargetRouterIdDic: make(map[int64]*pb.TargetRouterInfo),
-			}
+			b = newServiceRouterBuffer(nil)
 			m.routerBuffer.Value[serviceName] = b
 		}
 		b.Mutex.Lock()
@@ -98,35 +199,45 @@ func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetR
 	util.Info("%s Add Router %s", serviceName, info)
 }
 
+func (m *DefaultServiceMgr) AddRouterTable(info *pb.RouterTableInfo) {
+	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
+		m.routerBuffer.Mutex.Lock()
+		defer m.routerBuffer.Mutex.Unlock()
+		b, ok = m.routerBuffer.Value[info.ServiceName]
+		if !ok {
+			b = newServiceRouterBuffer(info)
+			m.routerBuffer.Value[info.ServiceName] = b
+		} else {
+			b.Mutex.Lock()
+		}
+		return
+	}()
+	if !ok {
+		return
+	}
+	//原本存在需要重新加载一次路由了
+	defer b.Mutex.Unlock()
+	b.KvRouterTable.RouterTableInfo = info
+	for _, kvInfo := range b.KvRouterIdDic {
+		b.KvRouterTable.addKVRouter(kvInfo)
+	}
+}
+
 func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInfo) {
 	b := func() (b *ServiceRouterBuffer) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
 		b, ok := m.routerBuffer.Value[serviceName]
 		if !ok {
-			b = &ServiceRouterBuffer{
-				KvRouterDic:       make(map[string]*pb.KVRouterInfo),
-				KvRouterIdDic:     make(map[int64]*pb.KVRouterInfo),
-				TargetRouterDic:   make(map[string]*pb.TargetRouterInfo),
-				TargetRouterIdDic: make(map[int64]*pb.TargetRouterInfo),
-			}
+			util.Warn("路由表注册前，发生了KV 路由注册")
+			b = newServiceRouterBuffer(nil)
 			m.routerBuffer.Value[serviceName] = b
 		}
 		b.Mutex.Lock()
 		return
 	}()
 	defer b.Mutex.Unlock()
-	dic := make(map[string]string)
-	for i := 0; i < len(info.Key); i++ {
-		dic[info.Key[i]] = info.Val[i]
-	}
-	js, err := json.Marshal(dic)
-	if err != nil {
-		util.Error("add kv router failed", err)
-		return
-	}
-	jss := string(js)
-	nowInfo, ok := b.KvRouterDic[jss]
+	nowInfo, ok := b.KvRouterTable.findKVRouter(info.Dic)
 	//保留更新的那个
 	if ok && nowInfo.CreateTime > info.CreateTime {
 		return
@@ -134,9 +245,28 @@ func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInf
 	if ok {
 		delete(b.KvRouterIdDic, nowInfo.RouterID)
 	}
-	b.KvRouterDic[jss] = info
+	b.KvRouterTable.addKVRouter(info)
 	b.KvRouterIdDic[info.RouterID] = info
 	util.Info("%s Add Router %s", serviceName, info)
+}
+
+func (m *DefaultServiceMgr) RemoveRouterTable(ServiceName string) {
+	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
+		m.routerBuffer.Mutex.Lock()
+		defer m.routerBuffer.Mutex.Unlock()
+		b, ok = m.routerBuffer.Value[ServiceName]
+		if !ok {
+			return nil, false
+		}
+		b.Mutex.Lock()
+		return
+	}()
+	if !ok {
+		return
+	}
+	defer b.Mutex.Unlock()
+	b.KvRouterTable.RouterTableInfo = nil
+	util.Info("%s Delete Router Table", ServiceName)
 }
 
 func (m *DefaultServiceMgr) RemoveKVRouter(ServiceName string, RouterID int64) {
@@ -155,19 +285,9 @@ func (m *DefaultServiceMgr) RemoveKVRouter(ServiceName string, RouterID int64) {
 	}
 	defer b.Mutex.Unlock()
 	info, ok := b.KvRouterIdDic[RouterID]
-	dic := make(map[string]string)
-	for i := 0; i < len(info.Key); i++ {
-		dic[info.Key[i]] = info.Val[i]
-	}
-	js, err := json.Marshal(dic)
-	if err != nil {
-		util.Error("remove kv router failed", err)
-		return
-	}
-	jss := string(js)
-	delete(b.KvRouterDic, jss)
+	b.KvRouterTable.removeKVRouter(info.Dic)
 	delete(b.KvRouterIdDic, RouterID)
-	util.Info("%s Delete KV Router %s", ServiceName, jss)
+	util.Info("%s Delete KV Router %s", ServiceName, info.Dic)
 }
 
 func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, RouterID int64) {
@@ -207,6 +327,15 @@ func (m *DefaultServiceMgr) handleTargetRouterDelete(serviceName string, ev *cli
 		return
 	}
 	m.RemoveTargetRouter(serviceName, id)
+}
+
+func (m *DefaultServiceMgr) handleRouterTableDelete(serviceName string) {
+	var err error
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "RouterTableDelete"}, err)
+	}()
+	m.RemoveRouterTable(serviceName)
 }
 
 func (m *DefaultServiceMgr) handleKVRouterDelete(serviceName string, ev *clientv3.Event) {
@@ -255,6 +384,52 @@ func (m *DefaultServiceMgr) handleKVRouterPut(serviceName string, ev *clientv3.E
 	return
 }
 
+func (m *DefaultServiceMgr) handleRouterTablePut(ev *clientv3.Event) (err error) {
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "RouterTablePut"}, err)
+	}()
+	info := &pb.RouterTableInfo{}
+	err = proto.Unmarshal(ev.Kv.Value, info)
+	if err != nil {
+		util.Error("err %v", err)
+		return
+	}
+	m.AddRouterTable(info)
+	return
+}
+
+func (m *DefaultServiceMgr) handleWatchRouterTable(serviceName string) {
+	cli, err := m.connManager.GetServiceConn(connMgr.RoutersEtcd, serviceName)
+	if err != nil {
+		util.Error("路由表获取etcd失败 %v", err)
+		return
+	}
+	revision, err := m.initRouterTable(cli, serviceName)
+	if err != nil {
+		util.Error("KV路由获取错误", err)
+	}
+	rch := cli.Watch(context.Background(),
+		util.RouterTableKey(serviceName),
+		clientv3.WithRev(revision),
+	)
+	go func() {
+		for wresp := range rch {
+			for _, ev := range wresp.Events {
+				switch ev.Type {
+				case clientv3.EventTypePut:
+					err := m.handleRouterTablePut(ev)
+					if err != nil {
+						util.Error("kv router err: %v", err)
+					}
+				case clientv3.EventTypeDelete:
+					m.handleRouterTableDelete(serviceName)
+				}
+			}
+		}
+	}()
+}
+
 func (m *DefaultServiceMgr) handleWatchKVRouter(cli *clientv3.Client, serviceName string) {
 	revision, err := m.initKVRouter(cli, serviceName)
 	if err != nil {
@@ -280,7 +455,6 @@ func (m *DefaultServiceMgr) handleWatchKVRouter(cli *clientv3.Client, serviceNam
 			}
 		}
 	}()
-
 }
 
 func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, serviceName string) {
@@ -304,6 +478,25 @@ func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, servic
 			}
 		}
 	}()
+}
+
+func (m *DefaultServiceMgr) initRouterTable(cli *clientv3.Client, serviceName string) (revision int64, err error) {
+	resp, err := cli.Get(context.Background(), util.RouterTableKey(serviceName))
+	if err != nil {
+		return
+	}
+	for _, kv := range resp.Kvs {
+		info := &pb.RouterTableInfo{}
+		err = proto.Unmarshal(kv.Value, info)
+		if err != nil {
+			util.Error("%v", err)
+			continue
+		}
+		m.AddRouterTable(info)
+	}
+	err = nil
+	revision = resp.Header.Revision
+	return
 }
 
 func (m *DefaultServiceMgr) initKVRouter(cli *clientv3.Client, serviceName string) (revision int64, err error) {

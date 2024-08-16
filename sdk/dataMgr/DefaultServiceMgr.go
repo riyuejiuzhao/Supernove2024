@@ -53,7 +53,7 @@ func (m *DefaultServiceMgr) RemoveInstance(serviceName string, instanceID int64)
 	}
 	delete(service.InstanceDic, instanceID)
 	delete(service.NameDic, info.Name)
-	util.Info("Remove %s Instance %v", serviceName, instanceID)
+	util.Info("removeKVRouter %s Instance %v", serviceName, instanceID)
 }
 
 func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInfo) {
@@ -259,6 +259,11 @@ func (m *DefaultServiceMgr) startFlushInfo() {
 		go func() {
 			defer wg.Done()
 			m.handleWatchService(serviceName)
+		}()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m.handleWatchRouterTable(serviceName)
 		}()
 		for _, cli := range clis {
 			wg.Add(1)

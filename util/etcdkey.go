@@ -50,11 +50,15 @@ func RouterTargetPrefix(serviceName string) string {
 	return fmt.Sprintf("%s.Dst.%s.", RouterHashKey, serviceName)
 }
 
-func RouterKVInfoKey(serviceName string, routerID int64) string {
+func RouterTableKey(serviceName string) string {
+	return fmt.Sprintf("Table.%s", serviceName)
+}
+
+func KVRouterInfoKey(serviceName string, routerID int64) string {
 	return fmt.Sprintf("%s.KV.%s.%v", RouterHashKey, serviceName, routerID)
 }
 
-func RouterTargetInfoKey(serviceName string, routerID int64) string {
+func TargetRouterInfoKey(serviceName string, routerID int64) string {
 	return fmt.Sprintf("%s.Dst.%s.%v", RouterHashKey, serviceName, routerID)
 }
 

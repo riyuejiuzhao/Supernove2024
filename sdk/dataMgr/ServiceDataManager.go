@@ -15,7 +15,7 @@ type ServiceDataManager interface {
 	GetInstanceInfo(serviceName string, instanceID int64) (*pb.InstanceInfo, bool)
 	GetInstanceInfoByName(serviceName string, name string) (*pb.InstanceInfo, bool)
 	GetTargetRouter(ServiceName string, SrcInstanceName string) (*pb.TargetRouterInfo, bool)
-	GetKVRouter(ServiceName string, Key string) (*pb.KVRouterInfo, bool)
+	GetKVRouter(ServiceName string, Key map[string]string) (*pb.KVRouterInfo, bool)
 }
 
 var (

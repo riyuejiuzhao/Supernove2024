@@ -10,7 +10,7 @@ import (
 type ServiceType int32
 
 const (
-	InstancesEtcd = iota
+	InstancesEtcd = ServiceType(iota)
 	RoutersEtcd
 	ServiceTypeCount
 )

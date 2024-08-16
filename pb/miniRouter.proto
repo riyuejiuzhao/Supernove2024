@@ -23,9 +23,7 @@ message TargetRouterInfo{
 message KVRouterInfo{
   int64 RouterID =1;
 
-  repeated string Key = 2;
-  repeated string Val = 3;
-
+  map<string,string> Dic = 2;
   repeated string DstInstanceName = 4;
 
   int64 Timeout = 5;
@@ -40,6 +38,13 @@ message ClusterInfo {
 }
 
 message InitArgv {
+}
+
+//路由表没有时间限制
+//说到底一个服务一个也不会很多，一直不断的用heartbeat续也不合理
+message RouterTableInfo{
+  string ServiceName = 2;
+  repeated string Tags = 3;
 }
 
 message InitResult{

@@ -6,7 +6,6 @@ import (
 	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
@@ -141,12 +140,7 @@ func (c *DiscoveryCli) processKeyValueRouter(
 	key map[string]string,
 	dstService string,
 ) (*ProcessRouterResult, error) {
-	js, err := json.Marshal(key)
-	if err != nil {
-		return nil, err
-	}
-	jss := string(js)
-	v, ok := c.DataMgr.GetKVRouter(dstService, jss)
+	v, ok := c.DataMgr.GetKVRouter(dstService, key)
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
