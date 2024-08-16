@@ -247,6 +247,11 @@ func (m *DefaultServiceMgr) initInstanceInfo(serviceName string) (revision int64
 }
 
 func (m *DefaultServiceMgr) startFlushInfo() {
+	//如果处于离线模式
+	//离线模式仅供性能测试使用
+	if m.connManager == nil {
+		return
+	}
 	clis := m.connManager.GetAllServiceConn(connMgr.RoutersEtcd)
 	var wg sync.WaitGroup
 	for _, serviceName := range m.config.SDK.Discovery.DstService {

@@ -1,16 +1,12 @@
 package test_router_test
 
 import (
-	"Supernove2024/pb"
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
-	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/svr"
 	"Supernove2024/util"
-	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"testing"
 	"time"
 )
@@ -18,51 +14,6 @@ import (
 type InstanceRegisterInfo struct {
 	*sdk.RegisterArgv
 	InstanceID int64
-}
-
-func Generate(serviceName string, serviceNum int, routerCount int) (rt map[string][]*pb.KVRouterInfo) {
-	rt = make(map[string][]*pb.KVRouterInfo)
-	for i := 0; i < serviceNum; i++ {
-		nowList := make([]*pb.KVRouterInfo, 0)
-		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
-		for j := 0; j < routerCount; j++ {
-			nowKey := fmt.Sprintf("%s_%v", nowServiceName, j)
-			nowVal := util.GenerateRandomString(10)
-			nowList = append(nowList, &pb.KVRouterInfo{
-				Key:        []string{nowKey},
-				Val:        []string{nowVal},
-				Timeout:    rand.Int63(),
-				CreateTime: rand.Int63(),
-			})
-		}
-		rt[nowServiceName] = nowList
-	}
-	return
-}
-
-func doTestMemoryForMap(generate map[string][]*pb.KVRouterInfo, t *testing.T) {
-	routerBuffer := util.SyncContainer[map[string]*dataMgr.ServiceRouterBuffer]{Value: make(map[string]*dataMgr.ServiceRouterBuffer)}
-	for nowServiceName, nowList := range generate {
-		routerBuffer.Value[nowServiceName] = &dataMgr.ServiceRouterBuffer{
-			KvRouterDic:     make(map[string]*pb.KVRouterInfo),
-			TargetRouterDic: make(map[string]*pb.TargetRouterInfo),
-		}
-		for _, info := range nowList {
-			js, err := json.Marshal(info)
-			if err != nil {
-				t.Fatal(err)
-			}
-			routerBuffer.Value[nowServiceName].KvRouterDic[string(js)] = info
-		}
-	}
-}
-
-func TestMemoryForMap(t *testing.T) {
-	serviceName := "testDiscovery"
-	serviceNum := 1
-	serviceRouterCount := 100000
-	result := Generate(serviceName, serviceNum, serviceRouterCount)
-	doTestMemoryForMap(result, t)
 }
 
 // 设置为只有一个Cluster的情况

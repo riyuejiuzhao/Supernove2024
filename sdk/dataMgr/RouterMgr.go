@@ -194,17 +194,50 @@ func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, RouterID int6
 	util.Info("%s Delete Target Router %s", ServiceName, info.SrcInstanceName)
 }
 
-func (m *DefaultServiceMgr) handleKVRouterDelete(serviceName string, ev *clientv3.Event) {
+func (m *DefaultServiceMgr) handleTargetRouterDelete(serviceName string, ev *clientv3.Event) {
+	var err error
 	begin := time.Now()
 	defer func() {
-		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "KVRouterDelete"}, nil)
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "TargetRouterDelete"}, err)
 	}()
+
+	id, err := util.TargetRouterKey2RouterID(string(ev.Kv.Key), serviceName)
+	if err != nil {
+		util.Error("解析RouterID err: %v", err)
+		return
+	}
+	m.RemoveTargetRouter(serviceName, id)
+}
+
+func (m *DefaultServiceMgr) handleKVRouterDelete(serviceName string, ev *clientv3.Event) {
+	var err error
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "KVRouterDelete"}, err)
+	}()
+
 	key, err := util.KVRouterKey2RouterID(string(ev.Kv.Key), serviceName)
 	if err != nil {
 		util.Error("%s delete kv router err %v", serviceName, err)
 		return
 	}
 	m.RemoveKVRouter(serviceName, key)
+}
+
+func (m *DefaultServiceMgr) handleTargetRouterPut(serviceName string, ev *clientv3.Event) {
+	var err error
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "TargetRouterPut"}, err)
+	}()
+
+	info := &pb.TargetRouterInfo{}
+	err = proto.Unmarshal(ev.Kv.Value, info)
+	if err != nil {
+		util.Error("err %v", err)
+		return
+	}
+	m.AddTargetRouter(serviceName, info)
 }
 
 func (m *DefaultServiceMgr) handleKVRouterPut(serviceName string, ev *clientv3.Event) (err error) {
@@ -242,11 +275,7 @@ func (m *DefaultServiceMgr) handleWatchKVRouter(cli *clientv3.Client, serviceNam
 						util.Error("kv router err: %v", err)
 					}
 				case clientv3.EventTypeDelete:
-					id, err := util.KVRouterKey2RouterID(string(ev.Kv.Key), serviceName)
-					if err != nil {
-						util.Error("kv router delete err: %v", err)
-					}
-					m.RemoveKVRouter(serviceName, id)
+					m.handleKVRouterDelete(serviceName, ev)
 				}
 			}
 		}
@@ -268,20 +297,9 @@ func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, servic
 			for _, ev := range wresp.Events {
 				switch ev.Type {
 				case clientv3.EventTypePut:
-					info := &pb.TargetRouterInfo{}
-					err := proto.Unmarshal(ev.Kv.Value, info)
-					if err != nil {
-						util.Error("err %v", err)
-						continue
-					}
-					m.AddTargetRouter(serviceName, info)
+					m.handleTargetRouterPut(serviceName, ev)
 				case clientv3.EventTypeDelete:
-					id, err := util.TargetRouterKey2RouterID(string(ev.Kv.Key), serviceName)
-					if err != nil {
-						util.Error("解析RouterID err: %v", err)
-						continue
-					}
-					m.RemoveTargetRouter(serviceName, id)
+					m.handleTargetRouterDelete(serviceName, ev)
 				}
 			}
 		}

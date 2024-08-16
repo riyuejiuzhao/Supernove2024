@@ -73,15 +73,26 @@ func RandomItem[T any](items []T) T {
 	return items[index]
 }
 
+var LogLevel = slog.LevelError
+
 func Info(format string, a ...any) {
+	if LogLevel > slog.LevelInfo {
+		return
+	}
 	slog.Info(fmt.Sprintf(format, a...))
 }
 
 func Error(format string, a ...any) {
+	if LogLevel > slog.LevelError {
+		return
+	}
 	slog.Error(fmt.Sprintf(format, a...))
 }
 
 func Warn(format string, a ...any) {
+	if LogLevel > slog.LevelWarn {
+		return
+	}
 	slog.Warn(fmt.Sprintf(format, a...))
 }
 
