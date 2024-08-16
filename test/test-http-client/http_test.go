@@ -3,6 +3,7 @@ package test_http_client
 import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
+	"Supernove2024/svr"
 	"Supernove2024/util"
 	"fmt"
 	"github.com/opentracing/opentracing-go"
@@ -170,6 +171,18 @@ func SetupClient(
 }
 
 func TestHttp(t *testing.T) {
+	go func() {
+		srv, err := svr.NewConfigSvr("client-svr.yaml")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if err = srv.Serve("127.0.0.1:30000"); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	//等服务器启动
+	time.Sleep(1 * time.Second)
+
 	go SetupClient(
 		"A", "B", "client.yaml",
 		"127.0.0.1", 20000,

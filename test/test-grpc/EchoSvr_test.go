@@ -3,6 +3,7 @@ package test_grpc
 import (
 	grpc_sdk "Supernove2024/grpc-sdk"
 	"Supernove2024/sdk"
+	"Supernove2024/svr"
 	"Supernove2024/util"
 	"context"
 	"fmt"
@@ -73,6 +74,18 @@ func EchoSetup(selfKey, otherKey, address string, opts ...grpc_sdk.ServerOption)
 }
 
 func TestGrpc(t *testing.T) {
+	go func() {
+		srv, err := svr.NewConfigSvr("mini-router-svr.yaml")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if err = srv.Serve("127.0.0.1:30000"); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	//等服务器启动
+	time.Sleep(1 * time.Second)
+
 	for _, addr := range []string{
 		"127.0.0.1:2301",
 		"127.0.0.1:2311",

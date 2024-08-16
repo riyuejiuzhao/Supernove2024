@@ -3,13 +3,27 @@ package test_instance
 import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
+	"Supernove2024/svr"
 	"Supernove2024/util"
 	"fmt"
+	"log"
 	"testing"
 	"time"
 )
 
 func TestManyInstance(t *testing.T) {
+	go func() {
+		srv, err := svr.NewConfigSvr("many_instance-svr.yaml")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if err = srv.Serve("127.0.0.1:30000"); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	//等服务器启动
+	time.Sleep(1 * time.Second)
+
 	for _, address := range []string{
 		"127.0.0.1:2301",
 		"127.0.0.1:2311",
@@ -36,8 +50,6 @@ func TestManyInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//生成路由
-	//每个服务路由个数
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		for j := 0; j < instanceNum; j++ {
