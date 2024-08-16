@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 	"log"
 	"net"
 	"sync"
@@ -59,10 +58,14 @@ func EchoSetup(selfKey, otherKey, address string, opts ...grpc_sdk.ServerOption)
 	for {
 		util.Info("%s send %s-%v", selfKey, selfKey, count)
 		ctx, _ := context.WithTimeout(context.Background(), 1000*time.Second)
-		md := metadata.MD{}
-		md.Set(grpc_sdk.RouterTypeHeader, grpc_sdk.KVRouterType)
-		md.Set(grpc_sdk.RouterKeyHeader, fmt.Sprintf(`{"Key":"%s"}`, otherKey))
-		ctx = metadata.NewOutgoingContext(ctx, md)
+		md := grpc_sdk.NewMetaData()
+		md.SetRouterType(grpc_sdk.KVRouterType)
+		err = md.AddRouterTag("Key", otherKey)
+		if err != nil {
+			util.Error("add router key err %v", err)
+			continue
+		}
+		ctx = md.NewOutgoingContext(ctx)
 		_, err = client.Echo(ctx, &Request{Content: fmt.Sprintf("%s-%v", selfKey, count)})
 		if err != nil {
 			util.Error("%v", err)
