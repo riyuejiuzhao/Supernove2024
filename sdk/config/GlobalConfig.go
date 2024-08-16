@@ -2,31 +2,33 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
 	"sync"
 )
 
-type ClusterConfig struct {
-	Name string      `yaml:"Name"`
-	Pod  []PodConfig `yaml:"Pod"`
-}
+/*
+	type ClusterConfig struct {
+		Name string      `yaml:"Name"`
+		Pod  []PodConfig `yaml:"Pod"`
+	}
 
-type PodConfig struct {
-	Host string `yaml:"Host"`
-	Port int32  `yaml:"Port"`
-}
-
+	type PodConfig struct {
+		Host string `yaml:"Host"`
+		Port int32  `yaml:"Port"`
+	}
 func (s PodConfig) String() string {
 	return fmt.Sprintf("%s:%v", s.Host, s.Port)
 }
+*/
 
 type Config struct {
 	SDK struct {
-		InstancesEtcd []ClusterConfig `yaml:"InstancesEtcd"`
-		RouterEtcd    []ClusterConfig `yaml:"RouterEtcd"`
-		Register      struct {
+		ConfigSvr struct {
+			Host string `yaml:"Host"`
+			Port int32  `yaml:"Port"`
+		} `yaml:"ConfigSvr"`
+		Register struct {
 			DefaultWeight     int32 `yaml:"DefaultWeight"`
 			DefaultServiceTTL int64 `yaml:"DefaultServiceTTL"`
 			DefaultRouterTTL  int64 `yaml:"DefaultRouterTTL"`

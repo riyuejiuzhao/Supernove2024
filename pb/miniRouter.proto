@@ -33,3 +33,20 @@ message KVRouterInfo{
   //如果有多个，那么允许指定更进一步的筛选方式
   int32 RouterType = 7;
 }
+
+message ClusterInfo {
+  string Name = 1;
+  repeated string Address = 2;
+}
+
+message InitArgv {
+}
+
+message InitResult{
+  repeated ClusterInfo Instances = 1;
+  repeated ClusterInfo Routers = 2;
+}
+
+service ConfigService {
+  rpc Init(InitArgv) returns (InitResult){}
+}

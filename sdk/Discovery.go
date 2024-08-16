@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"math/rand"
 	"stathat.com/c/consistent"
 	"time"
 )
@@ -99,13 +100,19 @@ func (c *DiscoveryCli) processRandomRouter(dstService string) (*ProcessRouterRes
 }
 
 func (c *DiscoveryCli) doProcessWeightRouter(dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
-	maxWeight := dstInstances[0]
+	allWeight := int32(0) //dstInstances[0].GetWeight()
 	for _, v := range dstInstances {
-		if v.GetWeight() > maxWeight.GetWeight() {
-			maxWeight = v
-		}
+		allWeight += v.GetWeight()
 	}
-	return &ProcessRouterResult{DstInstance: maxWeight}, nil
+	chosen := rand.Int31n(allWeight)
+	for _, v := range dstInstances {
+		if chosen > v.GetWeight() {
+			chosen -= v.GetWeight()
+			continue
+		}
+		return &ProcessRouterResult{DstInstance: v}, nil
+	}
+	return nil, fmt.Errorf("没有随机到结果")
 }
 
 func (c *DiscoveryCli) processWeightRouter(dstInstances string) (*ProcessRouterResult, error) {
