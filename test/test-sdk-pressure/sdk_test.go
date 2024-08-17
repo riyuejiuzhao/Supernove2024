@@ -1,4 +1,4 @@
-package test_sdk
+package test_sdk_pressure
 
 import (
 	"Supernove2024/pb"

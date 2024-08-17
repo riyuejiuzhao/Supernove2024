@@ -17,6 +17,8 @@ type MetricsManager struct {
 	MethodFailed  *prometheus.CounterVec
 	// 统计每个链接连接次数
 	ConnCount *prometheus.CounterVec
+	// 统计每次路由的结果
+	InstanceRequestCount *prometheus.CounterVec
 }
 
 var (
@@ -50,6 +52,12 @@ func NewMetricsMgr(cfg *config.Config) *MetricsManager {
 			},
 			[]string{"Name"},
 		),
+		InstanceRequestCount: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "Instance_count",
+			},
+			[]string{"Name"},
+		),
 	}
 
 	go func() {
@@ -61,6 +69,7 @@ func NewMetricsMgr(cfg *config.Config) *MetricsManager {
 			mMgr.MethodTime,
 			mMgr.MethodFailed,
 			mMgr.ConnCount,
+			mMgr.InstanceRequestCount,
 		)
 		http.Handle("/metrics", promhttp.Handler())
 		err := http.ListenAndServe(cfg.SDK.Metrics, nil)

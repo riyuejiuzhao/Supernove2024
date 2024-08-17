@@ -134,17 +134,49 @@ func TestGrpc(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		EchoSetup("AKey", "BKey", "127.0.0.1:20000", grpc_sdk.WithInstanceName("AKey"))
+		EchoSetup("AKey", "BKey", "127.0.0.1:20000",
+			grpc_sdk.WithInstanceName("AKey"),
+			grpc_sdk.WithRouterTables([]string{"Key"}),
+			grpc_sdk.WithInboundRouters([]grpc_sdk.InboundRouterOption{
+				{
+					NextRouterType: util.WeightedRouterType,
+					Tags:           map[string]string{"Key": "AKey"},
+					InstancesName:  []string{"AKey"},
+				},
+			}))
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		EchoSetup("BKey", "CKey", "127.0.0.1:20001", grpc_sdk.WithInstanceName("BKey"))
+		EchoSetup("BKey", "CKey", "127.0.0.1:20001",
+			grpc_sdk.WithInstanceName("BKey"),
+			grpc_sdk.WithRouterTables([]string{"Key"}),
+			grpc_sdk.WithInboundRouters([]grpc_sdk.InboundRouterOption{
+				{
+					NextRouterType: util.WeightedRouterType,
+					Tags:           map[string]string{"Key": "BKey"},
+					InstancesName:  []string{"BKey"},
+				},
+			}),
+		)
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		EchoSetup("CKey", "AKey", "127.0.0.1:20002", grpc_sdk.WithInstanceName("CKey"))
+		EchoSetup("CKey", "AKey", "127.0.0.1:20002",
+			grpc_sdk.WithInstanceName("CKey"),
+			grpc_sdk.WithRouterTables([]string{"Key"}),
+			grpc_sdk.WithInboundRouters([]grpc_sdk.InboundRouterOption{
+				{
+					NextRouterType: util.WeightedRouterType,
+					Tags:           map[string]string{"Key": "CKey"},
+					InstancesName:  []string{"CKey"},
+				},
+			}),
+		)
 	}()
 	wg.Wait()
+
+	time.Sleep(1 * time.Second)
+	//宕机测试
 }

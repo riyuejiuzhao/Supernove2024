@@ -1,4 +1,4 @@
-package test_show_router
+package test_show_router_change
 
 import (
 	"Supernove2024/sdk"
@@ -7,39 +7,14 @@ import (
 	"Supernove2024/svr"
 	"Supernove2024/util"
 	"fmt"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
 	"github.com/prometheus/client_golang/prometheus"
-	jaegerConfig "github.com/uber/jaeger-client-go/config"
 	"log"
 	"net/http"
 	"testing"
 	"time"
 )
 
-const jAddress = "127.0.0.1:6831"
-
 func SetupClient(targetService string) {
-
-	//链路追踪
-	jCfg := jaegerConfig.Configuration{
-		ServiceName: "Client",
-		Sampler: &jaegerConfig.SamplerConfig{
-			Type:  "const",
-			Param: 1,
-		},
-		Reporter: &jaegerConfig.ReporterConfig{
-			LogSpans:           true,
-			LocalAgentHostPort: jAddress,
-		},
-	}
-	tracer, closer, err := jCfg.NewTracer()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer closer.Close()
-	opentracing.SetGlobalTracer(tracer)
-	//====================================================
 	httpClient := &http.Client{}
 	discoveryAPI, err := sdk.NewDiscoveryAPI()
 	if err != nil {
@@ -62,23 +37,10 @@ func SetupClient(targetService string) {
 				return
 			}
 
-			span := tracer.StartSpan("client-request")
-			defer span.Finish()
-
 			address := fmt.Sprintf("http://%s:%v", router.DstInstance.GetHost(), router.DstInstance.GetPort())
 			req, err := http.NewRequest("GET", address, nil)
 			if err != nil {
 				util.Error("http get err: %v", err)
-				return
-			}
-
-			ext.HTTPUrl.Set(span, address)
-			ext.HTTPMethod.Set(span, req.Method)
-			err = tracer.Inject(span.Context(),
-				opentracing.HTTPHeaders,
-				opentracing.HTTPHeadersCarrier(req.Header))
-			if err != nil {
-				util.Error("trace inject err: %v", err)
 				return
 			}
 
@@ -106,25 +68,6 @@ func SetupServer(
 		util.Error("%v", err)
 		return
 	}
-	//链路追踪
-	jCfg := jaegerConfig.Configuration{
-		ServiceName: name,
-		Sampler: &jaegerConfig.SamplerConfig{
-			Type:  "const",
-			Param: 1,
-		},
-		Reporter: &jaegerConfig.ReporterConfig{
-			LogSpans:           true,
-			LocalAgentHostPort: jAddress,
-		},
-	}
-	tracer, closer, err := jCfg.NewTracer()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer closer.Close()
-	opentracing.SetGlobalTracer(tracer)
-
 	//启动服务器
 	address := fmt.Sprintf("%s:%v", host, port)
 	config.GlobalConfigFilePath = configFile
@@ -153,14 +96,7 @@ func SetupServer(
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		begin := time.Now()
-		defer func() {
-			mt.MetricsUpload(begin, prometheus.Labels{"Method": name}, nil)
-		}()
-		spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
-		span := tracer.StartSpan("hello-world-reply", opentracing.ChildOf(spanCtx))
-		defer span.Finish()
-
+		mt.InstanceRequestCount.With(prometheus.Labels{"Name": name}).Inc()
 		fmt.Printf("%s received\n", name)
 		_, err := fmt.Fprintf(w, "Hello world")
 		if err != nil {

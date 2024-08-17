@@ -1,4 +1,4 @@
-package test_instance
+package test_instance_pressure
 
 import (
 	"Supernove2024/sdk"
@@ -35,8 +35,8 @@ func TestManyInstance(t *testing.T) {
 	}
 
 	serviceName := "testDiscovery"
-	serviceNum := 100
-	instanceNum := 100
+	serviceNum := 1
+	instanceNum := 10000
 	config.GlobalConfigFilePath = "many_instance.yaml"
 	cfg, err := config.GlobalConfig()
 	if err != nil {
@@ -97,4 +97,5 @@ func TestManyInstance(t *testing.T) {
 	begin = time.Now()
 	_, err = dis.GetInstances(&sdk.GetInstancesArgv{ServiceName: ""})
 	util.Info("GetInstances:%v", time.Now().Sub(begin).Milliseconds())
+	time.Sleep(30 * time.Second)
 }

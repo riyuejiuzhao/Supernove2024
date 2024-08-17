@@ -153,7 +153,7 @@ func (c *DiscoveryCli) processKeyValueRouter(
 		allInstance = append(allInstance, nowInstance)
 	}
 	if len(allInstance) == 0 {
-		return nil, errors.New("没有目标路由")
+		return nil, errors.New("没有目标实例")
 	} else if len(allInstance) == 1 {
 		return &ProcessRouterResult{DstInstance: allInstance[0]}, nil
 	}

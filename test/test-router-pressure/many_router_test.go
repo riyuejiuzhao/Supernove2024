@@ -1,4 +1,4 @@
-package test_router_test
+package test_router_pressure_test
 
 import (
 	"Supernove2024/sdk"
