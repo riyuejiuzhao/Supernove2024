@@ -2,7 +2,6 @@ package test_grpc
 
 import (
 	grpc_sdk "Supernove2024/grpc-sdk"
-	"Supernove2024/sdk"
 	"Supernove2024/svr"
 	"Supernove2024/util"
 	"context"
@@ -95,39 +94,6 @@ func TestGrpc(t *testing.T) {
 		"127.0.0.1:2321",
 	} {
 		util.ClearEtcd(addr, t)
-	}
-
-	///通过另一个控制台添加路由
-	registerAPI, err := sdk.NewRegisterAPI()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-		Dic:             map[string]string{"Key": "AKey"},
-		DstServiceName:  "EchoService",
-		DstInstanceName: []string{"AKey"},
-		NextRouterType:  util.ConsistentRouterType,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-		Dic:             map[string]string{"Key": "BKey"},
-		DstServiceName:  "EchoService",
-		DstInstanceName: []string{"BKey"},
-		NextRouterType:  util.ConsistentRouterType,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
-		Dic:             map[string]string{"Key": "CKey"},
-		DstServiceName:  "EchoService",
-		DstInstanceName: []string{"CKey"},
-		NextRouterType:  util.ConsistentRouterType,
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	var wg sync.WaitGroup

@@ -291,6 +291,9 @@ func (m *DefaultServiceMgr) RemoveKVRouter(ServiceName string, RouterID int64) {
 	}
 	defer b.Mutex.Unlock()
 	info, ok := b.KvRouterIdDic[RouterID]
+	if !ok {
+		return
+	}
 	b.KvRouterTable.removeKVRouter(info.Dic)
 	delete(b.KvRouterIdDic, RouterID)
 	util.Info("%s Delete KV Router %s", ServiceName, info.Dic)
