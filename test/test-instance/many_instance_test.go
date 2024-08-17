@@ -62,9 +62,7 @@ func TestManyInstance(t *testing.T) {
 					t.Error(err)
 					return
 				}
-				dmg := dataMgr.NewServiceDataManager(cfg, conn, mt)
 				registerAPI := sdk.NewRegisterAPIStandalone(cfg, conn, mt)
-				dis := sdk.NewDiscoveryAPIStandalone(cfg, conn, dmg, mt)
 				_, err = registerAPI.Register(&sdk.RegisterArgv{
 					ServiceName: nowServiceName,
 					Host:        util.RandomIP(),
@@ -74,12 +72,29 @@ func TestManyInstance(t *testing.T) {
 					t.Error(err)
 					return
 				}
-				_, err = dis.GetInstances(&sdk.GetInstancesArgv{ServiceName: nowServiceName})
 			}()
 		}
 		util.Info("now:%s", nowServiceName)
 		time.Sleep(1 * time.Second)
 	}
 	util.Info("finish send")
-	time.Sleep(100 * time.Second)
+	mt, err := metrics.Instance()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	conn, err := connMgr.NewConnManager(cfg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	begin := time.Now()
+	dmg := dataMgr.NewServiceDataManager(cfg, conn, mt)
+	util.Info("create dmg:%v", time.Now().Sub(begin).Milliseconds())
+	begin = time.Now()
+	dis := sdk.NewDiscoveryAPIStandalone(cfg, conn, dmg, mt)
+	util.Info("create dis:%v", time.Now().Sub(begin).Milliseconds())
+	begin = time.Now()
+	_, err = dis.GetInstances(&sdk.GetInstancesArgv{ServiceName: ""})
+	util.Info("GetInstances:%v", time.Now().Sub(begin).Milliseconds())
 }
