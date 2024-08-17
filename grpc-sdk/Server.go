@@ -85,6 +85,12 @@ func NewServer(opts ...ServerOption) (srv *Server, err error) {
 	for _, opt := range opts {
 		opt(options)
 	}
+
+	if options.InstanceName == "" {
+		util.Warn("缺少Instance Name，将会随机生成")
+		options.InstanceName = util.GenerateRandomString(10)
+	}
+
 	grpcSrv := grpc.NewServer(options.GrpcOption...)
 	srv = &Server{
 		Server: grpcSrv,
@@ -150,7 +156,6 @@ func (srv *Server) Serve(lis net.Listener) (err error) {
 	if err != nil {
 		return err
 	}
-	//srv.routerRegister()
 
 	go func() {
 		c := make(chan os.Signal, 1)
