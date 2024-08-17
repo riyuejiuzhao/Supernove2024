@@ -86,7 +86,11 @@ func doTestManyRouter(t *testing.T, configFile string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sdk.NewDiscoveryAPI()
+	discoveryAPI, err := sdk.NewDiscoveryAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	discoveryAPI.GetInstances(&sdk.GetInstancesArgv{})
 
 	//生成路由
 	//每个服务路由个数
