@@ -4,7 +4,6 @@ import (
 	"Supernove2024/pb"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
-	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"context"
@@ -341,10 +340,9 @@ type RegisterAPI interface {
 func NewRegisterAPIStandalone(
 	config *config.Config,
 	conn connMgr.ConnManager,
-	dmgr dataMgr.ServiceDataManager,
 	mt *metrics.MetricsManager,
 ) RegisterAPI {
-	ctx := NewAPIContextStandalone(config, conn, dmgr, mt)
+	ctx := NewAPIContextStandalone(config, conn, mt)
 	return &RegisterCli{
 		APIContext: ctx,
 	}

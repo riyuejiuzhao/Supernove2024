@@ -3,7 +3,6 @@ package sdk
 import (
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
-	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/sdk/metrics"
 )
 
@@ -19,14 +18,12 @@ type APIContext struct {
 func NewAPIContextStandalone(
 	config *config.Config,
 	conn connMgr.ConnManager,
-	dataManger dataMgr.ServiceDataManager,
 	mt *metrics.MetricsManager,
 ) *APIContext {
 	return &APIContext{
 		Config:      config,
 		ConnManager: conn,
-		//DataMgr:     dataManger,
-		Metrics: mt,
+		Metrics:     mt,
 	}
 }
 

@@ -44,7 +44,7 @@ func (c *DiscoveryCli) GetInstances(argv *GetInstancesArgv) (result *GetInstance
 	service, ok := c.DataMgr.GetServiceInfo(argv.ServiceName)
 	if !ok {
 		result = nil
-		err = errors.New("不存在该服务")
+		err = fmt.Errorf("不存在该服务%s", argv.ServiceName)
 		return
 	}
 	result = &GetInstancesResult{
@@ -237,9 +237,10 @@ func NewDiscoveryAPIStandalone(
 	dmgr dataMgr.ServiceDataManager,
 	mt *metrics.MetricsManager,
 ) DiscoveryAPI {
-	ctx := NewAPIContextStandalone(config, conn, dmgr, mt)
+	ctx := NewAPIContextStandalone(config, conn, mt)
 	return &DiscoveryCli{
 		APIContext: ctx,
+		DataMgr:    dmgr,
 	}
 }
 

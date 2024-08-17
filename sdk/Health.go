@@ -3,7 +3,6 @@ package sdk
 import (
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
-	"Supernove2024/sdk/dataMgr"
 	"Supernove2024/sdk/metrics"
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
@@ -94,10 +93,9 @@ type HealthAPI interface {
 func NewHealthAPIStandalone(
 	config *config.Config,
 	conn connMgr.ConnManager,
-	dmgr dataMgr.ServiceDataManager,
 	mt *metrics.MetricsManager,
 ) HealthAPI {
-	ctx := NewAPIContextStandalone(config, conn, dmgr, mt)
+	ctx := NewAPIContextStandalone(config, conn, mt)
 	return &HealthCli{
 		APIContext: ctx,
 	}
