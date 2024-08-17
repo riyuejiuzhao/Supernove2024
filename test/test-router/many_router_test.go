@@ -69,7 +69,6 @@ func TestManyRouter(t *testing.T) {
 
 // 千万级别的路由
 func doTestManyRouter(t *testing.T, configFile string) {
-
 	serviceName := "testDiscovery"
 	serviceNum := 100
 	config.GlobalConfigFilePath = configFile //
@@ -94,8 +93,16 @@ func doTestManyRouter(t *testing.T, configFile string) {
 	serviceRouterCount := 100000
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
+		nowKey := "nowKey" //util.GenerateRandomString(5)
+		err = registerAPI.AddTable(&sdk.AddTableArgv{
+			ServiceName: nowServiceName,
+			Tags:        []string{nowKey},
+		})
+		if err != nil {
+			t.Error(err)
+			continue
+		}
 		for j := 0; j < serviceRouterCount; j++ {
-			nowKey := util.GenerateRandomString(5)
 			nowVal := util.GenerateRandomString(5)
 			go func() {
 				timeout := int64(60 * 60 * 10)

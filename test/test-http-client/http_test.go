@@ -57,6 +57,7 @@ func SetupClient(
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	reply, err := registerAPI.Register(&sdk.RegisterArgv{
 		ServiceName: service,
 		Name:        selfKey,
@@ -182,6 +183,27 @@ func TestHttp(t *testing.T) {
 	}()
 	//等服务器启动
 	time.Sleep(1 * time.Second)
+
+	config.GlobalConfigFilePath = "client.yaml"
+	registerAPI, err := sdk.NewRegisterAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = registerAPI.AddTable(&sdk.AddTableArgv{
+		ServiceName: "A",
+		Tags:        []string{"Key"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = registerAPI.AddTable(&sdk.AddTableArgv{
+		ServiceName: "B",
+		Tags:        []string{"Key"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	go SetupClient(
 		"A", "B", "client.yaml",

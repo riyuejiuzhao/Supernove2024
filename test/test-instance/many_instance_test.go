@@ -3,6 +3,9 @@ package test_instance
 import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
+	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/dataMgr"
+	"Supernove2024/sdk/metrics"
 	"Supernove2024/svr"
 	"Supernove2024/util"
 	"fmt"
@@ -45,16 +48,24 @@ func TestManyInstance(t *testing.T) {
 		cfg.SDK.Discovery.DstService = append(cfg.SDK.Discovery.DstService, nowServiceName)
 	}
 
-	registerAPI, err := sdk.NewRegisterAPI()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		for j := 0; j < instanceNum; j++ {
 			go func() {
-				_, err := registerAPI.Register(&sdk.RegisterArgv{
+				mt, err := metrics.Instance()
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				conn, err := connMgr.NewConnManager(cfg)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				dmg := dataMgr.NewServiceDataManager(cfg, conn, mt)
+				registerAPI := sdk.NewRegisterAPIStandalone(cfg, conn, mt)
+				dis := sdk.NewDiscoveryAPIStandalone(cfg, conn, dmg, mt)
+				_, err = registerAPI.Register(&sdk.RegisterArgv{
 					ServiceName: nowServiceName,
 					Host:        util.RandomIP(),
 					Port:        util.RandomPort(),
@@ -63,10 +74,12 @@ func TestManyInstance(t *testing.T) {
 					t.Error(err)
 					return
 				}
+				_, err = dis.GetInstances(&sdk.GetInstancesArgv{ServiceName: nowServiceName})
 			}()
 		}
 		util.Info("now:%s", nowServiceName)
 		time.Sleep(1 * time.Second)
 	}
 	util.Info("finish send")
+	time.Sleep(100 * time.Second)
 }
