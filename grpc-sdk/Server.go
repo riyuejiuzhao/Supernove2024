@@ -76,7 +76,6 @@ type Server struct {
 	*grpc.Server
 
 	GlobalConfig *config.Config
-	DiscoveryAPI sdk.DiscoveryAPI
 	RegisterAPI  sdk.RegisterAPI
 	HealthAPI    sdk.HealthAPI
 
@@ -86,10 +85,6 @@ type Server struct {
 
 func NewServer(opts ...ServerOption) (srv *Server, err error) {
 	cfg, err := config.GlobalConfig()
-	if err != nil {
-		return
-	}
-	dis, err := sdk.NewDiscoveryAPI()
 	if err != nil {
 		return
 	}
@@ -116,7 +111,6 @@ func NewServer(opts ...ServerOption) (srv *Server, err error) {
 		Server: grpcSrv,
 
 		GlobalConfig: cfg,
-		DiscoveryAPI: dis,
 		RegisterAPI:  reg,
 		HealthAPI:    health,
 
