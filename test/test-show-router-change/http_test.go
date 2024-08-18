@@ -6,6 +6,7 @@ import (
 	"Supernove2024/sdk/metrics"
 	"Supernove2024/svr"
 	"Supernove2024/util"
+	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"log"
@@ -56,6 +57,7 @@ func SetupClient(targetService string) {
 }
 
 func SetupServer(
+	ctx context.Context,
 	service string,
 	configFile string,
 	host string,
@@ -104,8 +106,21 @@ func SetupServer(
 		}
 	})
 
-	if err = http.ListenAndServe(address, mux); err != nil {
-		log.Fatalln(err)
+	srv := http.Server{
+		Addr:    address,
+		Handler: mux,
+	}
+
+	go func() {
+		if err = srv.ListenAndServe(); err != nil {
+			util.Info("%v", err)
+		}
+	}()
+	<-ctx.Done()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		util.Info("%v", err)
 	}
 }
 
@@ -131,37 +146,39 @@ func TestHttp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	go SetupServer(
+	go SetupServer(context.Background(),
 		"HTTP", "client.yaml",
 		"127.0.0.1", 20000,
 		"A0", 30)
 	time.Sleep(50 * time.Millisecond)
 
-	go SetupServer(
+	go SetupServer(context.Background(),
 		"HTTP", "client.yaml",
 		"127.0.0.1", 20001,
 		"A1", 20)
 	time.Sleep(50 * time.Millisecond)
 
-	go SetupServer(
+	go SetupServer(context.Background(),
 		"HTTP", "client.yaml",
 		"127.0.0.1", 20002,
 		"A2", 10)
 	time.Sleep(50 * time.Millisecond)
 
-	go SetupServer(
+	go SetupServer(context.Background(),
 		"HTTP", "client.yaml",
 		"127.0.0.1", 21000,
 		"B0", 1000)
 	time.Sleep(50 * time.Millisecond)
 
-	go SetupServer(
+	go SetupServer(context.Background(),
 		"HTTP", "client.yaml",
 		"127.0.0.1", 21001,
 		"C0", 50)
 	time.Sleep(50 * time.Millisecond)
 
-	go SetupServer(
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go SetupServer(ctx,
 		"HTTP", "client.yaml",
 		"127.0.0.1", 21002,
 		"C1", 50)
@@ -212,12 +229,19 @@ func TestHttp(t *testing.T) {
 			"Key2": "Client",
 		},
 		DstServiceName:  "HTTP",
-		DstInstanceName: []string{"C0", "C1"},
+		DstInstanceName: []string{"C0", "C1", "C2"},
 		Timeout:         &timeout,
 		NextRouterType:  util.WeightedRouterType,
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
+	time.Sleep(60 * time.Second)
+	cancel()
+	time.Sleep(60 * time.Second)
+	go SetupServer(context.Background(),
+		"HTTP", "client.yaml",
+		"127.0.0.1", 21003,
+		"C2", 50)
 	time.Sleep(60 * time.Second)
 }
