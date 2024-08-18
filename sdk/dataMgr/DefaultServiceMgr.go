@@ -72,9 +72,12 @@ func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInf
 		return
 	}()
 	defer service.Mutex.Unlock()
-	nowInfo, ok := service.InstanceDic[info.InstanceID]
+	nowInfo, ok := service.NameDic[info.Name]
 	if ok && nowInfo.CreateTime > info.CreateTime {
 		return
+	}
+	if ok {
+		delete(service.InstanceDic, nowInfo.InstanceID)
 	}
 	service.InstanceDic[info.InstanceID] = info
 	service.NameDic[info.Name] = info
