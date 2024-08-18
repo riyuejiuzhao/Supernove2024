@@ -8,9 +8,10 @@ import (
 	"Supernove2024/util"
 	"errors"
 	"fmt"
+	"github.com/dgryski/go-jump"
 	"github.com/prometheus/client_golang/prometheus"
+	"hash/fnv"
 	"math/rand"
-	"stathat.com/c/consistent"
 	"time"
 )
 
@@ -60,18 +61,14 @@ func (c *DiscoveryCli) doProcessConsistentRouter(
 	srcInstanceName string,
 	dstInstances []util.DstInstanceInfo,
 ) (*ProcessRouterResult, error) {
-	hash := consistent.New()
-	dict := make(map[string]util.DstInstanceInfo)
-	for _, v := range dstInstances {
-		address := util.Address(v.GetHost(), v.GetPort())
-		dict[address] = v
-		hash.Add(address)
-	}
-	dstInstanceID, err := hash.Get(srcInstanceName)
+	h := fnv.New64a()
+	_, err := h.Write([]byte(srcInstanceName))
 	if err != nil {
 		return nil, err
 	}
-	return &ProcessRouterResult{DstInstance: dict[dstInstanceID]}, err
+	keyHash := h.Sum64()
+	bucket := jump.Hash(keyHash, len(dstInstances))
+	return &ProcessRouterResult{DstInstance: dstInstances[bucket]}, err
 }
 
 func (c *DiscoveryCli) processConsistentRouter(
