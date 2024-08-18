@@ -111,7 +111,7 @@ func (b *MiniRouterBalancer) UpdateSubConnState(sc balancer.SubConn, state balan
 	b.nowPicker.Mutex.Lock()
 	defer b.nowPicker.Mutex.Unlock()
 	b.nowPicker.Value.states[sc] = state.ConnectivityState
-	b.cc.UpdateState(balancer.State{ConnectivityState: state.ConnectivityState, Picker: b.nowPicker.Value})
+	b.cc.UpdateState(balancer.State{ConnectivityState: connectivity.Ready, Picker: b.nowPicker.Value})
 	return
 }
 
