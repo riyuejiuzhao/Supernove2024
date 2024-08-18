@@ -48,7 +48,7 @@ func NewConfigSvr(configFile string) (srv *ConfigSvr, err error) {
 }
 
 func (s *ConfigSvr) configToPb(cs []*ClusterConfig) []*pb.ClusterInfo {
-	return util.SliceMap(s.etcdConfig.InstancesEtcd, func(t *ClusterConfig) *pb.ClusterInfo {
+	return util.SliceMap(cs, func(t *ClusterConfig) *pb.ClusterInfo {
 		address := make([]string, 0, len(t.Pod))
 		for _, p := range t.Pod {
 			address = append(address, util.Address(p.Host, p.Port))
