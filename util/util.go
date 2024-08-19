@@ -82,6 +82,9 @@ func RandomWeightItem[T Weighted](items []T) T {
 	for _, v := range items {
 		allWeight += v.GetWeight()
 	}
+	if allWeight == 0 {
+		return RandomItem(items)
+	}
 	chosen := rand.Int31n(allWeight)
 	for _, v := range items {
 		if chosen > v.GetWeight() {
