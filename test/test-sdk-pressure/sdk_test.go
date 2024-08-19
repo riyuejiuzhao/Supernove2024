@@ -20,7 +20,7 @@ func Generate(serviceName string, serviceNum int, routerCount int) (rt map[strin
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		for j := 0; j < routerCount; j++ {
 			nowKey := fmt.Sprintf("%s", nowServiceName)
-			nowVal := util.GenerateRandomString(10)
+			nowVal := "a" //util.GenerateRandomString(1)
 			nowList = append(nowList, &pb.KVRouterInfo{
 				Dic:             map[string]string{nowKey: nowVal},
 				DstInstanceName: []string{nowServiceName},
@@ -58,7 +58,7 @@ func TestMemoryForMap(t *testing.T) {
 
 	serviceName := "testDiscovery"
 	serviceNum := 1
-	serviceRouterCount := 100000
+	serviceRouterCount := 1000000
 	result := Generate(serviceName, serviceNum, serviceRouterCount)
 	doTestMemoryForMap(result, t)
 }
