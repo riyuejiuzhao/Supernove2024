@@ -244,12 +244,7 @@ func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInf
 		return
 	}()
 	defer b.Mutex.Unlock()
-	nowInfo, ok := b.KvRouterTable.findKVRouter(info.Dic)
-	if ok {
-		nowInfo = append(nowInfo, info)
-	} else {
-		b.KvRouterTable.addKVRouter(info)
-	}
+	b.KvRouterTable.addKVRouter(info)
 	b.KvRouterIdDic[info.RouterID] = info
 	util.Info("%s Add Router %s", serviceName, info)
 }

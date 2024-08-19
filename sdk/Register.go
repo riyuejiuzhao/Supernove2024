@@ -117,6 +117,7 @@ type AddKVRouterArgv struct {
 	DstInstanceName []string
 	Timeout         *int64
 	NextRouterType  int32
+	Weight          int32
 }
 
 func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRouterResult, err error) {
@@ -203,6 +204,7 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResul
 		Timeout:         timeout,
 		CreateTime:      time.Now().Unix(),
 		RouterType:      argv.NextRouterType,
+		Weight:          argv.Weight,
 	}
 	key := util.KVRouterInfoKey(argv.DstServiceName, int64(resp.ID))
 

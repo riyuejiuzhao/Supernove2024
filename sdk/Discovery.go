@@ -129,7 +129,7 @@ func (c *DiscoveryCli) processKeyValueRouter(
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
-	v := util.RandomItem(vs)
+	v := util.RandomWeightItem(vs)
 	allInstance := make([]util.DstInstanceInfo, 0, len(v.DstInstanceName))
 	for _, name := range v.DstInstanceName {
 		nowInstance, ok := c.DataMgr.GetInstanceInfoByName(dstService, name)
