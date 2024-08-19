@@ -136,9 +136,8 @@ func doTestManyRouter(t *testing.T, configFile string) {
 }
 
 func TestRouterWatch(t *testing.T) {
-	//util.LogLevel = slog.LevelError
 	go func() {
-		srv, err := svr.NewConfigSvr("routers-many-svr.yaml")
+		srv, err := svr.NewConfigSvr("routers-many-svr1.yaml")
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -155,8 +154,6 @@ func TestRouterWatch(t *testing.T) {
 		"127.0.0.1:2331",
 		"127.0.0.1:2341",
 		"127.0.0.1:2351",
-		"127.0.0.1:2361",
-		"127.0.0.1:2371",
 	} {
 		util.ClearEtcd(addr, t)
 	}
@@ -192,7 +189,7 @@ func TestRouterWatch(t *testing.T) {
 	serviceRouterCount := 10000000
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
-		nowKey := "nowKey" //util.GenerateRandomString(5)
+		nowKey := "nowKey"
 		err = registerAPI.AddTable(&sdk.AddTableArgv{
 			ServiceName: nowServiceName,
 			Tags:        []string{nowKey},
