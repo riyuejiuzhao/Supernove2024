@@ -26,8 +26,6 @@ func (s *EchoSvr) Echo(c context.Context, request *Request) (reply *Reply, err e
 	return
 }
 
-const jAddress = "127.0.0.1:6831"
-
 func EchoSetup(selfKey, otherKey, address string, opts ...grpc_sdk.ServerOption) {
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
