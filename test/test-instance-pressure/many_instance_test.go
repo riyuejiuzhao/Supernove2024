@@ -35,8 +35,8 @@ func TestManyInstance(t *testing.T) {
 	}
 
 	serviceName := "testDiscovery"
-	serviceNum := 1
-	instanceNum := 10000
+	serviceNum := 10
+	instanceNum := 1000
 	config.GlobalConfigFilePath = "many_instance.yaml"
 	cfg, err := config.GlobalConfig()
 	if err != nil {
@@ -73,6 +73,9 @@ func TestManyInstance(t *testing.T) {
 					return
 				}
 			}()
+			if j % 100 == 0 {
+				time.Sleep(1*time.Second)
+			}
 		}
 		util.Info("now:%s", nowServiceName)
 		time.Sleep(1 * time.Second)
