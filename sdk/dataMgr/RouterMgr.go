@@ -200,10 +200,6 @@ func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetR
 	}()
 	defer b.Mutex.Unlock()
 	nowInfo, ok := b.TargetRouterDic[info.SrcInstanceName]
-	//保留更新的那个
-	if ok && nowInfo.CreateTime > info.CreateTime {
-		return
-	}
 	if ok {
 		delete(b.TargetRouterIdDic, nowInfo.RouterID)
 	}

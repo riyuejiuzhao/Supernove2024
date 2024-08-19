@@ -130,5 +130,8 @@ func doTestManyRouter(t *testing.T, configFile string) {
 		}
 	}
 	util.Info("finish send")
+}
+
+func TestRouterWatch(t *testing.T) {
 
 }

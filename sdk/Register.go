@@ -72,7 +72,6 @@ func (c *RegisterCli) Register(service *RegisterArgv) (result *RegisterResult, e
 		Host:       service.Host,
 		Port:       service.Port,
 		Weight:     weight,
-		CreateTime: time.Now().Unix(),
 	}
 
 	key := util.InstanceKey(service.ServiceName, instanceInfo.InstanceID)
@@ -145,8 +144,6 @@ func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRou
 		RouterID:        int64(resp.ID),
 		SrcInstanceName: argv.SrcInstanceName,
 		DstInstanceName: argv.DstInstanceName,
-		Timeout:         *argv.Timeout,
-		CreateTime:      time.Now().Unix(),
 	}
 
 	bytes, err := proto.Marshal(info)
@@ -201,8 +198,6 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResul
 		RouterID:        int64(resp.ID),
 		Dic:             argv.Dic,
 		DstInstanceName: argv.DstInstanceName,
-		Timeout:         timeout,
-		CreateTime:      time.Now().Unix(),
 		RouterType:      argv.NextRouterType,
 		Weight:          argv.Weight,
 	}

@@ -8,7 +8,6 @@ message InstanceInfo {
   string Host = 3;
   int32 Port = 4;
   int32 Weight = 5;
-  int64 CreateTime = 6;
 }
 
 message TargetRouterInfo{
@@ -16,8 +15,6 @@ message TargetRouterInfo{
 
   string SrcInstanceName = 2;
   string DstInstanceName = 3;
-  int64 Timeout = 4;
-  int64 CreateTime = 6;
 }
 
 message KVRouterInfo{
@@ -27,8 +24,6 @@ message KVRouterInfo{
   map<string,string> Dic = 3;
   repeated string DstInstanceName = 4;
 
-  int64 Timeout = 5;
-  int64 CreateTime = 6;
   //如果有多个，那么允许指定更进一步的筛选方式
   int32 RouterType = 7;
 }

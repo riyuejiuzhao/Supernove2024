@@ -24,8 +24,6 @@ func Generate(serviceName string, serviceNum int, routerCount int) (rt map[strin
 			nowList = append(nowList, &pb.KVRouterInfo{
 				Dic:             map[string]string{nowKey: nowVal},
 				DstInstanceName: []string{nowServiceName},
-				Timeout:         rand.Int63(),
-				CreateTime:      rand.Int63(),
 			})
 		}
 		rt[nowServiceName] = nowList
@@ -193,8 +191,6 @@ func GenerateTarget(t *testing.T, dmg *dataMgr.DefaultServiceMgr, api sdk.Discov
 				RouterID:        rand.Int63(),
 				SrcInstanceName: src,
 				DstInstanceName: util.RandomItem(result.Service.Instances).GetName(),
-				Timeout:         rand.Int63(),
-				CreateTime:      0,
 			})
 			rt[nowServiceName] = append(rt[nowServiceName], src)
 		}
@@ -263,8 +259,6 @@ func GenerateKV(t *testing.T, dmg *dataMgr.DefaultServiceMgr, api sdk.DiscoveryA
 				RouterID:        rand.Int63(),
 				Dic:             dic,
 				DstInstanceName: []string{util.RandomItem(result.GetInstance()).GetName()},
-				Timeout:         rand.Int63(),
-				CreateTime:      0,
 			}
 			dmg.AddKVRouter(nowServiceName, router)
 			rt[nowServiceName] = append(rt[nowServiceName], router)
