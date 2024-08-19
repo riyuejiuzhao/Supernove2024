@@ -13,49 +13,53 @@ import (
 )
 
 type RouterMapNode struct {
-	KVRouterInfo *pb.KVRouterInfo
+	KVRouterInfo []*pb.KVRouterInfo
 	Nodes        map[string]*RouterMapNode
+}
+
+func newRouterMapNode() *RouterMapNode {
+	return &RouterMapNode{
+		KVRouterInfo: make([]*pb.KVRouterInfo, 0),
+		Nodes:        make(map[string]*RouterMapNode),
+	}
 }
 
 func (n *RouterMapNode) Add(index int, Tags []string, info *pb.KVRouterInfo) {
 	if index >= len(Tags) {
-		n.KVRouterInfo = info
+		n.KVRouterInfo = append(n.KVRouterInfo, info)
 		return
 	}
 	nowTag := Tags[index]
 	value, ok := info.Dic[nowTag]
 	if !ok {
-		n.KVRouterInfo = info
+		n.KVRouterInfo = append(n.KVRouterInfo, info)
 		return
 	}
 	next, ok := n.Nodes[value]
 	if !ok {
-		next = &RouterMapNode{
-			KVRouterInfo: nil,
-			Nodes:        make(map[string]*RouterMapNode),
-		}
+		next = newRouterMapNode()
 		n.Nodes[value] = next
 	}
 	next.Add(index+1, Tags, info)
 }
 
-func (n *RouterMapNode) Find(index int, Tags []string, Keys map[string]string) (*pb.KVRouterInfo, bool) {
+func (n *RouterMapNode) Find(index int, Tags []string, Keys map[string]string) ([]*pb.KVRouterInfo, bool) {
 	if index >= len(Tags) {
-		return n.KVRouterInfo, n.KVRouterInfo != nil
+		return n.KVRouterInfo, len(n.KVRouterInfo) != 0
 	}
 
 	nowTag := Tags[index]
 	value, ok := Keys[nowTag]
 	if !ok {
-		return n.KVRouterInfo, n.KVRouterInfo != nil
+		return n.KVRouterInfo, len(n.KVRouterInfo) != 0
 	}
 	next, ok := n.Nodes[value]
 	if !ok {
-		return n.KVRouterInfo, n.KVRouterInfo != nil
+		return n.KVRouterInfo, len(n.KVRouterInfo) != 0
 	}
 	result, ok := next.Find(index+1, Tags, Keys)
 	if !ok {
-		return n.KVRouterInfo, n.KVRouterInfo != nil
+		return n.KVRouterInfo, len(n.KVRouterInfo) != 0
 	}
 	return result, ok
 }
@@ -100,7 +104,7 @@ type ServiceRouterBuffer struct {
 	TargetRouterDic   map[string]*pb.TargetRouterInfo
 }
 
-func (b *RouterMapRoot) findKVRouter(Keys map[string]string) (*pb.KVRouterInfo, bool) {
+func (b *RouterMapRoot) findKVRouter(Keys map[string]string) ([]*pb.KVRouterInfo, bool) {
 	if b.Info == nil {
 		util.Warn("查询路由缺少路由表")
 		return nil, false
@@ -128,10 +132,7 @@ func newServiceRouterBuffer(info *pb.RouterTableInfo) (buffer *ServiceRouterBuff
 	buffer = &ServiceRouterBuffer{
 		KvRouterTable: &RouterMapRoot{
 			Info: info,
-			Root: &RouterMapNode{
-				KVRouterInfo: nil,
-				Nodes:        make(map[string]*RouterMapNode),
-			},
+			Root: newRouterMapNode(),
 		},
 		KvRouterIdDic:     make(map[int64]*pb.KVRouterInfo),
 		TargetRouterDic:   make(map[string]*pb.TargetRouterInfo),
@@ -159,7 +160,7 @@ func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceName 
 	return info, ok
 }
 
-func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Keys map[string]string) (*pb.KVRouterInfo, bool) {
+func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Keys map[string]string) ([]*pb.KVRouterInfo, bool) {
 	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -244,14 +245,11 @@ func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInf
 	}()
 	defer b.Mutex.Unlock()
 	nowInfo, ok := b.KvRouterTable.findKVRouter(info.Dic)
-	//保留更新的那个
-	if ok && nowInfo.CreateTime > info.CreateTime {
-		return
-	}
 	if ok {
-		delete(b.KvRouterIdDic, nowInfo.RouterID)
+		nowInfo = append(nowInfo, info)
+	} else {
+		b.KvRouterTable.addKVRouter(info)
 	}
-	b.KvRouterTable.addKVRouter(info)
 	b.KvRouterIdDic[info.RouterID] = info
 	util.Info("%s Add Router %s", serviceName, info)
 }

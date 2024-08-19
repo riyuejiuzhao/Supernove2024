@@ -22,8 +22,9 @@ message TargetRouterInfo{
 
 message KVRouterInfo{
   int64 RouterID =1;
+  int32 weight = 2;
 
-  map<string,string> Dic = 2;
+  map<string,string> Dic = 3;
   repeated string DstInstanceName = 4;
 
   int64 Timeout = 5;

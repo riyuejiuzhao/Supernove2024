@@ -11,7 +11,6 @@ import (
 	"github.com/dgryski/go-jump"
 	"github.com/prometheus/client_golang/prometheus"
 	"hash/fnv"
-	"math/rand"
 	"time"
 )
 
@@ -96,19 +95,8 @@ func (c *DiscoveryCli) processRandomRouter(dstService string) (*ProcessRouterRes
 }
 
 func (c *DiscoveryCli) doProcessWeightRouter(dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
-	allWeight := int32(0) //dstInstances[0].GetWeight()
-	for _, v := range dstInstances {
-		allWeight += v.GetWeight()
-	}
-	chosen := rand.Int31n(allWeight)
-	for _, v := range dstInstances {
-		if chosen > v.GetWeight() {
-			chosen -= v.GetWeight()
-			continue
-		}
-		return &ProcessRouterResult{DstInstance: v}, nil
-	}
-	return nil, fmt.Errorf("没有随机到结果")
+	v := util.RandomWeightItem(dstInstances)
+	return &ProcessRouterResult{DstInstance: v}, nil
 }
 
 func (c *DiscoveryCli) processWeightRouter(dstInstances string) (*ProcessRouterResult, error) {
@@ -137,10 +125,11 @@ func (c *DiscoveryCli) processKeyValueRouter(
 	key map[string]string,
 	dstService string,
 ) (*ProcessRouterResult, error) {
-	v, ok := c.DataMgr.GetKVRouter(dstService, key)
+	vs, ok := c.DataMgr.GetKVRouter(dstService, key)
 	if !ok {
 		return nil, errors.New("没有目标路由")
 	}
+	v := util.RandomItem(vs)
 	allInstance := make([]util.DstInstanceInfo, 0, len(v.DstInstanceName))
 	for _, name := range v.DstInstanceName {
 		nowInstance, ok := c.DataMgr.GetInstanceInfoByName(dstService, name)

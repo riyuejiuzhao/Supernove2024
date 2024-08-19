@@ -73,6 +73,27 @@ func RandomItem[T any](items []T) T {
 	return items[index]
 }
 
+type Weighted interface {
+	GetWeight() int32
+}
+
+func RandomWeightItem[T Weighted](items []T) T {
+	allWeight := int32(0)
+	for _, v := range items {
+		allWeight += v.GetWeight()
+	}
+	chosen := rand.Int31n(allWeight)
+	for _, v := range items {
+		if chosen > v.GetWeight() {
+			chosen -= v.GetWeight()
+			continue
+		}
+		return v
+	}
+	//按理来说不应该运行到这里的
+	return items[0]
+}
+
 var LogLevel = slog.LevelInfo
 
 func Info(format string, a ...any) {
