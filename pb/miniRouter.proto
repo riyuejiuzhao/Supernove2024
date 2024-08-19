@@ -12,7 +12,6 @@ message InstanceInfo {
 
 message TargetRouterInfo{
   int64 RouterID =1;
-
   string SrcInstanceName = 2;
   string DstInstanceName = 3;
 }
@@ -20,12 +19,10 @@ message TargetRouterInfo{
 message KVRouterInfo{
   int64 RouterID =1;
   int32 weight = 2;
-
   map<string,string> Dic = 3;
   repeated string DstInstanceName = 4;
-
   //如果有多个，那么允许指定更进一步的筛选方式
-  int32 RouterType = 7;
+  int32 RouterType = 5;
 }
 
 message ClusterInfo {
@@ -39,8 +36,8 @@ message InitArgv {
 //路由表没有时间限制
 //说到底一个服务一个也不会很多，一直不断的用heartbeat续也不合理
 message RouterTableInfo{
-  string ServiceName = 2;
-  repeated string Tags = 3;
+  string ServiceName = 1;
+  repeated string Tags = 2;
 }
 
 message InitResult{
