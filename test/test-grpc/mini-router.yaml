@@ -10,3 +10,6 @@ SDK:
     DstService:
       - EchoService
   Metrics: 127.0.0.1:10000
+  Breaker:
+    WindowTime: 60
+    ThresholdTrip: 1000
