@@ -124,6 +124,7 @@ func SetupServer(
 	}
 }
 
+// 金丝雀发布
 func TestHttp(t *testing.T) {
 	util.ClearEtcd("127.0.0.1:2301", t)
 	util.ClearEtcd("127.0.0.1:2311", t)
@@ -193,7 +194,7 @@ func TestHttp(t *testing.T) {
 	}
 
 	timeout := int64(10000000)
-	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
+	ori0, err := registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
 		Dic:             map[string]string{"Key0": "Client"},
 		DstServiceName:  "HTTP",
 		DstInstanceName: []string{"A0", "A1", "A2"},
@@ -204,7 +205,7 @@ func TestHttp(t *testing.T) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
+	rp0, err := registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
 		Dic:             map[string]string{"Key0": "Client"},
 		DstServiceName:  "HTTP",
 		DstInstanceName: []string{"B0", "B1", "B2"},
@@ -218,6 +219,36 @@ func TestHttp(t *testing.T) {
 
 	go SetupClient("HTTP")
 
+	time.Sleep(60 * time.Second)
+	err = registerAPI.RemoveKVRouter(&sdk.RemoveKVRouterArgv{
+		RouterID:       rp0.RouterID,
+		DstServiceName: "HTTP",
+		Dic:            map[string]string{"Key0": "Client"},
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+	//均分
+	_, err = registerAPI.AddKVRouter(&sdk.AddKVRouterArgv{
+		Dic:             map[string]string{"Key0": "Client"},
+		DstServiceName:  "HTTP",
+		DstInstanceName: []string{"B0", "B1", "B2"},
+		Timeout:         &timeout,
+		NextRouterType:  util.RandomRouterType,
+		Weight:          90,
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+	time.Sleep(60 * time.Second)
+	err = registerAPI.RemoveKVRouter(&sdk.RemoveKVRouterArgv{
+		RouterID:       ori0.RouterID,
+		DstServiceName: "HTTP",
+		Dic:            map[string]string{"Key0": "Client"},
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
 	for {
 	}
 }

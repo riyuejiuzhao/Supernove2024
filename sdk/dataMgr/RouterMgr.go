@@ -65,18 +65,26 @@ func (n *RouterMapNode) Find(index int, Tags []string, Keys map[string]string) (
 }
 
 // Remove 返回值通知父节点自身可否删除
-func (n *RouterMapNode) Remove(index int, Tags []string, Keys map[string]string) bool {
+func (n *RouterMapNode) Remove(index int, Tags []string, info *pb.KVRouterInfo) bool {
 	if index >= len(Tags) {
-		return n.KVRouterInfo != nil
+		i := 0
+		for ; i < len(n.KVRouterInfo); i++ {
+			if n.KVRouterInfo[i].RouterID != info.RouterID {
+				continue
+			}
+			n.KVRouterInfo = append(n.KVRouterInfo[:i], n.KVRouterInfo[i+1:]...)
+			break
+		}
+		return len(n.KVRouterInfo) == 0
 	}
 	nowTag := Tags[index]
-	value := Keys[nowTag]
+	value := info.Dic[nowTag]
 	next, ok := n.Nodes[value]
 	//没有能够完全匹配的，那就不删除任何路由
 	if !ok {
 		return false
 	}
-	ok = next.Remove(index+1, Tags, Keys)
+	ok = next.Remove(index+1, Tags, info)
 	//子路由存在不能删除的
 	//那么自身也不能删除
 	if !ok {
@@ -85,7 +93,7 @@ func (n *RouterMapNode) Remove(index int, Tags []string, Keys map[string]string)
 	//子路由可以删除，先删除子路由
 	delete(n.Nodes, value)
 	//下面没有任何子路由了，本身也不是路由就可以让父节点把自己也删掉
-	return len(n.Nodes) == 0 && n.KVRouterInfo == nil
+	return len(n.Nodes) == 0 && len(n.KVRouterInfo) == 0
 }
 
 type RouterMapRoot struct {
@@ -112,12 +120,12 @@ func (b *RouterMapRoot) findKVRouter(Keys map[string]string) ([]*pb.KVRouterInfo
 	return b.Root.Find(0, b.Info.Tags, Keys)
 }
 
-func (b *RouterMapRoot) removeKVRouter(Keys map[string]string) {
+func (b *RouterMapRoot) removeKVRouter(info *pb.KVRouterInfo) {
 	if b.Info == nil {
 		util.Warn("删除路由缺少路由表")
 		return
 	}
-	b.Root.Remove(0, b.Info.Tags, Keys)
+	b.Root.Remove(0, b.Info.Tags, info)
 }
 
 func (b *RouterMapRoot) addKVRouter(info *pb.KVRouterInfo) {
@@ -287,7 +295,7 @@ func (m *DefaultServiceMgr) RemoveKVRouter(ServiceName string, RouterID int64) {
 	if !ok {
 		return
 	}
-	b.KvRouterTable.removeKVRouter(info.Dic)
+	b.KvRouterTable.removeKVRouter(info)
 	delete(b.KvRouterIdDic, RouterID)
 	util.Info("%s Delete KV Router %s", ServiceName, info.Dic)
 }
