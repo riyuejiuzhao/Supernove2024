@@ -22,6 +22,8 @@ type ServiceInfoBuffer struct {
 }
 
 type DefaultServiceMgr struct {
+	SkipSave bool
+
 	config      *config.Config
 	connManager connMgr.ConnManager
 	mt          *metrics.MetricsManager
@@ -56,6 +58,9 @@ func (m *DefaultServiceMgr) RemoveInstance(serviceName string, instanceID int64)
 }
 
 func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInfo) {
+	if m.SkipSave {
+		return
+	}
 	service := func() (service *ServiceInfoBuffer) {
 		m.serviceBuffer.Mutex.Lock()
 		defer m.serviceBuffer.Mutex.Unlock()
@@ -164,6 +169,9 @@ func (m *DefaultServiceMgr) handleInstanceService(cli *clientv3.Client, serviceN
 			clientv3.WithRev(revision),
 		)
 		for wresp := range rch {
+			if m.SkipSave {
+				continue
+			}
 			for _, ev := range wresp.Events {
 				switch ev.Type {
 				case clientv3.EventTypePut:
@@ -295,6 +303,8 @@ func NewDefaultServiceMgr(
 	mt *metrics.MetricsManager,
 ) *DefaultServiceMgr {
 	mgr := &DefaultServiceMgr{
+		SkipSave: false,
+
 		config:      config,
 		connManager: manager,
 		mt:          mt,

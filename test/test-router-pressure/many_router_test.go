@@ -178,7 +178,9 @@ func TestRouterWatch(t *testing.T) {
 	conn, _ := connMgr.NewConnManager(cfg)
 	for i := 0; i < 10000; i++ {
 		mt, _ := metrics.Instance()
-		watches = append(watches, dataMgr.NewDefaultServiceMgr(cfg, conn, mt))
+		dmg := dataMgr.NewDefaultServiceMgr(cfg, conn, mt)
+		dmg.SkipSave = true
+		watches = append(watches, dmg)
 		util.Info("i:%v", i)
 	}
 	registerAPI, err := sdk.NewRegisterAPI()
@@ -187,7 +189,7 @@ func TestRouterWatch(t *testing.T) {
 	}
 
 	//每个服务路由个数
-	serviceRouterCount := 100000
+	serviceRouterCount := 10000000
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		nowKey := "nowKey" //util.GenerateRandomString(5)

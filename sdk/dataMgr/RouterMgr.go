@@ -187,6 +187,9 @@ func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Keys map[string]stri
 }
 
 func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetRouterInfo) {
+	if m.SkipSave {
+		return
+	}
 	b := func() (b *ServiceRouterBuffer) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -209,6 +212,9 @@ func (m *DefaultServiceMgr) AddTargetRouter(serviceName string, info *pb.TargetR
 }
 
 func (m *DefaultServiceMgr) AddRouterTable(info *pb.RouterTableInfo) {
+	if m.SkipSave {
+		return
+	}
 	b, ok := func() (b *ServiceRouterBuffer, ok bool) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -235,6 +241,9 @@ func (m *DefaultServiceMgr) AddRouterTable(info *pb.RouterTableInfo) {
 }
 
 func (m *DefaultServiceMgr) AddKVRouter(serviceName string, info *pb.KVRouterInfo) {
+	if m.SkipSave {
+		return
+	}
 	b := func() (b *ServiceRouterBuffer) {
 		m.routerBuffer.Mutex.Lock()
 		defer m.routerBuffer.Mutex.Unlock()
@@ -399,6 +408,9 @@ func (m *DefaultServiceMgr) handleWatchRouter(cli *clientv3.Client, serviceName 
 			clientv3.WithRev(revision),
 		)
 		for wresp := range rch {
+			if m.SkipSave {
+				continue
+			}
 			for _, ev := range wresp.Events {
 				switch ev.Type {
 				case clientv3.EventTypePut:
