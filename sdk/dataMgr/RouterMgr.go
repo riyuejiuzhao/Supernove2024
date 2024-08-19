@@ -2,9 +2,9 @@ package dataMgr
 
 import (
 	"Supernove2024/pb"
-	"Supernove2024/sdk/connMgr"
 	"Supernove2024/util"
 	"context"
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
@@ -320,223 +320,138 @@ func (m *DefaultServiceMgr) RemoveTargetRouter(ServiceName string, RouterID int6
 	util.Info("%s Delete Target Router %s", ServiceName, info.SrcInstanceName)
 }
 
-func (m *DefaultServiceMgr) handleTargetRouterDelete(serviceName string, ev *clientv3.Event) {
-	var err error
+func (m *DefaultServiceMgr) handleRouterDelete(serviceName string, ev *clientv3.Event) (err error) {
 	begin := time.Now()
 	defer func() {
-		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "TargetRouterDelete"}, err)
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "RouterDelete"}, err)
 	}()
 
-	id, err := util.TargetRouterKey2RouterID(string(ev.Kv.Key), serviceName)
-	if err != nil {
-		util.Error("解析RouterID err: %v", err)
-		return
-	}
-	m.RemoveTargetRouter(serviceName, id)
-}
-
-func (m *DefaultServiceMgr) handleRouterTableDelete(serviceName string) {
-	var err error
-	begin := time.Now()
-	defer func() {
-		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "RouterTableDelete"}, err)
-	}()
-	m.RemoveRouterTable(serviceName)
-}
-
-func (m *DefaultServiceMgr) handleKVRouterDelete(serviceName string, ev *clientv3.Event) {
-	var err error
-	begin := time.Now()
-	defer func() {
-		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "KVRouterDelete"}, err)
-	}()
-
-	key, err := util.KVRouterKey2RouterID(string(ev.Kv.Key), serviceName)
-	if err != nil {
-		util.Error("%s delete kv router err %v", serviceName, err)
-		return
-	}
-	m.RemoveKVRouter(serviceName, key)
-}
-
-func (m *DefaultServiceMgr) handleTargetRouterPut(serviceName string, ev *clientv3.Event) {
-	var err error
-	begin := time.Now()
-	defer func() {
-		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "TargetRouterPut"}, err)
-	}()
-
-	info := &pb.TargetRouterInfo{}
-	err = proto.Unmarshal(ev.Kv.Value, info)
-	if err != nil {
-		util.Error("err %v", err)
-		return
-	}
-	m.AddTargetRouter(serviceName, info)
-}
-
-func (m *DefaultServiceMgr) handleKVRouterPut(serviceName string, ev *clientv3.Event) (err error) {
-	begin := time.Now()
-	defer func() {
-		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "KVRouterPut"}, err)
-	}()
-	info := &pb.KVRouterInfo{}
-	err = proto.Unmarshal(ev.Kv.Value, info)
-	if err != nil {
-		util.Error("err %v", err)
-		return
-	}
-	m.AddKVRouter(serviceName, info)
-	return
-}
-
-func (m *DefaultServiceMgr) handleRouterTablePut(ev *clientv3.Event) (err error) {
-	begin := time.Now()
-	defer func() {
-		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "RouterTablePut"}, err)
-	}()
-	info := &pb.RouterTableInfo{}
-	err = proto.Unmarshal(ev.Kv.Value, info)
-	if err != nil {
-		util.Error("err %v", err)
-		return
-	}
-	m.AddRouterTable(info)
-	return
-}
-
-func (m *DefaultServiceMgr) handleWatchRouterTable(serviceName string) {
-	cli, err := m.connManager.GetServiceConn(connMgr.RoutersEtcd, serviceName)
-	if err != nil {
-		util.Error("路由表获取etcd失败 %v", err)
-		return
-	}
-	revision, err := m.initRouterTable(cli, serviceName)
-	if err != nil {
-		util.Error("KV路由获取错误", err)
-	}
-	rch := cli.Watch(context.Background(),
-		util.RouterTableKey(serviceName),
-		clientv3.WithRev(revision),
-	)
-	go func() {
-		for wresp := range rch {
-			for _, ev := range wresp.Events {
-				switch ev.Type {
-				case clientv3.EventTypePut:
-					err := m.handleRouterTablePut(ev)
-					if err != nil {
-						util.Error("kv router err: %v", err)
-					}
-				case clientv3.EventTypeDelete:
-					m.handleRouterTableDelete(serviceName)
-				}
-			}
-		}
-	}()
-}
-
-func (m *DefaultServiceMgr) handleWatchKVRouter(cli *clientv3.Client, serviceName string) {
-	revision, err := m.initKVRouter(cli, serviceName)
-	if err != nil {
-		util.Error("KV路由获取错误", err)
-	}
-	rch := cli.Watch(context.Background(),
-		util.RouterKVPrefix(serviceName),
-		clientv3.WithPrefix(),
-		clientv3.WithRev(revision),
-	)
-	go func() {
-		for wresp := range rch {
-			for _, ev := range wresp.Events {
-				switch ev.Type {
-				case clientv3.EventTypePut:
-					err := m.handleKVRouterPut(serviceName, ev)
-					if err != nil {
-						util.Error("kv router err: %v", err)
-					}
-				case clientv3.EventTypeDelete:
-					m.handleKVRouterDelete(serviceName, ev)
-				}
-			}
-		}
-	}()
-}
-
-func (m *DefaultServiceMgr) handleWatchTargetRouter(cli *clientv3.Client, serviceName string) {
-	revision, err := m.initTargetRouter(cli, serviceName)
-	if err != nil {
-		util.Error("获取全量TargetRouter出错", err)
-	}
-	rch := cli.Watch(context.Background(),
-		util.RouterTargetPrefix(serviceName),
-		clientv3.WithPrefix(),
-		clientv3.WithRev(revision))
-	go func() {
-		for wresp := range rch {
-			for _, ev := range wresp.Events {
-				switch ev.Type {
-				case clientv3.EventTypePut:
-					m.handleTargetRouterPut(serviceName, ev)
-				case clientv3.EventTypeDelete:
-					m.handleTargetRouterDelete(serviceName, ev)
-				}
-			}
-		}
-	}()
-}
-
-func (m *DefaultServiceMgr) initRouterTable(cli *clientv3.Client, serviceName string) (revision int64, err error) {
-	resp, err := cli.Get(context.Background(), util.RouterTableKey(serviceName))
-	if err != nil {
-		return
-	}
-	for _, kv := range resp.Kvs {
-		info := &pb.RouterTableInfo{}
-		err = proto.Unmarshal(kv.Value, info)
+	var id int64
+	key := string(ev.Kv.Key)
+	if util.IsRouterTable(serviceName, key) {
+		m.RemoveRouterTable(serviceName)
+	} else if util.IsKVRouter(serviceName, key) {
+		id, err = util.KVRouterKey2RouterID(string(ev.Kv.Key), serviceName)
 		if err != nil {
-			util.Error("%v", err)
-			continue
+			util.Error("%s delete kv router err %v", serviceName, err)
+			return
+		}
+		m.RemoveKVRouter(serviceName, id)
+		return
+	} else if util.IsDstRouter(serviceName, key) {
+		id, err = util.TargetRouterKey2RouterID(string(ev.Kv.Key), serviceName)
+		if err != nil {
+			util.Error("解析RouterID err: %v", err)
+			return
+		}
+		m.RemoveTargetRouter(serviceName, id)
+		return
+	}
+	err = fmt.Errorf("不识别的路由类型")
+	return
+}
+
+func (m *DefaultServiceMgr) handleRouterPut(serviceName string, ev *clientv3.Event) (err error) {
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "RouterPut"}, err)
+	}()
+	key := string(ev.Kv.Key)
+	if util.IsRouterTable(serviceName, key) {
+		info := &pb.RouterTableInfo{}
+		err = proto.Unmarshal(ev.Kv.Value, info)
+		if err != nil {
+			util.Error("err %v", err)
+			return
 		}
 		m.AddRouterTable(info)
-	}
-	err = nil
-	revision = resp.Header.Revision
-	return
-}
-
-func (m *DefaultServiceMgr) initKVRouter(cli *clientv3.Client, serviceName string) (revision int64, err error) {
-	resp, err := cli.Get(context.Background(), util.RouterKVPrefix(serviceName), clientv3.WithPrefix())
-	if err != nil {
-		return
-	}
-	for _, kv := range resp.Kvs {
+	} else if util.IsKVRouter(serviceName, key) {
 		info := &pb.KVRouterInfo{}
-		err = proto.Unmarshal(kv.Value, info)
+		err = proto.Unmarshal(ev.Kv.Value, info)
 		if err != nil {
-			util.Error("%v", err)
-			continue
+			util.Error("err %v", err)
+			return
 		}
 		m.AddKVRouter(serviceName, info)
+		return
+	} else if util.IsDstRouter(serviceName, key) {
+		info := &pb.TargetRouterInfo{}
+		err = proto.Unmarshal(ev.Kv.Value, info)
+		if err != nil {
+			util.Error("err %v", err)
+			return
+		}
+		m.AddTargetRouter(serviceName, info)
+		return
 	}
-	err = nil
-	revision = resp.Header.Revision
+	err = fmt.Errorf("不识别的路由类型")
 	return
 }
 
-func (m *DefaultServiceMgr) initTargetRouter(cli *clientv3.Client, serviceName string) (revision int64, err error) {
-	resp, err := cli.Get(context.Background(), util.RouterTargetPrefix(serviceName), clientv3.WithPrefix())
+func (m *DefaultServiceMgr) handleWatchRouter(cli *clientv3.Client, serviceName string) {
+	revision, err := m.initRouter(cli, serviceName)
+	if err != nil {
+		util.Error("路由获取错误 err: %v", err)
+	}
+	go func() {
+		rch := cli.Watch(context.Background(),
+			serviceName,
+			clientv3.WithPrefix(),
+			clientv3.WithRev(revision),
+		)
+		for wresp := range rch {
+			for _, ev := range wresp.Events {
+				switch ev.Type {
+				case clientv3.EventTypePut:
+					err := m.handleRouterPut(serviceName, ev)
+					if err != nil {
+						util.Error("router put err: %v", err)
+					}
+				case clientv3.EventTypeDelete:
+					err := m.handleRouterDelete(serviceName, ev)
+					if err != nil {
+						util.Error("router del err: %v", err)
+					}
+				}
+			}
+		}
+	}()
+}
+
+func (m *DefaultServiceMgr) initRouter(cli *clientv3.Client, serviceName string) (revision int64, err error) {
+	resp, err := cli.Get(context.Background(), serviceName, clientv3.WithPrefix())
 	if err != nil {
 		return
 	}
 	for _, kv := range resp.Kvs {
-		info := &pb.TargetRouterInfo{}
-		err = proto.Unmarshal(kv.Value, info)
-		if err != nil {
-			util.Error("%v", err)
-			continue
+		if util.IsRouterTable(serviceName, string(kv.Key)) {
+			info := &pb.RouterTableInfo{}
+			err = proto.Unmarshal(kv.Value, info)
+			if err != nil {
+				util.Error("%v", err)
+				continue
+			}
+			m.AddRouterTable(info)
+		} else if util.IsKVRouter(serviceName, string(kv.Key)) {
+			info := &pb.KVRouterInfo{}
+			err = proto.Unmarshal(kv.Value, info)
+			if err != nil {
+				util.Error("%v", err)
+				continue
+			}
+			m.AddKVRouter(serviceName, info)
+		} else if util.IsDstRouter(serviceName, string(kv.Key)) {
+			info := &pb.TargetRouterInfo{}
+			err = proto.Unmarshal(kv.Value, info)
+			if err != nil {
+				util.Error("%v", err)
+				continue
+			}
+			m.AddTargetRouter(serviceName, info)
+		} else {
+			util.Error("不识别的Key %v", string(kv.Key))
 		}
-		m.AddTargetRouter(serviceName, info)
+
 	}
 	err = nil
 	revision = resp.Header.Revision

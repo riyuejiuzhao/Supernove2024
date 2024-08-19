@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
-	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -152,22 +151,18 @@ func (m *DefaultServiceMgr) handleInstanceDelete(serviceName string, ev *clientv
 	}
 }
 
-func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
-	cli, err := m.connManager.GetServiceConn(connMgr.InstancesEtcd, "")
-	if err != nil {
-		log.Fatal(err)
-	}
+func (m *DefaultServiceMgr) handleInstanceService(cli *clientv3.Client, serviceName string) {
 	m.tryAddServiceInfoChanList(serviceName)
-	revision, err := m.initInstanceInfo(serviceName)
+	revision, err := m.initServiceInfo(cli, serviceName)
 	if err != nil {
 		util.Error("获取全量数据失败：%v", err)
 	}
-	rch := cli.Watch(context.Background(),
-		util.InstancePrefix(serviceName),
-		clientv3.WithPrefix(),
-		clientv3.WithRev(revision),
-	)
 	go func() {
+		rch := cli.Watch(context.Background(),
+			serviceName,
+			clientv3.WithPrefix(),
+			clientv3.WithRev(revision),
+		)
 		for wresp := range rch {
 			for _, ev := range wresp.Events {
 				switch ev.Type {
@@ -183,6 +178,20 @@ func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
 			m.sendServiceInfoAllChan(serviceName)
 		}
 	}()
+
+}
+
+func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
+	instanceCli, err := m.connManager.GetServiceConn(connMgr.InstancesEtcd, "")
+	if err != nil {
+		util.Error("%s 服务数据初始化失败", serviceName)
+		return
+	}
+	m.handleInstanceService(instanceCli, serviceName)
+	clis := m.connManager.GetAllServiceConn(connMgr.RoutersEtcd)
+	for _, cli := range clis {
+		m.handleWatchRouter(cli, serviceName)
+	}
 }
 
 func (m *DefaultServiceMgr) tryAddServiceInfoChanList(serviceName string) *util.SyncContainer[[]chan<- *util.ServiceInfo] {
@@ -225,12 +234,8 @@ func (m *DefaultServiceMgr) sendServiceInfoAllChan(serviceName string) {
 	}
 }
 
-func (m *DefaultServiceMgr) initInstanceInfo(serviceName string) (revision int64, err error) {
-	cli, err := m.connManager.GetServiceConn(connMgr.InstancesEtcd, "")
-	if err != nil {
-		return
-	}
-	resp, err := cli.Get(context.Background(), util.InstancePrefix(serviceName), clientv3.WithPrefix())
+func (m *DefaultServiceMgr) initServiceInfo(cli *clientv3.Client, serviceName string) (revision int64, err error) {
+	resp, err := cli.Get(context.Background(), serviceName, clientv3.WithPrefix())
 	if err != nil {
 		return
 	}
@@ -252,33 +257,9 @@ func (m *DefaultServiceMgr) startFlushInfo() {
 	if m.connManager == nil {
 		return
 	}
-	clis := m.connManager.GetAllServiceConn(connMgr.RoutersEtcd)
-	var wg sync.WaitGroup
 	for _, serviceName := range m.config.SDK.Discovery.DstService {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			m.handleWatchService(serviceName)
-		}()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			m.handleWatchRouterTable(serviceName)
-		}()
-		for _, cli := range clis {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				m.handleWatchKVRouter(cli, serviceName)
-			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				m.handleWatchTargetRouter(cli, serviceName)
-			}()
-		}
+		m.handleWatchService(serviceName)
 	}
-	wg.Wait()
 }
 
 func (m *DefaultServiceMgr) GetInstanceInfoByName(serviceName string, name string) (*pb.InstanceInfo, bool) {

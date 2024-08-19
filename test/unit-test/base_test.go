@@ -329,6 +329,7 @@ func TestHealthSvr(t *testing.T) {
 	for _, v := range testData {
 		result, err := registerAPI.Register(&sdk.RegisterArgv{
 			ServiceName: v.ServiceName,
+			Name:        util.GenerateRandomString(10),
 			Host:        v.Host,
 			Port:        v.Port})
 		if err != nil {

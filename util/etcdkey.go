@@ -15,7 +15,7 @@ const (
 )
 
 func InstancePrefix(serviceName string) string {
-	return fmt.Sprintf("%s.%s.", ServiceHashKey, serviceName)
+	return fmt.Sprintf("%s.%s.", serviceName, ServiceHashKey)
 }
 
 func InstanceKey2InstanceID(key string, service string) string {
@@ -23,17 +23,11 @@ func InstanceKey2InstanceID(key string, service string) string {
 }
 
 func InstanceKey(serviceName string, id int64) string {
-	return fmt.Sprintf("%s.%s.%v", ServiceHashKey, serviceName, id)
+	return fmt.Sprintf("%s.%s.%v", serviceName, ServiceHashKey, id)
 }
-
-/*
-func KVRouterKey2Key(key string, service string) string {
-	return strings.TrimPrefix(key, RouterKVPrefix(service))
-}
-*/
 
 func RouterKVPrefix(serviceName string) string {
-	return fmt.Sprintf("%s.KV.%s.", RouterHashKey, serviceName)
+	return fmt.Sprintf("%s.%s.KV.", serviceName, RouterHashKey)
 }
 
 func TargetRouterKey2RouterID(key string, service string) (int64, error) {
@@ -47,19 +41,34 @@ func KVRouterKey2RouterID(key string, service string) (int64, error) {
 }
 
 func RouterTargetPrefix(serviceName string) string {
-	return fmt.Sprintf("%s.Dst.%s.", RouterHashKey, serviceName)
+	return fmt.Sprintf("%s.%s.Dst.", serviceName, RouterHashKey)
 }
 
 func RouterTableKey(serviceName string) string {
-	return fmt.Sprintf("Table.%s", serviceName)
+	return fmt.Sprintf("%s.Table", serviceName)
 }
 
 func KVRouterInfoKey(serviceName string, routerID int64) string {
-	return fmt.Sprintf("%s.KV.%s.%v", RouterHashKey, serviceName, routerID)
+	return fmt.Sprintf("%s.%s.KV.%v", serviceName, RouterHashKey, routerID)
 }
 
 func TargetRouterInfoKey(serviceName string, routerID int64) string {
-	return fmt.Sprintf("%s.Dst.%s.%v", RouterHashKey, serviceName, routerID)
+	return fmt.Sprintf("%s.%s.Dst.%v", serviceName, RouterHashKey, routerID)
+}
+
+func IsKVRouter(serviceName string, Key string) bool {
+	from := len(serviceName) + len(RouterHashKey) + 2
+	return Key[from:from+2] == "KV"
+}
+
+func IsDstRouter(serviceName string, Key string) bool {
+	from := len(serviceName) + len(RouterHashKey) + 2
+	return Key[from:from+3] == "Dst"
+}
+
+func IsRouterTable(serviceName string, Key string) bool {
+	from := len(serviceName) + 1
+	return Key[from:from+5] == "Table"
 }
 
 func KvRouterHashSlotKey(dstService string, dic map[string]string) string {
