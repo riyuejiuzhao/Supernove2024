@@ -78,7 +78,15 @@ func (c *DiscoveryCli) processConsistentRouter(
 	if !ok || len(instances.Instances) == 0 {
 		return nil, errors.New("没有对应实例")
 	}
-	return c.doProcessConsistentRouter(srcInstanceName, instances.Instances)
+	readyInstance := make([]util.DstInstanceInfo, 0, len(instances.Instances))
+	for _, i := range instances.Instances {
+		breakInfo, ok := i.(*dataMgr.InstanceInfo)
+		if !ok || !breakInfo.Breaker.Ready() {
+			continue
+		}
+		readyInstance = append(readyInstance, i)
+	}
+	return c.doProcessConsistentRouter(srcInstanceName, readyInstance)
 }
 
 func (c *DiscoveryCli) doProcessRandomRouter(dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
@@ -91,7 +99,15 @@ func (c *DiscoveryCli) processRandomRouter(dstService string) (*ProcessRouterRes
 	if !ok {
 		return nil, fmt.Errorf("不存在服务%s", dstService)
 	}
-	return c.doProcessRandomRouter(serviceInfo.Instances)
+	readyInstance := make([]util.DstInstanceInfo, 0, len(serviceInfo.Instances))
+	for _, i := range serviceInfo.Instances {
+		breakInfo, ok := i.(*dataMgr.InstanceInfo)
+		if !ok || !breakInfo.Breaker.Ready() {
+			continue
+		}
+		readyInstance = append(readyInstance, i)
+	}
+	return c.doProcessRandomRouter(readyInstance)
 }
 
 func (c *DiscoveryCli) doProcessWeightRouter(dstInstances []util.DstInstanceInfo) (*ProcessRouterResult, error) {
@@ -104,7 +120,15 @@ func (c *DiscoveryCli) processWeightRouter(dstInstances string) (*ProcessRouterR
 	if !ok {
 		return nil, fmt.Errorf("没有服务%s", dstInstances)
 	}
-	return c.doProcessWeightRouter(service.Instances)
+	readyInstance := make([]util.DstInstanceInfo, 0, len(service.Instances))
+	for _, i := range service.Instances {
+		breakInfo, ok := i.(*dataMgr.InstanceInfo)
+		if !ok || !breakInfo.Breaker.Ready() {
+			continue
+		}
+		readyInstance = append(readyInstance, i)
+	}
+	return c.doProcessWeightRouter(readyInstance)
 }
 
 func (c *DiscoveryCli) processTargetRouter(srcInstanceName string, dstService string) (*ProcessRouterResult, error) {
@@ -113,7 +137,7 @@ func (c *DiscoveryCli) processTargetRouter(srcInstanceName string, dstService st
 		return nil, errors.New("没有目标路由")
 	}
 	i, ok := c.DataMgr.GetInstanceInfoByName(dstService, target.DstInstanceName)
-	if !ok {
+	if !ok || !i.Breaker.Ready() {
 		return nil, errors.New("没有目标实例")
 	}
 	return &ProcessRouterResult{DstInstance: i}, nil
@@ -130,7 +154,7 @@ func (c *DiscoveryCli) processKeyValueRouter(
 		return nil, errors.New("没有目标路由")
 	}
 	v := util.RandomWeightItem(vs)
-	allInstance := make([]util.DstInstanceInfo, 0, len(v.DstInstanceName))
+	allInstance := make([]*dataMgr.InstanceInfo, 0, len(v.DstInstanceName))
 	for _, name := range v.DstInstanceName {
 		nowInstance, ok := c.DataMgr.GetInstanceInfoByName(dstService, name)
 		if !ok {
@@ -141,15 +165,28 @@ func (c *DiscoveryCli) processKeyValueRouter(
 	if len(allInstance) == 0 {
 		return nil, errors.New("没有目标实例")
 	} else if len(allInstance) == 1 {
-		return &ProcessRouterResult{DstInstance: allInstance[0]}, nil
+		if allInstance[0].Breaker.Ready() {
+			return &ProcessRouterResult{DstInstance: allInstance[0]}, nil
+		}
+		return nil, errors.New("没有目标实例")
+	}
+	readyInstance := make([]util.DstInstanceInfo, 0, len(allInstance))
+	for _, i := range allInstance {
+		if !i.Breaker.Ready() {
+			continue
+		}
+		readyInstance = append(readyInstance, i)
+	}
+	if len(readyInstance) == 0 {
+		return nil, errors.New("没有目标实例")
 	}
 	switch v.RouterType {
 	case util.ConsistentRouterType:
-		return c.doProcessConsistentRouter(srcInstanceName, allInstance)
+		return c.doProcessConsistentRouter(srcInstanceName, readyInstance)
 	case util.RandomRouterType:
-		return c.doProcessRandomRouter(allInstance)
+		return c.doProcessRandomRouter(readyInstance)
 	case util.WeightedRouterType:
-		return c.doProcessWeightRouter(allInstance)
+		return c.doProcessWeightRouter(readyInstance)
 	default:
 		return nil, fmt.Errorf("不支持进一步路由格式%v", v.RouterType)
 	}

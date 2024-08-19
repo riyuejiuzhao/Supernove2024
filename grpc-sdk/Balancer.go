@@ -5,6 +5,7 @@ import (
 	"Supernove2024/util"
 	"encoding/json"
 	"fmt"
+	"github.com/sony/gobreaker"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
@@ -29,27 +30,6 @@ func (bb *miniRouterBalancerBuilder) Build(cc balancer.ClientConn, opts balancer
 
 func (bb *miniRouterBalancerBuilder) Name() string {
 	return Scheme
-}
-
-type BalancerInstanceInfo struct {
-	SubConn  balancer.SubConn
-	Instance util.DstInstanceInfo
-}
-
-func (r *BalancerInstanceInfo) GetName() string {
-	return r.Instance.GetName()
-}
-func (r *BalancerInstanceInfo) GetInstanceID() int64 {
-	return r.Instance.GetInstanceID()
-}
-func (r *BalancerInstanceInfo) GetWeight() int32 {
-	return r.Instance.GetWeight()
-}
-func (r *BalancerInstanceInfo) GetHost() string {
-	return r.Instance.GetHost()
-}
-func (r *BalancerInstanceInfo) GetPort() int32 {
-	return r.Instance.GetPort()
 }
 
 type MiniRouterBalancer struct {
@@ -95,6 +75,7 @@ func (b *MiniRouterBalancer) UpdateClientConnState(s balancer.ClientConnState) e
 		serviceName:  serviceName,
 		states:       states,
 		infos:        infos,
+		breakers:     make(map[int64]*gobreaker.CircuitBreaker),
 	}
 
 	func() {
@@ -121,8 +102,9 @@ type MiniRouterPicker struct {
 	discoveryAPI sdk.DiscoveryAPI
 	serviceName  string //util.DstService
 
-	infos  map[int64]balancer.SubConn
-	states map[balancer.SubConn]connectivity.State
+	breakers map[int64]*gobreaker.CircuitBreaker
+	infos    map[int64]balancer.SubConn
+	states   map[balancer.SubConn]connectivity.State
 }
 
 func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
@@ -177,5 +159,11 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 	if p.states[bInfo] != connectivity.Ready {
 		return balancer.PickResult{}, fmt.Errorf("对映实例尚未连接完成")
 	}
-	return balancer.PickResult{SubConn: bInfo}, nil
+	return balancer.PickResult{SubConn: bInfo, Done: func(doneInfo balancer.DoneInfo) {
+		if doneInfo.Err != nil {
+			result.DstInstance.GetBreaker().Fail()
+		} else {
+			result.DstInstance.GetBreaker().Success()
+		}
+	}}, nil
 }

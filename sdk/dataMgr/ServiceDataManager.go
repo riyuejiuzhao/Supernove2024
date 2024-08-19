@@ -6,14 +6,24 @@ import (
 	"Supernove2024/sdk/connMgr"
 	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
+	circuit "github.com/rubyist/circuitbreaker"
 	"sync"
 )
+
+type InstanceInfo struct {
+	*pb.InstanceInfo
+	Breaker *circuit.Breaker
+}
+
+func (m *InstanceInfo) GetBreaker() *circuit.Breaker {
+	return m.Breaker
+}
 
 type ServiceDataManager interface {
 	GetServiceInfo(serviceName string) (*util.ServiceInfo, bool)
 	WatchServiceInfo(serviceName string) (<-chan *util.ServiceInfo, error)
-	GetInstanceInfo(serviceName string, instanceID int64) (*pb.InstanceInfo, bool)
-	GetInstanceInfoByName(serviceName string, name string) (*pb.InstanceInfo, bool)
+	GetInstanceInfo(serviceName string, instanceID int64) (*InstanceInfo, bool)
+	GetInstanceInfoByName(serviceName string, name string) (*InstanceInfo, bool)
 	GetTargetRouter(ServiceName string, SrcInstanceName string) (*pb.TargetRouterInfo, bool)
 	GetKVRouter(ServiceName string, Key map[string]string) ([]*pb.KVRouterInfo, bool)
 }

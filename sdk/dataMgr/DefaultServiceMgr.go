@@ -8,6 +8,7 @@ import (
 	"Supernove2024/util"
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
+	circuit "github.com/rubyist/circuitbreaker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
 	"strconv"
@@ -17,8 +18,8 @@ import (
 
 type ServiceInfoBuffer struct {
 	Mutex       sync.Mutex
-	InstanceDic map[int64]*pb.InstanceInfo
-	NameDic     map[string]*pb.InstanceInfo
+	InstanceDic map[int64]*InstanceInfo
+	NameDic     map[string]*InstanceInfo
 }
 
 type DefaultServiceMgr struct {
@@ -67,8 +68,8 @@ func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInf
 		service, ok := m.serviceBuffer.Value[serviceName]
 		if !ok {
 			service = &ServiceInfoBuffer{
-				InstanceDic: make(map[int64]*pb.InstanceInfo),
-				NameDic:     make(map[string]*pb.InstanceInfo),
+				InstanceDic: make(map[int64]*InstanceInfo),
+				NameDic:     make(map[string]*InstanceInfo),
 			}
 			m.serviceBuffer.Value[serviceName] = service
 		}
@@ -80,8 +81,15 @@ func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInf
 	if ok {
 		delete(service.InstanceDic, nowInfo.InstanceID)
 	}
-	service.InstanceDic[info.InstanceID] = info
-	service.NameDic[info.Name] = info
+	infoNow := &InstanceInfo{
+		InstanceInfo: info,
+		Breaker: circuit.NewBreakerWithOptions(&circuit.Options{
+			ShouldTrip: circuit.ThresholdTripFunc(m.config.SDK.Breaker.ThresholdTrip),
+			WindowTime: time.Duration(m.config.SDK.Breaker.WindowTime) * time.Second,
+		}),
+	}
+	service.InstanceDic[info.InstanceID] = infoNow
+	service.NameDic[info.Name] = infoNow
 	util.Info("%s Add Instance %v", serviceName, info.InstanceID)
 }
 
@@ -109,7 +117,7 @@ func (m *DefaultServiceMgr) GetServiceInfo(serviceName string) (*util.ServiceInf
 	return info, true
 }
 
-func (m *DefaultServiceMgr) GetInstanceInfo(serviceName string, instanceID int64) (*pb.InstanceInfo, bool) {
+func (m *DefaultServiceMgr) GetInstanceInfo(serviceName string, instanceID int64) (*InstanceInfo, bool) {
 	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
 		m.serviceBuffer.Mutex.Lock()
 		defer m.serviceBuffer.Mutex.Unlock()
@@ -270,7 +278,7 @@ func (m *DefaultServiceMgr) startFlushInfo() {
 	}
 }
 
-func (m *DefaultServiceMgr) GetInstanceInfoByName(serviceName string, name string) (*pb.InstanceInfo, bool) {
+func (m *DefaultServiceMgr) GetInstanceInfoByName(serviceName string, name string) (*InstanceInfo, bool) {
 	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
 		m.serviceBuffer.Mutex.Lock()
 		defer m.serviceBuffer.Mutex.Unlock()

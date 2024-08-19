@@ -7,21 +7,6 @@ import (
 	"sync"
 )
 
-/*
-	type ClusterConfig struct {
-		Name string      `yaml:"Name"`
-		Pod  []PodConfig `yaml:"Pod"`
-	}
-
-	type PodConfig struct {
-		Host string `yaml:"Host"`
-		Port int32  `yaml:"Port"`
-	}
-func (s PodConfig) String() string {
-	return fmt.Sprintf("%s:%v", s.Host, s.Port)
-}
-*/
-
 type Config struct {
 	SDK struct {
 		ConfigSvr struct {
@@ -37,6 +22,10 @@ type Config struct {
 			DstService []string `yaml:"DstService"`
 		} `yaml:"Discovery"`
 		Metrics string `yaml:"Metrics"`
+		Breaker struct {
+			ThresholdTrip int64 `yaml:"ThresholdTrip"`
+			WindowTime    int64 `yaml:"WindowTime"`
+		} `yaml:"Breaker"`
 	} `yaml:"SDK"`
 }
 
@@ -75,6 +64,12 @@ func LoadConfig(configFileOpts ...string) (*Config, error) {
 	err = yaml.Unmarshal(configYaml, &config)
 	if err != nil {
 		return nil, err
+	}
+	if config.SDK.Breaker.ThresholdTrip == 0 {
+		config.SDK.Breaker.ThresholdTrip = 10
+	}
+	if config.SDK.Breaker.WindowTime == 0 {
+		config.SDK.Breaker.WindowTime = 10
 	}
 	return &config, nil
 }

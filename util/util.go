@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
+	circuit "github.com/rubyist/circuitbreaker"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"log/slog"
 	"math/rand"
@@ -143,6 +144,7 @@ type DstInstanceInfo interface {
 	GetWeight() int32
 	GetHost() string
 	GetPort() int32
+	GetBreaker() *circuit.Breaker
 }
 
 type SyncContainer[T any] struct {
