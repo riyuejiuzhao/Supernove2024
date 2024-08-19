@@ -159,11 +159,12 @@ func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, er
 	if p.states[bInfo] != connectivity.Ready {
 		return balancer.PickResult{}, fmt.Errorf("对映实例尚未连接完成")
 	}
-	return balancer.PickResult{SubConn: bInfo, Done: func(doneInfo balancer.DoneInfo) {
-		if doneInfo.Err != nil {
-			result.DstInstance.GetBreaker().Fail()
-		} else {
-			result.DstInstance.GetBreaker().Success()
-		}
-	}}, nil
+	return balancer.PickResult{SubConn: bInfo,
+		Done: func(doneInfo balancer.DoneInfo) {
+			if doneInfo.Err != nil {
+				result.DstInstance.GetBreaker().Fail()
+			} else {
+				result.DstInstance.GetBreaker().Success()
+			}
+		}}, nil
 }
