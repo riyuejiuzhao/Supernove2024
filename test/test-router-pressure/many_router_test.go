@@ -7,6 +7,7 @@ import (
 	"Supernove2024/util"
 	"fmt"
 	"log"
+	"log/slog"
 	"testing"
 	"time"
 )
@@ -40,6 +41,7 @@ func TestForOneCluster(t *testing.T) {
 }
 
 func TestManyRouter(t *testing.T) {
+	util.LogLevel = slog.LevelError
 	go func() {
 		srv, err := svr.NewConfigSvr("routers-many-svr.yaml")
 		if err != nil {
@@ -121,7 +123,7 @@ func doTestManyRouter(t *testing.T, configFile string) {
 					return
 				}
 			}()
-			if j%5000 == 0 {
+			if j%3000 == 0 {
 				time.Sleep(1 * time.Second)
 				util.Info("i:%v j:%v", i, j)
 			}
