@@ -330,6 +330,7 @@ func (m *DefaultServiceMgr) handleRouterDelete(serviceName string, ev *clientv3.
 	key := string(ev.Kv.Key)
 	if util.IsRouterTable(serviceName, key) {
 		m.RemoveRouterTable(serviceName)
+		return
 	} else if util.IsKVRouter(serviceName, key) {
 		id, err = util.KVRouterKey2RouterID(string(ev.Kv.Key), serviceName)
 		if err != nil {
@@ -361,15 +362,14 @@ func (m *DefaultServiceMgr) handleRouterPut(serviceName string, ev *clientv3.Eve
 		info := &pb.RouterTableInfo{}
 		err = proto.Unmarshal(ev.Kv.Value, info)
 		if err != nil {
-			util.Error("err %v", err)
 			return
 		}
 		m.AddRouterTable(info)
+		return
 	} else if util.IsKVRouter(serviceName, key) {
 		info := &pb.KVRouterInfo{}
 		err = proto.Unmarshal(ev.Kv.Value, info)
 		if err != nil {
-			util.Error("err %v", err)
 			return
 		}
 		m.AddKVRouter(serviceName, info)
@@ -378,7 +378,6 @@ func (m *DefaultServiceMgr) handleRouterPut(serviceName string, ev *clientv3.Eve
 		info := &pb.TargetRouterInfo{}
 		err = proto.Unmarshal(ev.Kv.Value, info)
 		if err != nil {
-			util.Error("err %v", err)
 			return
 		}
 		m.AddTargetRouter(serviceName, info)
