@@ -19,7 +19,7 @@ type HeartBeatArgv struct {
 	InstanceID  int64
 }
 
-func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) (err error) {
+func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) (cancel context.CancelFunc, err error) {
 	begin := time.Now()
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "HeartBeat"}, err)
@@ -29,7 +29,9 @@ func (c *HealthCli) HeartBeat(argv *HeartBeatArgv) (err error) {
 	if err != nil {
 		return
 	}
-	ch, err := client.KeepAlive(context.Background(), clientv3.LeaseID(argv.InstanceID))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch, err := client.KeepAlive(ctx, clientv3.LeaseID(argv.InstanceID))
 	if err != nil {
 		return
 	}
@@ -61,7 +63,7 @@ type KeepRouterAliveArgv struct {
 	RouterID int64
 }
 
-func (c *HealthCli) KeepRouterAlive(argv *KeepRouterAliveArgv) (err error) {
+func (c *HealthCli) KeepRouterAliveOnce(argv *KeepRouterAliveArgv) (err error) {
 	begin := time.Now()
 	defer func() {
 		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "KeepRouterAlive"}, err)
@@ -71,7 +73,26 @@ func (c *HealthCli) KeepRouterAlive(argv *KeepRouterAliveArgv) (err error) {
 	if err != nil {
 		return
 	}
-	ch, err := client.KeepAlive(context.Background(), clientv3.LeaseID(argv.RouterID))
+
+	_, err = client.KeepAliveOnce(context.Background(), clientv3.LeaseID(argv.RouterID))
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (c *HealthCli) KeepRouterAlive(argv *KeepRouterAliveArgv) (cancel context.CancelFunc, err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "KeepRouterAlive"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(connMgr.InstancesEtcd, "")
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ch, err := client.KeepAlive(ctx, clientv3.LeaseID(argv.RouterID))
 	if err != nil {
 		return
 	}
@@ -86,8 +107,9 @@ func (c *HealthCli) KeepRouterAlive(argv *KeepRouterAliveArgv) (err error) {
 // 发送心跳
 type HealthAPI interface {
 	HeartBeatOnce(*HeartBeatArgv) error
-	HeartBeat(argv *HeartBeatArgv) error
-	KeepRouterAlive(argv *KeepRouterAliveArgv) error
+	HeartBeat(argv *HeartBeatArgv) (cancel context.CancelFunc, err error)
+	KeepRouterAlive(argv *KeepRouterAliveArgv) (cancel context.CancelFunc, err error)
+	KeepRouterAliveOnce(argv *KeepRouterAliveArgv) error
 }
 
 func NewHealthAPIStandalone(

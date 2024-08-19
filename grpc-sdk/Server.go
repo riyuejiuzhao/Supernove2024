@@ -4,6 +4,7 @@ import (
 	"Supernove2024/sdk"
 	"Supernove2024/sdk/config"
 	"Supernove2024/util"
+	"context"
 	"errors"
 	"google.golang.org/grpc"
 	"net"
@@ -81,6 +82,7 @@ type Server struct {
 
 	options       *serverOptions
 	InstanceIdDic map[string]int64
+	cancelHeart   []context.CancelFunc
 }
 
 func NewServer(opts ...ServerOption) (srv *Server, err error) {
@@ -166,10 +168,11 @@ func (srv *Server) doRegister(lis net.Listener) (err error) {
 		}
 		srv.InstanceIdDic[name] = registerResult.InstanceID
 		//添加心跳
-		err = srv.HealthAPI.HeartBeat(&sdk.HeartBeatArgv{
+		cancel, err := srv.HealthAPI.HeartBeat(&sdk.HeartBeatArgv{
 			ServiceName: name,
 			InstanceID:  registerResult.InstanceID,
 		})
+		srv.cancelHeart = append(srv.cancelHeart, cancel)
 		if err != nil {
 			util.Error("register heart beat err: %v", err)
 			continue
@@ -186,7 +189,8 @@ func (srv *Server) doRegister(lis net.Listener) (err error) {
 				util.Error("注册路由失败 err:%v", err)
 				continue
 			}
-			err = srv.HealthAPI.KeepRouterAlive(&sdk.KeepRouterAliveArgv{RouterID: result.RouterID})
+			cancel, err := srv.HealthAPI.KeepRouterAlive(&sdk.KeepRouterAliveArgv{RouterID: result.RouterID})
+			srv.cancelHeart = append(srv.cancelHeart, cancel)
 			if err != nil {
 				util.Error("路由保活失败")
 				continue
@@ -226,6 +230,9 @@ func (srv *Server) doDeregister() (err error) {
 			return
 		}
 		delete(srv.InstanceIdDic, name)
+	}
+	for _, cancel := range srv.cancelHeart {
+		cancel()
 	}
 	return
 }
