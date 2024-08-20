@@ -2,14 +2,14 @@
     - Name: Instance
       Pod:
       - Host: 127.0.0.1
-        Port: 2301
+        Port: 23010
   RouterEtcd:
     - Name: Router0
       Pod:
       - Host: 127.0.0.1
-        Port: 2311
+        Port: 23110
     - Name: Router1
       Pod:
       - Host: 127.0.0.1
-        Port: 2321
+        Port: 23210
 
