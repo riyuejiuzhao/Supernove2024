@@ -83,10 +83,11 @@ func EchoSetup(selfKey, address string, opts ...grpc_sdk.ServerOption) {
 	RegisterEchoServiceServer(svr, &EchoSvr{Key: selfKey})
 	go func() {
 		if err := svr.Serve(lis); err != nil {
-			log.Fatalln(err)
+			util.Error("server err:%v", err)
 		}
 	}()
-
+	//time.Sleep(60 * time.Second)
+	//svr.GracefulStop()
 }
 
 func TestGrpc(t *testing.T) {
