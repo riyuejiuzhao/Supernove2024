@@ -237,10 +237,10 @@ func (srv *Server) doDeregister() (err error) {
 	return
 }
 
-func (srv *Server) Stop() {
+func (srv *Server) GracefulStop() {
 	err := srv.doDeregister()
 	if err != nil {
 		util.Error("stop err: %v", err)
 	}
-	srv.Server.Stop()
+	srv.Server.GracefulStop()
 }
