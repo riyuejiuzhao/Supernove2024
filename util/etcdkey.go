@@ -78,3 +78,7 @@ func KvRouterHashSlotKey(dstService string, dic map[string]string) string {
 func TargetRouterHashSlotKey(dstServiceName string, srcInstanceName string) string {
 	return fmt.Sprintf("%s-%s", dstServiceName, srcInstanceName)
 }
+
+func ServiceAllInfoPrefix(service string) string {
+	return fmt.Sprintf("%s.", service)
+}

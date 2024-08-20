@@ -172,7 +172,7 @@ func (m *DefaultServiceMgr) handleInstanceService(cli *clientv3.Client, serviceN
 	}
 	go func() {
 		rch := cli.Watch(context.Background(),
-			serviceName,
+			util.ServiceAllInfoPrefix(serviceName),
 			clientv3.WithPrefix(),
 			clientv3.WithRev(revision),
 		)

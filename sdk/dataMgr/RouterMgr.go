@@ -403,7 +403,7 @@ func (m *DefaultServiceMgr) handleWatchRouter(cli *clientv3.Client, serviceName 
 	}
 	go func() {
 		rch := cli.Watch(context.Background(),
-			serviceName,
+			util.ServiceAllInfoPrefix(serviceName),
 			clientv3.WithPrefix(),
 			clientv3.WithRev(revision),
 		)
