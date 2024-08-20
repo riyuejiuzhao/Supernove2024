@@ -13,6 +13,17 @@ services:
       --listen-metrics-urls         http://0.0.0.0:2303
       --metrics basic
     network_mode: host
+  grpc-proxy0:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: grpc-proxy0
+    command: >
+      /usr/local/bin/etcd grpc-proxy start
+      --endpoints=http://0.0.0.0:2301
+      --listen-addr=0.0.0.0:23010
+    depends_on:
+      - etcd0 
+    network_mode: host
+
   etcd1:
     image: quay.io/coreos/etcd
     container_name: etcd1
@@ -26,6 +37,17 @@ services:
       --listen-metrics-urls          http://0.0.0.0:2313
       --metrics                      basic
     network_mode: host
+  grpc-proxy1:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: grpc-proxy1
+    command: >
+      /usr/local/bin/etcd grpc-proxy start
+      --endpoints=http://0.0.0.0:2311
+      --listen-addr=0.0.0.0:23110
+    depends_on:
+      - etcd1
+    network_mode: host
+
   etcd2:
     image: quay.io/coreos/etcd
     container_name: etcd2
@@ -39,6 +61,17 @@ services:
       --listen-metrics-urls          http://0.0.0.0:2323
       --metrics                      basic
     network_mode: host
+  grpc-proxy2:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: grpc-proxy2
+    command: >
+      /usr/local/bin/etcd grpc-proxy start
+      --endpoints=http://0.0.0.0:2321
+      --listen-addr=0.0.0.0:23210
+    depends_on:
+      - etcd2
+    network_mode: host
+
   etcd3:
     image: quay.io/coreos/etcd
     container_name: etcd3
@@ -52,6 +85,17 @@ services:
       --listen-metrics-urls          http://0.0.0.0:2333
       --metrics                      basic
     network_mode: host
+  grpc-proxy3:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: grpc-proxy3
+    command: >
+      /usr/local/bin/etcd grpc-proxy start
+      --endpoints=http://0.0.0.0:2331
+      --listen-addr=0.0.0.0:23310
+    depends_on:
+      - etcd3
+    network_mode: host
+
   etcd4:
     image: quay.io/coreos/etcd
     container_name: etcd4
@@ -65,6 +109,17 @@ services:
       --listen-metrics-urls          http://0.0.0.0:2343
       --metrics                      basic
     network_mode: host
+  grpc-proxy4:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: grpc-proxy4
+    command: >
+      /usr/local/bin/etcd grpc-proxy start
+      --endpoints=http://0.0.0.0:2341
+      --listen-addr=0.0.0.0:23410
+    depends_on:
+      - etcd4
+    network_mode: host
+
   etcd5:
     image: quay.io/coreos/etcd
     container_name: etcd5
@@ -78,6 +133,19 @@ services:
       --listen-metrics-urls          http://0.0.0.0:2353
       --metrics                      basic
     network_mode: host
+  grpc-proxy5:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: grpc-proxy5
+    command: >
+      /usr/local/bin/etcd grpc-proxy start
+      --endpoints=http://0.0.0.0:2351
+      --listen-addr=0.0.0.0:23510
+    depends_on:
+      - etcd5
+    network_mode: host
+
+
+
   etcd6:
     image: quay.io/coreos/etcd
     container_name: etcd6
@@ -91,6 +159,17 @@ services:
       --listen-metrics-urls          http://0.0.0.0:2363
       --metrics                      basic
     network_mode: host
+  grpc-proxy6:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: grpc-proxy6
+    command: >
+      /usr/local/bin/etcd grpc-proxy start
+      --endpoints=http://0.0.0.0:2361
+      --listen-addr=0.0.0.0:23610
+    depends_on:
+      - etcd6
+    network_mode: host
+
   etcd7:
     image: quay.io/coreos/etcd
     container_name: etcd7
@@ -104,3 +183,14 @@ services:
       --listen-metrics-urls          http://0.0.0.0:2373
       --metrics                      basic
     network_mode: host
+  grpc-proxy7:
+    image: quay.io/coreos/etcd:v3.5.0
+    container_name: grpc-proxy7
+    command: >
+      /usr/local/bin/etcd grpc-proxy start
+      --endpoints=http://0.0.0.0:2371
+      --listen-addr=0.0.0.0:23710
+    depends_on:
+      - etcd7
+    network_mode: host
+
