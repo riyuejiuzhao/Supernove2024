@@ -1,0 +1,26 @@
+InstancesEtcd:
+  - Name: I
+    Pod:
+      - Host: 127.0.0.1
+        Port: 2301
+RouterEtcd:
+  - Name: R0
+    Pod:
+      - Host: 127.0.0.1
+        Port: 2311
+  - Name: R1
+    Pod:
+      - Host: 127.0.0.1
+        Port: 2321
+  - Name: R2
+    Pod:
+      - Host: 127.0.0.1
+        Port: 2331
+  - Name: R3
+    Pod:
+      - Host: 127.0.0.1
+        Port: 2341
+  - Name: R4
+    Pod:
+      - Host: 127.0.0.1
+        Port: 2351

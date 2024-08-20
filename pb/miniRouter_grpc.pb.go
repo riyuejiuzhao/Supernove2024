@@ -18,474 +18,86 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// RegisterServiceClient is the client API for RegisterService service.
+// ConfigServiceClient is the client API for ConfigService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type RegisterServiceClient interface {
-	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterReply, error)
-	Deregister(ctx context.Context, in *DeregisterRequest, opts ...grpc.CallOption) (*DeregisterReply, error)
-	AddRouter(ctx context.Context, in *AddRouterRequest, opts ...grpc.CallOption) (*AddRouterReply, error)
-	RemoveRouter(ctx context.Context, in *RemoveRouterRequest, opts ...grpc.CallOption) (*RemoveRouterReply, error)
+type ConfigServiceClient interface {
+	Init(ctx context.Context, in *InitArgv, opts ...grpc.CallOption) (*InitResult, error)
 }
 
-type registerServiceClient struct {
+type configServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewRegisterServiceClient(cc grpc.ClientConnInterface) RegisterServiceClient {
-	return &registerServiceClient{cc}
+func NewConfigServiceClient(cc grpc.ClientConnInterface) ConfigServiceClient {
+	return &configServiceClient{cc}
 }
 
-func (c *registerServiceClient) Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterReply, error) {
-	out := new(RegisterReply)
-	err := c.cc.Invoke(ctx, "/RegisterService/Register", in, out, opts...)
+func (c *configServiceClient) Init(ctx context.Context, in *InitArgv, opts ...grpc.CallOption) (*InitResult, error) {
+	out := new(InitResult)
+	err := c.cc.Invoke(ctx, "/ConfigService/Init", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *registerServiceClient) Deregister(ctx context.Context, in *DeregisterRequest, opts ...grpc.CallOption) (*DeregisterReply, error) {
-	out := new(DeregisterReply)
-	err := c.cc.Invoke(ctx, "/RegisterService/Deregister", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *registerServiceClient) AddRouter(ctx context.Context, in *AddRouterRequest, opts ...grpc.CallOption) (*AddRouterReply, error) {
-	out := new(AddRouterReply)
-	err := c.cc.Invoke(ctx, "/RegisterService/AddRouter", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *registerServiceClient) RemoveRouter(ctx context.Context, in *RemoveRouterRequest, opts ...grpc.CallOption) (*RemoveRouterReply, error) {
-	out := new(RemoveRouterReply)
-	err := c.cc.Invoke(ctx, "/RegisterService/RemoveRouter", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// RegisterServiceServer is the server API for RegisterService service.
-// All implementations must embed UnimplementedRegisterServiceServer
+// ConfigServiceServer is the server API for ConfigService service.
+// All implementations must embed UnimplementedConfigServiceServer
 // for forward compatibility
-type RegisterServiceServer interface {
-	Register(context.Context, *RegisterRequest) (*RegisterReply, error)
-	Deregister(context.Context, *DeregisterRequest) (*DeregisterReply, error)
-	AddRouter(context.Context, *AddRouterRequest) (*AddRouterReply, error)
-	RemoveRouter(context.Context, *RemoveRouterRequest) (*RemoveRouterReply, error)
-	mustEmbedUnimplementedRegisterServiceServer()
+type ConfigServiceServer interface {
+	Init(context.Context, *InitArgv) (*InitResult, error)
+	mustEmbedUnimplementedConfigServiceServer()
 }
 
-// UnimplementedRegisterServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedRegisterServiceServer struct {
+// UnimplementedConfigServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedConfigServiceServer struct {
 }
 
-func (UnimplementedRegisterServiceServer) Register(context.Context, *RegisterRequest) (*RegisterReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Register not implemented")
+func (UnimplementedConfigServiceServer) Init(context.Context, *InitArgv) (*InitResult, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Init not implemented")
 }
-func (UnimplementedRegisterServiceServer) Deregister(context.Context, *DeregisterRequest) (*DeregisterReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Deregister not implemented")
-}
-func (UnimplementedRegisterServiceServer) AddRouter(context.Context, *AddRouterRequest) (*AddRouterReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddRouter not implemented")
-}
-func (UnimplementedRegisterServiceServer) RemoveRouter(context.Context, *RemoveRouterRequest) (*RemoveRouterReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveRouter not implemented")
-}
-func (UnimplementedRegisterServiceServer) mustEmbedUnimplementedRegisterServiceServer() {}
+func (UnimplementedConfigServiceServer) mustEmbedUnimplementedConfigServiceServer() {}
 
-// UnsafeRegisterServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to RegisterServiceServer will
+// UnsafeConfigServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ConfigServiceServer will
 // result in compilation errors.
-type UnsafeRegisterServiceServer interface {
-	mustEmbedUnimplementedRegisterServiceServer()
+type UnsafeConfigServiceServer interface {
+	mustEmbedUnimplementedConfigServiceServer()
 }
 
-func RegisterRegisterServiceServer(s grpc.ServiceRegistrar, srv RegisterServiceServer) {
-	s.RegisterService(&RegisterService_ServiceDesc, srv)
+func RegisterConfigServiceServer(s grpc.ServiceRegistrar, srv ConfigServiceServer) {
+	s.RegisterService(&ConfigService_ServiceDesc, srv)
 }
 
-func _RegisterService_Register_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RegisterRequest)
+func _ConfigService_Init_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitArgv)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RegisterServiceServer).Register(ctx, in)
+		return srv.(ConfigServiceServer).Init(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/RegisterService/Register",
+		FullMethod: "/ConfigService/Init",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RegisterServiceServer).Register(ctx, req.(*RegisterRequest))
+		return srv.(ConfigServiceServer).Init(ctx, req.(*InitArgv))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RegisterService_Deregister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeregisterRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RegisterServiceServer).Deregister(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/RegisterService/Deregister",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RegisterServiceServer).Deregister(ctx, req.(*DeregisterRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RegisterService_AddRouter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AddRouterRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RegisterServiceServer).AddRouter(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/RegisterService/AddRouter",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RegisterServiceServer).AddRouter(ctx, req.(*AddRouterRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RegisterService_RemoveRouter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveRouterRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RegisterServiceServer).RemoveRouter(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/RegisterService/RemoveRouter",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RegisterServiceServer).RemoveRouter(ctx, req.(*RemoveRouterRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-// RegisterService_ServiceDesc is the grpc.ServiceDesc for RegisterService service.
+// ConfigService_ServiceDesc is the grpc.ServiceDesc for ConfigService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var RegisterService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "RegisterService",
-	HandlerType: (*RegisterServiceServer)(nil),
+var ConfigService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "ConfigService",
+	HandlerType: (*ConfigServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Register",
-			Handler:    _RegisterService_Register_Handler,
-		},
-		{
-			MethodName: "Deregister",
-			Handler:    _RegisterService_Deregister_Handler,
-		},
-		{
-			MethodName: "AddRouter",
-			Handler:    _RegisterService_AddRouter_Handler,
-		},
-		{
-			MethodName: "RemoveRouter",
-			Handler:    _RegisterService_RemoveRouter_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "miniRouter.proto",
-}
-
-// DiscoveryServiceClient is the client API for DiscoveryService service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type DiscoveryServiceClient interface {
-	GetServices(ctx context.Context, in *GetServicesRequest, opts ...grpc.CallOption) (*GetServicesReply, error)
-	GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (*GetInstancesReply, error)
-	GetRouters(ctx context.Context, in *GetRoutersRequest, opts ...grpc.CallOption) (*GetRoutersReply, error)
-}
-
-type discoveryServiceClient struct {
-	cc grpc.ClientConnInterface
-}
-
-func NewDiscoveryServiceClient(cc grpc.ClientConnInterface) DiscoveryServiceClient {
-	return &discoveryServiceClient{cc}
-}
-
-func (c *discoveryServiceClient) GetServices(ctx context.Context, in *GetServicesRequest, opts ...grpc.CallOption) (*GetServicesReply, error) {
-	out := new(GetServicesReply)
-	err := c.cc.Invoke(ctx, "/DiscoveryService/GetServices", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *discoveryServiceClient) GetInstances(ctx context.Context, in *GetInstancesRequest, opts ...grpc.CallOption) (*GetInstancesReply, error) {
-	out := new(GetInstancesReply)
-	err := c.cc.Invoke(ctx, "/DiscoveryService/GetInstances", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *discoveryServiceClient) GetRouters(ctx context.Context, in *GetRoutersRequest, opts ...grpc.CallOption) (*GetRoutersReply, error) {
-	out := new(GetRoutersReply)
-	err := c.cc.Invoke(ctx, "/DiscoveryService/GetRouters", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// DiscoveryServiceServer is the server API for DiscoveryService service.
-// All implementations must embed UnimplementedDiscoveryServiceServer
-// for forward compatibility
-type DiscoveryServiceServer interface {
-	GetServices(context.Context, *GetServicesRequest) (*GetServicesReply, error)
-	GetInstances(context.Context, *GetInstancesRequest) (*GetInstancesReply, error)
-	GetRouters(context.Context, *GetRoutersRequest) (*GetRoutersReply, error)
-	mustEmbedUnimplementedDiscoveryServiceServer()
-}
-
-// UnimplementedDiscoveryServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedDiscoveryServiceServer struct {
-}
-
-func (UnimplementedDiscoveryServiceServer) GetServices(context.Context, *GetServicesRequest) (*GetServicesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetServices not implemented")
-}
-func (UnimplementedDiscoveryServiceServer) GetInstances(context.Context, *GetInstancesRequest) (*GetInstancesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetInstances not implemented")
-}
-func (UnimplementedDiscoveryServiceServer) GetRouters(context.Context, *GetRoutersRequest) (*GetRoutersReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetRouters not implemented")
-}
-func (UnimplementedDiscoveryServiceServer) mustEmbedUnimplementedDiscoveryServiceServer() {}
-
-// UnsafeDiscoveryServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to DiscoveryServiceServer will
-// result in compilation errors.
-type UnsafeDiscoveryServiceServer interface {
-	mustEmbedUnimplementedDiscoveryServiceServer()
-}
-
-func RegisterDiscoveryServiceServer(s grpc.ServiceRegistrar, srv DiscoveryServiceServer) {
-	s.RegisterService(&DiscoveryService_ServiceDesc, srv)
-}
-
-func _DiscoveryService_GetServices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetServicesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DiscoveryServiceServer).GetServices(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/DiscoveryService/GetServices",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DiscoveryServiceServer).GetServices(ctx, req.(*GetServicesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DiscoveryService_GetInstances_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetInstancesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DiscoveryServiceServer).GetInstances(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/DiscoveryService/GetInstances",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DiscoveryServiceServer).GetInstances(ctx, req.(*GetInstancesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DiscoveryService_GetRouters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetRoutersRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DiscoveryServiceServer).GetRouters(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/DiscoveryService/GetRouters",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DiscoveryServiceServer).GetRouters(ctx, req.(*GetRoutersRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-// DiscoveryService_ServiceDesc is the grpc.ServiceDesc for DiscoveryService service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var DiscoveryService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "DiscoveryService",
-	HandlerType: (*DiscoveryServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "GetServices",
-			Handler:    _DiscoveryService_GetServices_Handler,
-		},
-		{
-			MethodName: "GetInstances",
-			Handler:    _DiscoveryService_GetInstances_Handler,
-		},
-		{
-			MethodName: "GetRouters",
-			Handler:    _DiscoveryService_GetRouters_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "miniRouter.proto",
-}
-
-// HealthServiceClient is the client API for HealthService service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type HealthServiceClient interface {
-	HeartBeat(ctx context.Context, in *HeartBeatRequest, opts ...grpc.CallOption) (*HeartBeatReply, error)
-	GetHealthInfo(ctx context.Context, in *GetHealthInfoRequest, opts ...grpc.CallOption) (*GetHealthInfoReply, error)
-}
-
-type healthServiceClient struct {
-	cc grpc.ClientConnInterface
-}
-
-func NewHealthServiceClient(cc grpc.ClientConnInterface) HealthServiceClient {
-	return &healthServiceClient{cc}
-}
-
-func (c *healthServiceClient) HeartBeat(ctx context.Context, in *HeartBeatRequest, opts ...grpc.CallOption) (*HeartBeatReply, error) {
-	out := new(HeartBeatReply)
-	err := c.cc.Invoke(ctx, "/HealthService/HeartBeat", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *healthServiceClient) GetHealthInfo(ctx context.Context, in *GetHealthInfoRequest, opts ...grpc.CallOption) (*GetHealthInfoReply, error) {
-	out := new(GetHealthInfoReply)
-	err := c.cc.Invoke(ctx, "/HealthService/GetHealthInfo", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// HealthServiceServer is the server API for HealthService service.
-// All implementations must embed UnimplementedHealthServiceServer
-// for forward compatibility
-type HealthServiceServer interface {
-	HeartBeat(context.Context, *HeartBeatRequest) (*HeartBeatReply, error)
-	GetHealthInfo(context.Context, *GetHealthInfoRequest) (*GetHealthInfoReply, error)
-	mustEmbedUnimplementedHealthServiceServer()
-}
-
-// UnimplementedHealthServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedHealthServiceServer struct {
-}
-
-func (UnimplementedHealthServiceServer) HeartBeat(context.Context, *HeartBeatRequest) (*HeartBeatReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method HeartBeat not implemented")
-}
-func (UnimplementedHealthServiceServer) GetHealthInfo(context.Context, *GetHealthInfoRequest) (*GetHealthInfoReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetHealthInfo not implemented")
-}
-func (UnimplementedHealthServiceServer) mustEmbedUnimplementedHealthServiceServer() {}
-
-// UnsafeHealthServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to HealthServiceServer will
-// result in compilation errors.
-type UnsafeHealthServiceServer interface {
-	mustEmbedUnimplementedHealthServiceServer()
-}
-
-func RegisterHealthServiceServer(s grpc.ServiceRegistrar, srv HealthServiceServer) {
-	s.RegisterService(&HealthService_ServiceDesc, srv)
-}
-
-func _HealthService_HeartBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(HeartBeatRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(HealthServiceServer).HeartBeat(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/HealthService/HeartBeat",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HealthServiceServer).HeartBeat(ctx, req.(*HeartBeatRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _HealthService_GetHealthInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetHealthInfoRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(HealthServiceServer).GetHealthInfo(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/HealthService/GetHealthInfo",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HealthServiceServer).GetHealthInfo(ctx, req.(*GetHealthInfoRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-// HealthService_ServiceDesc is the grpc.ServiceDesc for HealthService service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var HealthService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "HealthService",
-	HandlerType: (*HealthServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "HeartBeat",
-			Handler:    _HealthService_HeartBeat_Handler,
-		},
-		{
-			MethodName: "GetHealthInfo",
-			Handler:    _HealthService_GetHealthInfo_Handler,
+			MethodName: "Init",
+			Handler:    _ConfigService_Init_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

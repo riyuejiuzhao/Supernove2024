@@ -1,0 +1,15 @@
+SDK:
+  ConfigSvr:
+    Host: 127.0.0.1
+    Port: 30000
+  Register:
+    DefaultWeight: 10
+    DefaultServiceTTL: 2
+    DefaultRouterTTL: 2
+  Discovery:
+    DstService:
+      - EchoService
+  Metrics: 127.0.0.1:10000
+  Breaker:
+    WindowTime: 60
+    ThresholdTrip: 1000

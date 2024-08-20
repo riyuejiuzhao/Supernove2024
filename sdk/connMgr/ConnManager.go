@@ -3,25 +3,23 @@ package connMgr
 import (
 	"Supernove2024/sdk/config"
 	"errors"
-	"github.com/shimingyah/pool"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"sync"
 )
 
 type ServiceType int32
 
 const (
-	Discovery ServiceType = iota
-	HealthCheck
-	Register
-
+	InstancesEtcd = ServiceType(iota)
+	RoutersEtcd
 	ServiceTypeCount
 )
 
-// ConnManager 管理GRPC链接
+// ConnManager 管理链接
 type ConnManager interface {
+	GetAllServiceConn(service ServiceType) []*clientv3.Client
 	// GetServiceConn 指定服务的链接
-	GetServiceConn(service ServiceType) (pool.Conn, error)
-	// GetConn 指定地址的链接
-	GetConn(service ServiceType, address string) (pool.Conn, error)
+	GetServiceConn(service ServiceType, key string) (*clientv3.Client, error)
 }
 
 var (
@@ -29,13 +27,21 @@ var (
 	NewConnManager             = newDefaultConnManager
 )
 
+var connMutex sync.Mutex
+
 func Instance() (ConnManager, error) {
+	connMutex.Lock()
+	defer connMutex.Unlock()
 	if connMgr == nil {
 		cfg, err := config.GlobalConfig()
 		if err != nil {
 			return nil, errors.New("创建连接管理器失败")
 		}
-		connMgr = NewConnManager(cfg)
+		newMgr, err := NewConnManager(cfg)
+		if err != nil {
+			return nil, err
+		}
+		connMgr = newMgr
 	}
 	return connMgr, nil
 }

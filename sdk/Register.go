@@ -2,149 +2,323 @@ package sdk
 
 import (
 	"Supernove2024/pb"
+	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"context"
+	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/protobuf/proto"
+	"time"
 )
 
 type RegisterCli struct {
-	APIContext
+	*APIContext
 }
 
 type RegisterArgv struct {
 	ServiceName string
 	Host        string
 	Port        int32
+	Name        string
 
 	//optional
-	Weight     *int32
-	TTL        *int64
-	InstanceID *string
+	Weight *int32
+	TTL    *int64
 }
 
 type RegisterResult struct {
-	InstanceID string
+	InstanceID int64
 }
 
 type DeregisterArgv struct {
 	ServiceName string
-	Host        string
-	Port        int32
-	InstanceID  string
+	InstanceID  int64
 }
 
-func (c *RegisterCli) Register(service *RegisterArgv) (*RegisterResult, error) {
-	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-	rpcCli := pb.NewRegisterServiceClient(conn.Value())
+func (c *RegisterCli) Register(service *RegisterArgv) (result *RegisterResult, err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "Register"}, err)
+	}()
 	var weight int32
-	var ttl int64
 	if service.Weight != nil {
 		weight = *service.Weight
 	} else {
-		weight = c.Config.Global.Register.DefaultWeight
+		weight = c.Config.SDK.Register.DefaultWeight
 	}
+
+	var ttl int64
 	if service.TTL != nil {
 		ttl = *service.TTL
 	} else {
-		ttl = c.Config.Global.Register.DefaultTTL
+		ttl = c.Config.SDK.Register.DefaultServiceTTL
 	}
-	request := pb.RegisterRequest{
-		ServiceName: service.ServiceName,
-		Host:        service.Host,
-		Port:        service.Port,
-		Weight:      weight,
-		TTL:         ttl,
-		InstanceID:  service.InstanceID,
-	}
-	reply, err := rpcCli.Register(context.Background(), &request)
+
+	client, err := c.ConnManager.GetServiceConn(connMgr.InstancesEtcd, "")
 	if err != nil {
-		return nil, err
+		return
 	}
-	util.Info("注册服务: ServiceName: %v, Host: %v, Port: %v, Weight: %v, InstanceID: %v",
-		request.ServiceName, request.Host, request.Port, request.Weight, reply.InstanceID)
-	return &RegisterResult{InstanceID: reply.InstanceID}, nil
+	resp, err := client.Grant(context.Background(), ttl)
+	if err != nil {
+		return
+	}
+
+	instanceInfo := &pb.InstanceInfo{
+		InstanceID: int64(resp.ID),
+		Name:       service.Name,
+		Host:       service.Host,
+		Port:       service.Port,
+		Weight:     weight,
+	}
+
+	key := util.InstanceKey(service.ServiceName, instanceInfo.InstanceID)
+	bytes, err := proto.Marshal(instanceInfo)
+	if err != nil {
+		return
+	}
+	_, err = client.Put(context.Background(), key, string(bytes), clientv3.WithLease(resp.ID))
+	if err != nil {
+		return
+	}
+	result = &RegisterResult{InstanceID: instanceInfo.InstanceID}
+	return
 }
 
-func (c *RegisterCli) Deregister(service *DeregisterArgv) error {
-	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
+func (c *RegisterCli) Deregister(service *DeregisterArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "Deregister"}, err)
+	}()
+	client, err := c.ConnManager.GetServiceConn(connMgr.InstancesEtcd, "")
 	if err != nil {
-		return err
+		return
 	}
-	defer conn.Close()
-	rpcCli := pb.NewRegisterServiceClient(conn.Value())
-	request := pb.DeregisterRequest{
-		ServiceName: service.ServiceName,
-		Host:        service.Host,
-		Port:        service.Port,
-		InstanceID:  service.InstanceID,
-	}
-	_, err = rpcCli.Deregister(context.Background(), &request)
+	_, err = client.Revoke(context.Background(), clientv3.LeaseID(service.InstanceID))
 	if err != nil {
-		return err
+		return
 	}
-	util.Info("注销服务: ServiceName: %s, Host: %s, Port: %v, InstanceID: %s",
-		request.ServiceName, request.Host, request.Port, request.InstanceID)
-	return nil
+	return
 }
 
 type AddTargetRouterArgv struct {
-	SrcInstanceID  string
-	DstServiceName string
-	DstInstanceID  string
-	Timeout        int64
+	SrcInstanceName string
+	DstServiceName  string
+	DstInstanceName string
+	Timeout         *int64
 }
 
 type AddKVRouterArgv struct {
-	Key            string
+	Dic             map[string]string
+	DstServiceName  string
+	DstInstanceName []string
+	Timeout         *int64
+	NextRouterType  int32
+	Weight          int32
+}
+
+func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) (result *AddRouterResult, err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddTargetRouter"}, err)
+	}()
+	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd,
+		util.TargetRouterHashSlotKey(argv.DstServiceName, argv.SrcInstanceName))
+	if err != nil {
+		return
+	}
+	var timeout int64
+	if argv.Timeout != nil {
+		timeout = *argv.Timeout
+	} else {
+		timeout = c.Config.SDK.Register.DefaultRouterTTL
+	}
+	resp, err := client.Grant(context.Background(), timeout)
+	if err != nil {
+		return
+	}
+
+	info := &pb.TargetRouterInfo{
+		RouterID:        int64(resp.ID),
+		SrcInstanceName: argv.SrcInstanceName,
+		DstInstanceName: argv.DstInstanceName,
+	}
+
+	bytes, err := proto.Marshal(info)
+	if err != nil {
+		return
+	}
+	key := util.TargetRouterInfoKey(argv.DstServiceName, int64(resp.ID))
+	_, err = client.Put(context.Background(), key, string(bytes), clientv3.WithLease(resp.ID))
+	if err != nil {
+		return
+	}
+	result = &AddRouterResult{RouterID: int64(resp.ID)}
+	return
+}
+
+type AddRouterResult struct {
+	RouterID int64
+}
+
+func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResult, err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddKVRouter"}, err)
+	}()
+
+	var timeout int64
+	if argv.Timeout == nil {
+		timeout = c.Config.SDK.Register.DefaultRouterTTL
+	} else {
+		timeout = *argv.Timeout
+	}
+
+	if argv.NextRouterType != util.RandomRouterType &&
+		argv.NextRouterType != util.WeightedRouterType &&
+		argv.NextRouterType != util.ConsistentRouterType {
+		return nil, fmt.Errorf("不支持的NextRouterType:%v", argv.NextRouterType)
+	}
+
+	client, err := c.ConnManager.GetServiceConn(
+		connMgr.RoutersEtcd,
+		util.KvRouterHashSlotKey(argv.DstServiceName, argv.Dic))
+	if err != nil {
+		return
+	}
+
+	resp, err := client.Grant(context.Background(), timeout)
+	if err != nil {
+		return
+	}
+
+	info := &pb.KVRouterInfo{
+		RouterID:        int64(resp.ID),
+		Dic:             argv.Dic,
+		DstInstanceName: argv.DstInstanceName,
+		RouterType:      argv.NextRouterType,
+		Weight:          argv.Weight,
+	}
+	key := util.KVRouterInfoKey(argv.DstServiceName, int64(resp.ID))
+
+	bytes, err := proto.Marshal(info)
+	if err != nil {
+		return
+	}
+	_, err = client.Put(context.Background(), key, string(bytes), clientv3.WithLease(resp.ID))
+	if err != nil {
+		return
+	}
+	result = &AddRouterResult{RouterID: int64(resp.ID)}
+	return
+}
+
+type RemoveKVRouterArgv struct {
+	RouterID       int64
 	DstServiceName string
-	DstInstanceID  string
-	Timeout        int64
+	Dic            map[string]string
 }
 
-func (c *RegisterCli) AddTargetRouter(argv *AddTargetRouterArgv) error {
-	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
+func (c *RegisterCli) RemoveKVRouter(argv *RemoveKVRouterArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "removeKVRouter"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(
+		connMgr.RoutersEtcd,
+		util.KvRouterHashSlotKey(argv.DstServiceName, argv.Dic))
 	if err != nil {
-		return err
+		return
 	}
-	defer conn.Close()
-	rpcCli := pb.NewRegisterServiceClient(conn.Value())
-	_, err = rpcCli.AddRouter(context.Background(), &pb.AddRouterRequest{
-		RouterType:  util.TargetRouterType,
-		ServiceName: argv.DstServiceName,
-		TargetRouterInfo: &pb.TargetRouterInfo{
-			SrcInstanceID: argv.SrcInstanceID,
-			DstInstanceID: argv.DstInstanceID,
-			Timeout:       argv.Timeout,
-		}})
+
+	_, err = client.Revoke(context.Background(), clientv3.LeaseID(argv.RouterID))
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+	return
 }
 
-func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) error {
-	conn, err := c.ConnManager.GetServiceConn(connMgr.Register)
+type RemoveTargetRouterArgv struct {
+	RouterID    int64
+	DstService  string
+	SrcInstance string
+}
+
+func (c *RegisterCli) RemoveTargetRouter(argv *RemoveTargetRouterArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "removeKVRouter"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(
+		connMgr.RoutersEtcd,
+		util.TargetRouterHashSlotKey(argv.DstService, argv.SrcInstance))
 	if err != nil {
-		return err
+		return
 	}
-	defer conn.Close()
-	rpcCli := pb.NewRegisterServiceClient(conn.Value())
-	_, err = rpcCli.AddRouter(context.Background(), &pb.AddRouterRequest{
-		RouterType:  util.KVRouterType,
-		ServiceName: argv.DstServiceName,
-		KvRouterInfo: &pb.KVRouterInfo{
-			Key:           argv.Key,
-			DstInstanceID: argv.DstInstanceID,
-			Timeout:       argv.Timeout,
-		}})
+	_, err = client.Revoke(context.Background(), clientv3.LeaseID(argv.RouterID))
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+	return
+}
+
+type AddTableArgv struct {
+	ServiceName string
+	Tags        []string
+}
+
+type RemoveTableArgv struct {
+	TableID     int64
+	ServiceName string
+}
+
+func (c *RegisterCli) AddTable(argv *AddTableArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "AddTable"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd, argv.ServiceName)
+	if err != nil {
+		return
+	}
+
+	info := &pb.RouterTableInfo{
+		ServiceName: argv.ServiceName,
+		Tags:        argv.Tags,
+	}
+	key := util.RouterTableKey(argv.ServiceName) // int64(resp.ID))
+
+	bytes, err := proto.Marshal(info)
+	if err != nil {
+		return
+	}
+	_, err = client.Put(context.Background(), key, string(bytes)) //, clientv3.WithLease(resp.ID))
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (c *RegisterCli) RemoveTable(argv *RemoveTableArgv) (err error) {
+	begin := time.Now()
+	defer func() {
+		c.Metrics.MetricsUpload(begin, prometheus.Labels{"Method": "RemoveTable"}, err)
+	}()
+
+	client, err := c.ConnManager.GetServiceConn(connMgr.RoutersEtcd, argv.ServiceName)
+	if err != nil {
+		return
+	}
+	_, err = client.Revoke(context.Background(), clientv3.LeaseID(argv.TableID))
+	if err != nil {
+		return
+	}
+	return
 }
 
 // RegisterAPI 功能：
@@ -152,8 +326,23 @@ func (c *RegisterCli) AddKVRouter(argv *AddKVRouterArgv) error {
 type RegisterAPI interface {
 	Register(service *RegisterArgv) (*RegisterResult, error)
 	Deregister(service *DeregisterArgv) error
-	AddTargetRouter(*AddTargetRouterArgv) error
-	AddKVRouter(argv *AddKVRouterArgv) error
+	AddTargetRouter(*AddTargetRouterArgv) (result *AddRouterResult, err error)
+	AddKVRouter(argv *AddKVRouterArgv) (result *AddRouterResult, err error)
+	RemoveKVRouter(argv *RemoveKVRouterArgv) error
+	RemoveTargetRouter(argv *RemoveTargetRouterArgv) error
+	AddTable(argv *AddTableArgv) error
+	RemoveTable(argv *RemoveTableArgv) error
+}
+
+func NewRegisterAPIStandalone(
+	config *config.Config,
+	conn connMgr.ConnManager,
+	mt *metrics.MetricsManager,
+) RegisterAPI {
+	ctx := NewAPIContextStandalone(config, conn, mt)
+	return &RegisterCli{
+		APIContext: ctx,
+	}
 }
 
 func NewRegisterAPI() (RegisterAPI, error) {
@@ -161,5 +350,5 @@ func NewRegisterAPI() (RegisterAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &RegisterCli{*ctx}, nil
+	return &RegisterCli{ctx}, nil
 }

@@ -25,10 +25,11 @@ type InstanceInfo struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	InstanceID string `protobuf:"bytes,1,opt,name=InstanceID,proto3" json:"InstanceID,omitempty"`
-	Host       string `protobuf:"bytes,2,opt,name=Host,proto3" json:"Host,omitempty"`
-	Port       int32  `protobuf:"varint,3,opt,name=Port,proto3" json:"Port,omitempty"`
-	Weight     int32  `protobuf:"varint,4,opt,name=Weight,proto3" json:"Weight,omitempty"`
+	InstanceID int64  `protobuf:"varint,1,opt,name=InstanceID,proto3" json:"InstanceID,omitempty"`
+	Name       string `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
+	Host       string `protobuf:"bytes,3,opt,name=Host,proto3" json:"Host,omitempty"`
+	Port       int32  `protobuf:"varint,4,opt,name=Port,proto3" json:"Port,omitempty"`
+	Weight     int32  `protobuf:"varint,5,opt,name=Weight,proto3" json:"Weight,omitempty"`
 }
 
 func (x *InstanceInfo) Reset() {
@@ -63,9 +64,16 @@ func (*InstanceInfo) Descriptor() ([]byte, []int) {
 	return file_miniRouter_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *InstanceInfo) GetInstanceID() string {
+func (x *InstanceInfo) GetInstanceID() int64 {
 	if x != nil {
 		return x.InstanceID
+	}
+	return 0
+}
+
+func (x *InstanceInfo) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
@@ -91,328 +99,20 @@ func (x *InstanceInfo) GetWeight() int32 {
 	return 0
 }
 
-type ServiceInfo struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName string          `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	Revision    int64           `protobuf:"varint,2,opt,name=Revision,proto3" json:"Revision,omitempty"`
-	Instances   []*InstanceInfo `protobuf:"bytes,3,rep,name=Instances,proto3" json:"Instances,omitempty"`
-}
-
-func (x *ServiceInfo) Reset() {
-	*x = ServiceInfo{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *ServiceInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ServiceInfo) ProtoMessage() {}
-
-func (x *ServiceInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ServiceInfo.ProtoReflect.Descriptor instead.
-func (*ServiceInfo) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *ServiceInfo) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *ServiceInfo) GetRevision() int64 {
-	if x != nil {
-		return x.Revision
-	}
-	return 0
-}
-
-func (x *ServiceInfo) GetInstances() []*InstanceInfo {
-	if x != nil {
-		return x.Instances
-	}
-	return nil
-}
-
-type RegisterRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName string `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	Host        string `protobuf:"bytes,2,opt,name=Host,proto3" json:"Host,omitempty"`
-	Port        int32  `protobuf:"varint,3,opt,name=Port,proto3" json:"Port,omitempty"`
-	Weight      int32  `protobuf:"varint,4,opt,name=Weight,proto3" json:"Weight,omitempty"` // 权重
-	TTL         int64  `protobuf:"varint,5,opt,name=TTL,proto3" json:"TTL,omitempty"`       //上报时间间隔
-	// 可选，如果不设置那么服务器将其设置为IP:Port
-	InstanceID *string `protobuf:"bytes,6,opt,name=InstanceID,proto3,oneof" json:"InstanceID,omitempty"`
-}
-
-func (x *RegisterRequest) Reset() {
-	*x = RegisterRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *RegisterRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegisterRequest) ProtoMessage() {}
-
-func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
-func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *RegisterRequest) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *RegisterRequest) GetHost() string {
-	if x != nil {
-		return x.Host
-	}
-	return ""
-}
-
-func (x *RegisterRequest) GetPort() int32 {
-	if x != nil {
-		return x.Port
-	}
-	return 0
-}
-
-func (x *RegisterRequest) GetWeight() int32 {
-	if x != nil {
-		return x.Weight
-	}
-	return 0
-}
-
-func (x *RegisterRequest) GetTTL() int64 {
-	if x != nil {
-		return x.TTL
-	}
-	return 0
-}
-
-func (x *RegisterRequest) GetInstanceID() string {
-	if x != nil && x.InstanceID != nil {
-		return *x.InstanceID
-	}
-	return ""
-}
-
-type RegisterReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	InstanceID string `protobuf:"bytes,1,opt,name=InstanceID,proto3" json:"InstanceID,omitempty"`
-}
-
-func (x *RegisterReply) Reset() {
-	*x = RegisterReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[3]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *RegisterReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegisterReply) ProtoMessage() {}
-
-func (x *RegisterReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[3]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegisterReply.ProtoReflect.Descriptor instead.
-func (*RegisterReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *RegisterReply) GetInstanceID() string {
-	if x != nil {
-		return x.InstanceID
-	}
-	return ""
-}
-
-type DeregisterRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName string `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	InstanceID  string `protobuf:"bytes,2,opt,name=InstanceID,proto3" json:"InstanceID,omitempty"`
-	Host        string `protobuf:"bytes,3,opt,name=Host,proto3" json:"Host,omitempty"`
-	Port        int32  `protobuf:"varint,4,opt,name=Port,proto3" json:"Port,omitempty"`
-}
-
-func (x *DeregisterRequest) Reset() {
-	*x = DeregisterRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[4]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *DeregisterRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeregisterRequest) ProtoMessage() {}
-
-func (x *DeregisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[4]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeregisterRequest.ProtoReflect.Descriptor instead.
-func (*DeregisterRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *DeregisterRequest) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *DeregisterRequest) GetInstanceID() string {
-	if x != nil {
-		return x.InstanceID
-	}
-	return ""
-}
-
-func (x *DeregisterRequest) GetHost() string {
-	if x != nil {
-		return x.Host
-	}
-	return ""
-}
-
-func (x *DeregisterRequest) GetPort() int32 {
-	if x != nil {
-		return x.Port
-	}
-	return 0
-}
-
-type DeregisterReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *DeregisterReply) Reset() {
-	*x = DeregisterReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[5]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *DeregisterReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeregisterReply) ProtoMessage() {}
-
-func (x *DeregisterReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[5]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeregisterReply.ProtoReflect.Descriptor instead.
-func (*DeregisterReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{5}
-}
-
 type TargetRouterInfo struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	SrcInstanceID string `protobuf:"bytes,1,opt,name=SrcInstanceID,proto3" json:"SrcInstanceID,omitempty"`
-	DstInstanceID string `protobuf:"bytes,2,opt,name=DstInstanceID,proto3" json:"DstInstanceID,omitempty"`
-	Timeout       int64  `protobuf:"varint,3,opt,name=Timeout,proto3" json:"Timeout,omitempty"`
-	CreateTime    int64  `protobuf:"varint,4,opt,name=CreateTime,proto3" json:"CreateTime,omitempty"`
+	RouterID        int64  `protobuf:"varint,1,opt,name=RouterID,proto3" json:"RouterID,omitempty"`
+	SrcInstanceName string `protobuf:"bytes,2,opt,name=SrcInstanceName,proto3" json:"SrcInstanceName,omitempty"`
+	DstInstanceName string `protobuf:"bytes,3,opt,name=DstInstanceName,proto3" json:"DstInstanceName,omitempty"`
 }
 
 func (x *TargetRouterInfo) Reset() {
 	*x = TargetRouterInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[6]
+		mi := &file_miniRouter_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -425,7 +125,7 @@ func (x *TargetRouterInfo) String() string {
 func (*TargetRouterInfo) ProtoMessage() {}
 
 func (x *TargetRouterInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[6]
+	mi := &file_miniRouter_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -438,35 +138,28 @@ func (x *TargetRouterInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TargetRouterInfo.ProtoReflect.Descriptor instead.
 func (*TargetRouterInfo) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{6}
+	return file_miniRouter_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *TargetRouterInfo) GetSrcInstanceID() string {
+func (x *TargetRouterInfo) GetRouterID() int64 {
 	if x != nil {
-		return x.SrcInstanceID
-	}
-	return ""
-}
-
-func (x *TargetRouterInfo) GetDstInstanceID() string {
-	if x != nil {
-		return x.DstInstanceID
-	}
-	return ""
-}
-
-func (x *TargetRouterInfo) GetTimeout() int64 {
-	if x != nil {
-		return x.Timeout
+		return x.RouterID
 	}
 	return 0
 }
 
-func (x *TargetRouterInfo) GetCreateTime() int64 {
+func (x *TargetRouterInfo) GetSrcInstanceName() string {
 	if x != nil {
-		return x.CreateTime
+		return x.SrcInstanceName
 	}
-	return 0
+	return ""
+}
+
+func (x *TargetRouterInfo) GetDstInstanceName() string {
+	if x != nil {
+		return x.DstInstanceName
+	}
+	return ""
 }
 
 type KVRouterInfo struct {
@@ -474,16 +167,18 @@ type KVRouterInfo struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Key           string `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
-	DstInstanceID string `protobuf:"bytes,2,opt,name=DstInstanceID,proto3" json:"DstInstanceID,omitempty"`
-	Timeout       int64  `protobuf:"varint,3,opt,name=Timeout,proto3" json:"Timeout,omitempty"`
-	CreateTime    int64  `protobuf:"varint,4,opt,name=CreateTime,proto3" json:"CreateTime,omitempty"`
+	RouterID        int64             `protobuf:"varint,1,opt,name=RouterID,proto3" json:"RouterID,omitempty"`
+	Weight          int32             `protobuf:"varint,2,opt,name=weight,proto3" json:"weight,omitempty"`
+	Dic             map[string]string `protobuf:"bytes,3,rep,name=Dic,proto3" json:"Dic,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	DstInstanceName []string          `protobuf:"bytes,4,rep,name=DstInstanceName,proto3" json:"DstInstanceName,omitempty"`
+	// 如果有多个，那么允许指定更进一步的筛选方式
+	RouterType int32 `protobuf:"varint,5,opt,name=RouterType,proto3" json:"RouterType,omitempty"`
 }
 
 func (x *KVRouterInfo) Reset() {
 	*x = KVRouterInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[7]
+		mi := &file_miniRouter_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -496,7 +191,7 @@ func (x *KVRouterInfo) String() string {
 func (*KVRouterInfo) ProtoMessage() {}
 
 func (x *KVRouterInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[7]
+	mi := &file_miniRouter_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -509,916 +204,245 @@ func (x *KVRouterInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KVRouterInfo.ProtoReflect.Descriptor instead.
 func (*KVRouterInfo) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{7}
+	return file_miniRouter_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *KVRouterInfo) GetKey() string {
+func (x *KVRouterInfo) GetRouterID() int64 {
 	if x != nil {
-		return x.Key
-	}
-	return ""
-}
-
-func (x *KVRouterInfo) GetDstInstanceID() string {
-	if x != nil {
-		return x.DstInstanceID
-	}
-	return ""
-}
-
-func (x *KVRouterInfo) GetTimeout() int64 {
-	if x != nil {
-		return x.Timeout
+		return x.RouterID
 	}
 	return 0
 }
 
-func (x *KVRouterInfo) GetCreateTime() int64 {
+func (x *KVRouterInfo) GetWeight() int32 {
 	if x != nil {
-		return x.CreateTime
+		return x.Weight
 	}
 	return 0
 }
 
-type ServiceRouterInfo struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName   string              `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	Revision      int64               `protobuf:"varint,2,opt,name=Revision,proto3" json:"Revision,omitempty"`
-	TargetRouters []*TargetRouterInfo `protobuf:"bytes,3,rep,name=TargetRouters,proto3" json:"TargetRouters,omitempty"`
-	KVRouters     []*KVRouterInfo     `protobuf:"bytes,4,rep,name=KVRouters,proto3" json:"KVRouters,omitempty"`
-}
-
-func (x *ServiceRouterInfo) Reset() {
-	*x = ServiceRouterInfo{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[8]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *ServiceRouterInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ServiceRouterInfo) ProtoMessage() {}
-
-func (x *ServiceRouterInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[8]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ServiceRouterInfo.ProtoReflect.Descriptor instead.
-func (*ServiceRouterInfo) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *ServiceRouterInfo) GetServiceName() string {
+func (x *KVRouterInfo) GetDic() map[string]string {
 	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *ServiceRouterInfo) GetRevision() int64 {
-	if x != nil {
-		return x.Revision
-	}
-	return 0
-}
-
-func (x *ServiceRouterInfo) GetTargetRouters() []*TargetRouterInfo {
-	if x != nil {
-		return x.TargetRouters
+		return x.Dic
 	}
 	return nil
 }
 
-func (x *ServiceRouterInfo) GetKVRouters() []*KVRouterInfo {
+func (x *KVRouterInfo) GetDstInstanceName() []string {
 	if x != nil {
-		return x.KVRouters
+		return x.DstInstanceName
 	}
 	return nil
 }
 
-type AddRouterRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	RouterType       int32             `protobuf:"varint,1,opt,name=RouterType,proto3" json:"RouterType,omitempty"`
-	ServiceName      string            `protobuf:"bytes,2,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	KvRouterInfo     *KVRouterInfo     `protobuf:"bytes,3,opt,name=KvRouterInfo,proto3,oneof" json:"KvRouterInfo,omitempty"`
-	TargetRouterInfo *TargetRouterInfo `protobuf:"bytes,4,opt,name=targetRouterInfo,proto3,oneof" json:"targetRouterInfo,omitempty"`
-}
-
-func (x *AddRouterRequest) Reset() {
-	*x = AddRouterRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[9]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *AddRouterRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AddRouterRequest) ProtoMessage() {}
-
-func (x *AddRouterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[9]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AddRouterRequest.ProtoReflect.Descriptor instead.
-func (*AddRouterRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *AddRouterRequest) GetRouterType() int32 {
+func (x *KVRouterInfo) GetRouterType() int32 {
 	if x != nil {
 		return x.RouterType
 	}
 	return 0
 }
 
-func (x *AddRouterRequest) GetServiceName() string {
+type ClusterInfo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Name    string   `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	Address []string `protobuf:"bytes,2,rep,name=Address,proto3" json:"Address,omitempty"`
+}
+
+func (x *ClusterInfo) Reset() {
+	*x = ClusterInfo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_miniRouter_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ClusterInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClusterInfo) ProtoMessage() {}
+
+func (x *ClusterInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_miniRouter_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClusterInfo.ProtoReflect.Descriptor instead.
+func (*ClusterInfo) Descriptor() ([]byte, []int) {
+	return file_miniRouter_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ClusterInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ClusterInfo) GetAddress() []string {
+	if x != nil {
+		return x.Address
+	}
+	return nil
+}
+
+type InitArgv struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *InitArgv) Reset() {
+	*x = InitArgv{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_miniRouter_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *InitArgv) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitArgv) ProtoMessage() {}
+
+func (x *InitArgv) ProtoReflect() protoreflect.Message {
+	mi := &file_miniRouter_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitArgv.ProtoReflect.Descriptor instead.
+func (*InitArgv) Descriptor() ([]byte, []int) {
+	return file_miniRouter_proto_rawDescGZIP(), []int{4}
+}
+
+// 路由表没有时间限制
+// 说到底一个服务一个也不会很多，一直不断的用heartbeat续也不合理
+type RouterTableInfo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ServiceName string   `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
+	Tags        []string `protobuf:"bytes,2,rep,name=Tags,proto3" json:"Tags,omitempty"`
+}
+
+func (x *RouterTableInfo) Reset() {
+	*x = RouterTableInfo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_miniRouter_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RouterTableInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RouterTableInfo) ProtoMessage() {}
+
+func (x *RouterTableInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_miniRouter_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RouterTableInfo.ProtoReflect.Descriptor instead.
+func (*RouterTableInfo) Descriptor() ([]byte, []int) {
+	return file_miniRouter_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RouterTableInfo) GetServiceName() string {
 	if x != nil {
 		return x.ServiceName
 	}
 	return ""
 }
 
-func (x *AddRouterRequest) GetKvRouterInfo() *KVRouterInfo {
+func (x *RouterTableInfo) GetTags() []string {
 	if x != nil {
-		return x.KvRouterInfo
+		return x.Tags
 	}
 	return nil
 }
 
-func (x *AddRouterRequest) GetTargetRouterInfo() *TargetRouterInfo {
+type InitResult struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Instances []*ClusterInfo `protobuf:"bytes,1,rep,name=Instances,proto3" json:"Instances,omitempty"`
+	Routers   []*ClusterInfo `protobuf:"bytes,2,rep,name=Routers,proto3" json:"Routers,omitempty"`
+}
+
+func (x *InitResult) Reset() {
+	*x = InitResult{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_miniRouter_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *InitResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitResult) ProtoMessage() {}
+
+func (x *InitResult) ProtoReflect() protoreflect.Message {
+	mi := &file_miniRouter_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitResult.ProtoReflect.Descriptor instead.
+func (*InitResult) Descriptor() ([]byte, []int) {
+	return file_miniRouter_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *InitResult) GetInstances() []*ClusterInfo {
 	if x != nil {
-		return x.TargetRouterInfo
+		return x.Instances
 	}
 	return nil
 }
 
-type AddRouterReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *AddRouterReply) Reset() {
-	*x = AddRouterReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[10]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *AddRouterReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AddRouterReply) ProtoMessage() {}
-
-func (x *AddRouterReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[10]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AddRouterReply.ProtoReflect.Descriptor instead.
-func (*AddRouterReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{10}
-}
-
-type RemoveRouterRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	RouterType       int32             `protobuf:"varint,1,opt,name=RouterType,proto3" json:"RouterType,omitempty"`
-	ServiceName      string            `protobuf:"bytes,2,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	KvRouterInfo     *KVRouterInfo     `protobuf:"bytes,3,opt,name=KvRouterInfo,proto3,oneof" json:"KvRouterInfo,omitempty"`
-	TargetRouterInfo *TargetRouterInfo `protobuf:"bytes,4,opt,name=targetRouterInfo,proto3,oneof" json:"targetRouterInfo,omitempty"`
-}
-
-func (x *RemoveRouterRequest) Reset() {
-	*x = RemoveRouterRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[11]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *RemoveRouterRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RemoveRouterRequest) ProtoMessage() {}
-
-func (x *RemoveRouterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[11]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RemoveRouterRequest.ProtoReflect.Descriptor instead.
-func (*RemoveRouterRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *RemoveRouterRequest) GetRouterType() int32 {
+func (x *InitResult) GetRouters() []*ClusterInfo {
 	if x != nil {
-		return x.RouterType
-	}
-	return 0
-}
-
-func (x *RemoveRouterRequest) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *RemoveRouterRequest) GetKvRouterInfo() *KVRouterInfo {
-	if x != nil {
-		return x.KvRouterInfo
-	}
-	return nil
-}
-
-func (x *RemoveRouterRequest) GetTargetRouterInfo() *TargetRouterInfo {
-	if x != nil {
-		return x.TargetRouterInfo
-	}
-	return nil
-}
-
-type RemoveRouterReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *RemoveRouterReply) Reset() {
-	*x = RemoveRouterReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[12]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *RemoveRouterReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RemoveRouterReply) ProtoMessage() {}
-
-func (x *RemoveRouterReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[12]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RemoveRouterReply.ProtoReflect.Descriptor instead.
-func (*RemoveRouterReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{12}
-}
-
-type GetInstancesRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName string `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	Revision    int64  `protobuf:"varint,2,opt,name=Revision,proto3" json:"Revision,omitempty"`
-}
-
-func (x *GetInstancesRequest) Reset() {
-	*x = GetInstancesRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[13]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetInstancesRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetInstancesRequest) ProtoMessage() {}
-
-func (x *GetInstancesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[13]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetInstancesRequest.ProtoReflect.Descriptor instead.
-func (*GetInstancesRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *GetInstancesRequest) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *GetInstancesRequest) GetRevision() int64 {
-	if x != nil {
-		return x.Revision
-	}
-	return 0
-}
-
-type GetInstancesReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Service *ServiceInfo `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`
-}
-
-func (x *GetInstancesReply) Reset() {
-	*x = GetInstancesReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[14]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetInstancesReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetInstancesReply) ProtoMessage() {}
-
-func (x *GetInstancesReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[14]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetInstancesReply.ProtoReflect.Descriptor instead.
-func (*GetInstancesReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *GetInstancesReply) GetService() *ServiceInfo {
-	if x != nil {
-		return x.Service
-	}
-	return nil
-}
-
-type GetServicesRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *GetServicesRequest) Reset() {
-	*x = GetServicesRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[15]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetServicesRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetServicesRequest) ProtoMessage() {}
-
-func (x *GetServicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[15]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetServicesRequest.ProtoReflect.Descriptor instead.
-func (*GetServicesRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{15}
-}
-
-type GetServicesReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName []string `protobuf:"bytes,1,rep,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-}
-
-func (x *GetServicesReply) Reset() {
-	*x = GetServicesReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[16]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetServicesReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetServicesReply) ProtoMessage() {}
-
-func (x *GetServicesReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[16]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetServicesReply.ProtoReflect.Descriptor instead.
-func (*GetServicesReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *GetServicesReply) GetServiceName() []string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return nil
-}
-
-type GetRoutersRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName string `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	Revision    int64  `protobuf:"varint,2,opt,name=Revision,proto3" json:"Revision,omitempty"`
-}
-
-func (x *GetRoutersRequest) Reset() {
-	*x = GetRoutersRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[17]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetRoutersRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetRoutersRequest) ProtoMessage() {}
-
-func (x *GetRoutersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[17]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetRoutersRequest.ProtoReflect.Descriptor instead.
-func (*GetRoutersRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *GetRoutersRequest) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *GetRoutersRequest) GetRevision() int64 {
-	if x != nil {
-		return x.Revision
-	}
-	return 0
-}
-
-type GetRoutersReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Router *ServiceRouterInfo `protobuf:"bytes,1,opt,name=router,proto3" json:"router,omitempty"`
-}
-
-func (x *GetRoutersReply) Reset() {
-	*x = GetRoutersReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[18]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetRoutersReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetRoutersReply) ProtoMessage() {}
-
-func (x *GetRoutersReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[18]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetRoutersReply.ProtoReflect.Descriptor instead.
-func (*GetRoutersReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *GetRoutersReply) GetRouter() *ServiceRouterInfo {
-	if x != nil {
-		return x.Router
-	}
-	return nil
-}
-
-type HeartBeatRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName string `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	InstanceID  string `protobuf:"bytes,2,opt,name=InstanceID,proto3" json:"InstanceID,omitempty"`
-}
-
-func (x *HeartBeatRequest) Reset() {
-	*x = HeartBeatRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[19]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *HeartBeatRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HeartBeatRequest) ProtoMessage() {}
-
-func (x *HeartBeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[19]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HeartBeatRequest.ProtoReflect.Descriptor instead.
-func (*HeartBeatRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{19}
-}
-
-func (x *HeartBeatRequest) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *HeartBeatRequest) GetInstanceID() string {
-	if x != nil {
-		return x.InstanceID
-	}
-	return ""
-}
-
-type HeartBeatReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-}
-
-func (x *HeartBeatReply) Reset() {
-	*x = HeartBeatReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[20]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *HeartBeatReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HeartBeatReply) ProtoMessage() {}
-
-func (x *HeartBeatReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[20]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HeartBeatReply.ProtoReflect.Descriptor instead.
-func (*HeartBeatReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{20}
-}
-
-type InstanceHealthInfo struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	InstanceID    string `protobuf:"bytes,1,opt,name=InstanceID,proto3" json:"InstanceID,omitempty"`
-	TTL           int64  `protobuf:"varint,2,opt,name=TTL,proto3" json:"TTL,omitempty"`
-	LastHeartBeat int64  `protobuf:"varint,3,opt,name=LastHeartBeat,proto3" json:"LastHeartBeat,omitempty"`
-}
-
-func (x *InstanceHealthInfo) Reset() {
-	*x = InstanceHealthInfo{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[21]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *InstanceHealthInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*InstanceHealthInfo) ProtoMessage() {}
-
-func (x *InstanceHealthInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[21]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use InstanceHealthInfo.ProtoReflect.Descriptor instead.
-func (*InstanceHealthInfo) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{21}
-}
-
-func (x *InstanceHealthInfo) GetInstanceID() string {
-	if x != nil {
-		return x.InstanceID
-	}
-	return ""
-}
-
-func (x *InstanceHealthInfo) GetTTL() int64 {
-	if x != nil {
-		return x.TTL
-	}
-	return 0
-}
-
-func (x *InstanceHealthInfo) GetLastHeartBeat() int64 {
-	if x != nil {
-		return x.LastHeartBeat
-	}
-	return 0
-}
-
-type ServiceHealthInfo struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName        string                `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-	InstanceHealthInfo []*InstanceHealthInfo `protobuf:"bytes,2,rep,name=InstanceHealthInfo,proto3" json:"InstanceHealthInfo,omitempty"`
-}
-
-func (x *ServiceHealthInfo) Reset() {
-	*x = ServiceHealthInfo{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[22]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *ServiceHealthInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ServiceHealthInfo) ProtoMessage() {}
-
-func (x *ServiceHealthInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[22]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ServiceHealthInfo.ProtoReflect.Descriptor instead.
-func (*ServiceHealthInfo) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{22}
-}
-
-func (x *ServiceHealthInfo) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-func (x *ServiceHealthInfo) GetInstanceHealthInfo() []*InstanceHealthInfo {
-	if x != nil {
-		return x.InstanceHealthInfo
-	}
-	return nil
-}
-
-type GetHealthInfoRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ServiceName string `protobuf:"bytes,1,opt,name=ServiceName,proto3" json:"ServiceName,omitempty"`
-}
-
-func (x *GetHealthInfoRequest) Reset() {
-	*x = GetHealthInfoRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[23]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetHealthInfoRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetHealthInfoRequest) ProtoMessage() {}
-
-func (x *GetHealthInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[23]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetHealthInfoRequest.ProtoReflect.Descriptor instead.
-func (*GetHealthInfoRequest) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{23}
-}
-
-func (x *GetHealthInfoRequest) GetServiceName() string {
-	if x != nil {
-		return x.ServiceName
-	}
-	return ""
-}
-
-type GetHealthInfoReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	HealthInfo *ServiceHealthInfo `protobuf:"bytes,1,opt,name=HealthInfo,proto3" json:"HealthInfo,omitempty"`
-}
-
-func (x *GetHealthInfoReply) Reset() {
-	*x = GetHealthInfoReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_miniRouter_proto_msgTypes[24]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *GetHealthInfoReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetHealthInfoReply) ProtoMessage() {}
-
-func (x *GetHealthInfoReply) ProtoReflect() protoreflect.Message {
-	mi := &file_miniRouter_proto_msgTypes[24]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetHealthInfoReply.ProtoReflect.Descriptor instead.
-func (*GetHealthInfoReply) Descriptor() ([]byte, []int) {
-	return file_miniRouter_proto_rawDescGZIP(), []int{24}
-}
-
-func (x *GetHealthInfoReply) GetHealthInfo() *ServiceHealthInfo {
-	if x != nil {
-		return x.HealthInfo
+		return x.Routers
 	}
 	return nil
 }
@@ -1427,197 +451,58 @@ var File_miniRouter_proto protoreflect.FileDescriptor
 
 var file_miniRouter_proto_rawDesc = []byte{
 	0x0a, 0x10, 0x6d, 0x69, 0x6e, 0x69, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x22, 0x6e, 0x0a, 0x0c, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x6e,
-	0x66, 0x6f, 0x12, 0x1e, 0x0a, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65,
-	0x49, 0x44, 0x12, 0x12, 0x0a, 0x04, 0x48, 0x6f, 0x73, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x04, 0x48, 0x6f, 0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x50, 0x6f, 0x72, 0x74, 0x18, 0x03,
-	0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x50, 0x6f, 0x72, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x57, 0x65,
-	0x69, 0x67, 0x68, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x57, 0x65, 0x69, 0x67,
-	0x68, 0x74, 0x22, 0x78, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x49, 0x6e, 0x66,
-	0x6f, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e,
-	0x61, 0x6d, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x08, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x12,
-	0x2b, 0x0a, 0x09, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x18, 0x03, 0x20, 0x03,
-	0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x6e, 0x66,
-	0x6f, 0x52, 0x09, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x22, 0xb9, 0x01, 0x0a,
-	0x0f, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
-	0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61,
-	0x6d, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x48, 0x6f, 0x73, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x04, 0x48, 0x6f, 0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x50, 0x6f, 0x72, 0x74, 0x18, 0x03,
-	0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x50, 0x6f, 0x72, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x57, 0x65,
-	0x69, 0x67, 0x68, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x57, 0x65, 0x69, 0x67,
-	0x68, 0x74, 0x12, 0x10, 0x0a, 0x03, 0x54, 0x54, 0x4c, 0x18, 0x05, 0x20, 0x01, 0x28, 0x03, 0x52,
-	0x03, 0x54, 0x54, 0x4c, 0x12, 0x23, 0x0a, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65,
-	0x49, 0x44, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x0a, 0x49, 0x6e, 0x73, 0x74,
-	0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x88, 0x01, 0x01, 0x42, 0x0d, 0x0a, 0x0b, 0x5f, 0x49, 0x6e,
-	0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x22, 0x2f, 0x0a, 0x0d, 0x52, 0x65, 0x67, 0x69,
-	0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x1e, 0x0a, 0x0a, 0x49, 0x6e, 0x73,
-	0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x49,
-	0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x22, 0x7d, 0x0a, 0x11, 0x44, 0x65, 0x72,
-	0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x20,
-	0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65,
-	0x12, 0x1e, 0x0a, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x18, 0x02,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44,
-	0x12, 0x12, 0x0a, 0x04, 0x48, 0x6f, 0x73, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
-	0x48, 0x6f, 0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x50, 0x6f, 0x72, 0x74, 0x18, 0x04, 0x20, 0x01,
-	0x28, 0x05, 0x52, 0x04, 0x50, 0x6f, 0x72, 0x74, 0x22, 0x11, 0x0a, 0x0f, 0x44, 0x65, 0x72, 0x65,
-	0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x98, 0x01, 0x0a, 0x10,
-	0x54, 0x61, 0x72, 0x67, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f,
-	0x12, 0x24, 0x0a, 0x0d, 0x53, 0x72, 0x63, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49,
-	0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x53, 0x72, 0x63, 0x49, 0x6e, 0x73, 0x74,
-	0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x12, 0x24, 0x0a, 0x0d, 0x44, 0x73, 0x74, 0x49, 0x6e, 0x73,
-	0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x44,
-	0x73, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x12, 0x18, 0x0a, 0x07,
-	0x54, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x54,
-	0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x12, 0x1e, 0x0a, 0x0a, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65,
-	0x54, 0x69, 0x6d, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x03, 0x52, 0x0a, 0x43, 0x72, 0x65, 0x61,
-	0x74, 0x65, 0x54, 0x69, 0x6d, 0x65, 0x22, 0x80, 0x01, 0x0a, 0x0c, 0x4b, 0x56, 0x52, 0x6f, 0x75,
-	0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x10, 0x0a, 0x03, 0x4b, 0x65, 0x79, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x4b, 0x65, 0x79, 0x12, 0x24, 0x0a, 0x0d, 0x44, 0x73, 0x74,
-	0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x0d, 0x44, 0x73, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x12,
-	0x18, 0x0a, 0x07, 0x54, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03,
-	0x52, 0x07, 0x54, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x12, 0x1e, 0x0a, 0x0a, 0x43, 0x72, 0x65,
-	0x61, 0x74, 0x65, 0x54, 0x69, 0x6d, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x03, 0x52, 0x0a, 0x43,
-	0x72, 0x65, 0x61, 0x74, 0x65, 0x54, 0x69, 0x6d, 0x65, 0x22, 0xb7, 0x01, 0x0a, 0x11, 0x53, 0x65,
-	0x72, 0x76, 0x69, 0x63, 0x65, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x12,
-	0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d,
-	0x65, 0x12, 0x1a, 0x0a, 0x08, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x03, 0x52, 0x08, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x37, 0x0a,
-	0x0d, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x73, 0x18, 0x03,
-	0x20, 0x03, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74, 0x52, 0x6f, 0x75,
-	0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x0d, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74, 0x52,
-	0x6f, 0x75, 0x74, 0x65, 0x72, 0x73, 0x12, 0x2b, 0x0a, 0x09, 0x4b, 0x56, 0x52, 0x6f, 0x75, 0x74,
-	0x65, 0x72, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x4b, 0x56, 0x52, 0x6f,
-	0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x09, 0x4b, 0x56, 0x52, 0x6f, 0x75, 0x74,
-	0x65, 0x72, 0x73, 0x22, 0xf6, 0x01, 0x0a, 0x10, 0x41, 0x64, 0x64, 0x52, 0x6f, 0x75, 0x74, 0x65,
-	0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1e, 0x0a, 0x0a, 0x52, 0x6f, 0x75, 0x74,
-	0x65, 0x72, 0x54, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x0a, 0x52, 0x6f,
-	0x75, 0x74, 0x65, 0x72, 0x54, 0x79, 0x70, 0x65, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76,
-	0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x53,
-	0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x36, 0x0a, 0x0c, 0x4b, 0x76,
-	0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b,
-	0x32, 0x0d, 0x2e, 0x4b, 0x56, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x48,
-	0x00, 0x52, 0x0c, 0x4b, 0x76, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x88,
-	0x01, 0x01, 0x12, 0x42, 0x0a, 0x10, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74,
-	0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x54,
-	0x61, 0x72, 0x67, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x48,
-	0x01, 0x52, 0x10, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49,
-	0x6e, 0x66, 0x6f, 0x88, 0x01, 0x01, 0x42, 0x0f, 0x0a, 0x0d, 0x5f, 0x4b, 0x76, 0x52, 0x6f, 0x75,
-	0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x42, 0x13, 0x0a, 0x11, 0x5f, 0x74, 0x61, 0x72, 0x67,
-	0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x22, 0x10, 0x0a, 0x0e,
-	0x41, 0x64, 0x64, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0xf9,
-	0x01, 0x0a, 0x13, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1e, 0x0a, 0x0a, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72,
-	0x54, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x0a, 0x52, 0x6f, 0x75, 0x74,
-	0x65, 0x72, 0x54, 0x79, 0x70, 0x65, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63,
-	0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x53, 0x65, 0x72,
-	0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x36, 0x0a, 0x0c, 0x4b, 0x76, 0x52, 0x6f,
-	0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d,
-	0x2e, 0x4b, 0x56, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x48, 0x00, 0x52,
-	0x0c, 0x4b, 0x76, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x88, 0x01, 0x01,
-	0x12, 0x42, 0x0a, 0x10, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72,
-	0x49, 0x6e, 0x66, 0x6f, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x54, 0x61, 0x72,
-	0x67, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x48, 0x01, 0x52,
-	0x10, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66,
-	0x6f, 0x88, 0x01, 0x01, 0x42, 0x0f, 0x0a, 0x0d, 0x5f, 0x4b, 0x76, 0x52, 0x6f, 0x75, 0x74, 0x65,
-	0x72, 0x49, 0x6e, 0x66, 0x6f, 0x42, 0x13, 0x0a, 0x11, 0x5f, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74,
-	0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x22, 0x13, 0x0a, 0x11, 0x52, 0x65,
-	0x6d, 0x6f, 0x76, 0x65, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22,
-	0x53, 0x0a, 0x13, 0x47, 0x65, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63,
-	0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x53, 0x65, 0x72,
-	0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x52, 0x65, 0x76, 0x69,
-	0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x08, 0x52, 0x65, 0x76, 0x69,
-	0x73, 0x69, 0x6f, 0x6e, 0x22, 0x3b, 0x0a, 0x11, 0x47, 0x65, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61,
-	0x6e, 0x63, 0x65, 0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x26, 0x0a, 0x07, 0x73, 0x65, 0x72,
-	0x76, 0x69, 0x63, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0c, 0x2e, 0x53, 0x65, 0x72,
-	0x76, 0x69, 0x63, 0x65, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x07, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63,
-	0x65, 0x22, 0x14, 0x0a, 0x12, 0x47, 0x65, 0x74, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x34, 0x0a, 0x10, 0x47, 0x65, 0x74, 0x53, 0x65,
-	0x72, 0x76, 0x69, 0x63, 0x65, 0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x20, 0x0a, 0x0b, 0x53,
-	0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09,
-	0x52, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x22, 0x51, 0x0a,
-	0x11, 0x47, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65,
-	0x73, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d,
-	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65,
-	0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x08, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e,
-	0x22, 0x3d, 0x0a, 0x0f, 0x47, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x73, 0x52, 0x65,
-	0x70, 0x6c, 0x79, 0x12, 0x2a, 0x0a, 0x06, 0x72, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x52, 0x6f, 0x75,
-	0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x06, 0x72, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x22,
-	0x54, 0x0a, 0x10, 0x48, 0x65, 0x61, 0x72, 0x74, 0x42, 0x65, 0x61, 0x74, 0x52, 0x65, 0x71, 0x75,
-	0x65, 0x73, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61,
-	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63,
-	0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1e, 0x0a, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63,
-	0x65, 0x49, 0x44, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61,
-	0x6e, 0x63, 0x65, 0x49, 0x44, 0x22, 0x10, 0x0a, 0x0e, 0x48, 0x65, 0x61, 0x72, 0x74, 0x42, 0x65,
-	0x61, 0x74, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x6c, 0x0a, 0x12, 0x49, 0x6e, 0x73, 0x74, 0x61,
-	0x6e, 0x63, 0x65, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x1e, 0x0a,
-	0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49, 0x44, 0x12, 0x10, 0x0a,
-	0x03, 0x54, 0x54, 0x4c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x03, 0x52, 0x03, 0x54, 0x54, 0x4c, 0x12,
-	0x24, 0x0a, 0x0d, 0x4c, 0x61, 0x73, 0x74, 0x48, 0x65, 0x61, 0x72, 0x74, 0x42, 0x65, 0x61, 0x74,
-	0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x0d, 0x4c, 0x61, 0x73, 0x74, 0x48, 0x65, 0x61, 0x72,
-	0x74, 0x42, 0x65, 0x61, 0x74, 0x22, 0x7a, 0x0a, 0x11, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65,
-	0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65,
-	0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x0b, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x43, 0x0a, 0x12,
-	0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e,
-	0x66, 0x6f, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x13, 0x2e, 0x49, 0x6e, 0x73, 0x74, 0x61,
-	0x6e, 0x63, 0x65, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x12, 0x49,
-	0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e, 0x66,
-	0x6f, 0x22, 0x38, 0x0a, 0x14, 0x47, 0x65, 0x74, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e,
-	0x66, 0x6f, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72,
+	0x74, 0x6f, 0x22, 0x82, 0x01, 0x0a, 0x0c, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49,
+	0x6e, 0x66, 0x6f, 0x12, 0x1e, 0x0a, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x49,
+	0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63,
+	0x65, 0x49, 0x44, 0x12, 0x12, 0x0a, 0x04, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x04, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x48, 0x6f, 0x73, 0x74, 0x18,
+	0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x48, 0x6f, 0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x50,
+	0x6f, 0x72, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x50, 0x6f, 0x72, 0x74, 0x12,
+	0x16, 0x0a, 0x06, 0x57, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x05, 0x52,
+	0x06, 0x57, 0x65, 0x69, 0x67, 0x68, 0x74, 0x22, 0x82, 0x01, 0x0a, 0x10, 0x54, 0x61, 0x72, 0x67,
+	0x65, 0x74, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x1a, 0x0a, 0x08,
+	0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x08,
+	0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x44, 0x12, 0x28, 0x0a, 0x0f, 0x53, 0x72, 0x63, 0x49,
+	0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x0f, 0x53, 0x72, 0x63, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x4e, 0x61,
+	0x6d, 0x65, 0x12, 0x28, 0x0a, 0x0f, 0x44, 0x73, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63,
+	0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x44, 0x73, 0x74,
+	0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x22, 0xee, 0x01, 0x0a,
+	0x0c, 0x4b, 0x56, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x1a, 0x0a,
+	0x08, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52,
+	0x08, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x44, 0x12, 0x16, 0x0a, 0x06, 0x77, 0x65, 0x69,
+	0x67, 0x68, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x77, 0x65, 0x69, 0x67, 0x68,
+	0x74, 0x12, 0x28, 0x0a, 0x03, 0x44, 0x69, 0x63, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x16,
+	0x2e, 0x4b, 0x56, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x2e, 0x44, 0x69,
+	0x63, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x03, 0x44, 0x69, 0x63, 0x12, 0x28, 0x0a, 0x0f, 0x44,
+	0x73, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x04,
+	0x20, 0x03, 0x28, 0x09, 0x52, 0x0f, 0x44, 0x73, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63,
+	0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x1e, 0x0a, 0x0a, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x54,
+	0x79, 0x70, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x05, 0x52, 0x0a, 0x52, 0x6f, 0x75, 0x74, 0x65,
+	0x72, 0x54, 0x79, 0x70, 0x65, 0x1a, 0x36, 0x0a, 0x08, 0x44, 0x69, 0x63, 0x45, 0x6e, 0x74, 0x72,
+	0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03,
+	0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x3b, 0x0a,
+	0x0b, 0x43, 0x6c, 0x75, 0x73, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x12, 0x0a, 0x04,
+	0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x4e, 0x61, 0x6d, 0x65,
+	0x12, 0x18, 0x0a, 0x07, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28,
+	0x09, 0x52, 0x07, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x22, 0x0a, 0x0a, 0x08, 0x49, 0x6e,
+	0x69, 0x74, 0x41, 0x72, 0x67, 0x76, 0x22, 0x47, 0x0a, 0x0f, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72,
+	0x54, 0x61, 0x62, 0x6c, 0x65, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x20, 0x0a, 0x0b, 0x53, 0x65, 0x72,
 	0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b,
-	0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x22, 0x48, 0x0a, 0x12, 0x47,
-	0x65, 0x74, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x70, 0x6c,
-	0x79, 0x12, 0x32, 0x0a, 0x0a, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e, 0x66, 0x6f, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x48,
-	0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x0a, 0x48, 0x65, 0x61, 0x6c, 0x74,
-	0x68, 0x49, 0x6e, 0x66, 0x6f, 0x32, 0xe6, 0x01, 0x0a, 0x0f, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74,
-	0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x2e, 0x0a, 0x08, 0x52, 0x65, 0x67,
-	0x69, 0x73, 0x74, 0x65, 0x72, 0x12, 0x10, 0x2e, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0e, 0x2e, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74,
-	0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00, 0x12, 0x34, 0x0a, 0x0a, 0x44, 0x65, 0x72,
-	0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x12, 0x12, 0x2e, 0x44, 0x65, 0x72, 0x65, 0x67, 0x69,
-	0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x10, 0x2e, 0x44, 0x65,
-	0x72, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00, 0x12,
-	0x31, 0x0a, 0x09, 0x41, 0x64, 0x64, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x12, 0x11, 0x2e, 0x41,
-	0x64, 0x64, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
-	0x0f, 0x2e, 0x41, 0x64, 0x64, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79,
-	0x22, 0x00, 0x12, 0x3a, 0x0a, 0x0c, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x6f, 0x75, 0x74,
-	0x65, 0x72, 0x12, 0x14, 0x2e, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x6f, 0x75, 0x74, 0x65,
-	0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x12, 0x2e, 0x52, 0x65, 0x6d, 0x6f, 0x76,
-	0x65, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00, 0x32, 0xbd,
-	0x01, 0x0a, 0x10, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x53, 0x65, 0x72, 0x76,
-	0x69, 0x63, 0x65, 0x12, 0x37, 0x0a, 0x0b, 0x47, 0x65, 0x74, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63,
-	0x65, 0x73, 0x12, 0x13, 0x2e, 0x47, 0x65, 0x74, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x11, 0x2e, 0x47, 0x65, 0x74, 0x53, 0x65, 0x72,
-	0x76, 0x69, 0x63, 0x65, 0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00, 0x12, 0x3a, 0x0a, 0x0c,
-	0x47, 0x65, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x12, 0x14, 0x2e, 0x47,
-	0x65, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65,
-	0x73, 0x74, 0x1a, 0x12, 0x2e, 0x47, 0x65, 0x74, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65,
-	0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00, 0x12, 0x34, 0x0a, 0x0a, 0x47, 0x65, 0x74, 0x52,
-	0x6f, 0x75, 0x74, 0x65, 0x72, 0x73, 0x12, 0x12, 0x2e, 0x47, 0x65, 0x74, 0x52, 0x6f, 0x75, 0x74,
-	0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x10, 0x2e, 0x47, 0x65, 0x74,
-	0x52, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x73, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x22, 0x00, 0x32, 0x81,
-	0x01, 0x0a, 0x0d, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65,
-	0x12, 0x31, 0x0a, 0x09, 0x48, 0x65, 0x61, 0x72, 0x74, 0x42, 0x65, 0x61, 0x74, 0x12, 0x11, 0x2e,
-	0x48, 0x65, 0x61, 0x72, 0x74, 0x42, 0x65, 0x61, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
-	0x1a, 0x0f, 0x2e, 0x48, 0x65, 0x61, 0x72, 0x74, 0x42, 0x65, 0x61, 0x74, 0x52, 0x65, 0x70, 0x6c,
-	0x79, 0x22, 0x00, 0x12, 0x3d, 0x0a, 0x0d, 0x47, 0x65, 0x74, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68,
-	0x49, 0x6e, 0x66, 0x6f, 0x12, 0x15, 0x2e, 0x47, 0x65, 0x74, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68,
-	0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x13, 0x2e, 0x47, 0x65,
-	0x74, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x70, 0x6c, 0x79,
-	0x22, 0x00, 0x42, 0x06, 0x5a, 0x04, 0x2e, 0x3b, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x54,
+	0x61, 0x67, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x04, 0x54, 0x61, 0x67, 0x73, 0x22,
+	0x60, 0x0a, 0x0a, 0x49, 0x6e, 0x69, 0x74, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x2a, 0x0a,
+	0x09, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x0c, 0x2e, 0x43, 0x6c, 0x75, 0x73, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x09,
+	0x49, 0x6e, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x73, 0x12, 0x26, 0x0a, 0x07, 0x52, 0x6f, 0x75,
+	0x74, 0x65, 0x72, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x0c, 0x2e, 0x43, 0x6c, 0x75,
+	0x73, 0x74, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x07, 0x52, 0x6f, 0x75, 0x74, 0x65, 0x72,
+	0x73, 0x32, 0x31, 0x0a, 0x0d, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x53, 0x65, 0x72, 0x76, 0x69,
+	0x63, 0x65, 0x12, 0x20, 0x0a, 0x04, 0x49, 0x6e, 0x69, 0x74, 0x12, 0x09, 0x2e, 0x49, 0x6e, 0x69,
+	0x74, 0x41, 0x72, 0x67, 0x76, 0x1a, 0x0b, 0x2e, 0x49, 0x6e, 0x69, 0x74, 0x52, 0x65, 0x73, 0x75,
+	0x6c, 0x74, 0x22, 0x00, 0x42, 0x06, 0x5a, 0x04, 0x2e, 0x3b, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1632,69 +517,28 @@ func file_miniRouter_proto_rawDescGZIP() []byte {
 	return file_miniRouter_proto_rawDescData
 }
 
-var file_miniRouter_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_miniRouter_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_miniRouter_proto_goTypes = []interface{}{
-	(*InstanceInfo)(nil),         // 0: InstanceInfo
-	(*ServiceInfo)(nil),          // 1: ServiceInfo
-	(*RegisterRequest)(nil),      // 2: RegisterRequest
-	(*RegisterReply)(nil),        // 3: RegisterReply
-	(*DeregisterRequest)(nil),    // 4: DeregisterRequest
-	(*DeregisterReply)(nil),      // 5: DeregisterReply
-	(*TargetRouterInfo)(nil),     // 6: TargetRouterInfo
-	(*KVRouterInfo)(nil),         // 7: KVRouterInfo
-	(*ServiceRouterInfo)(nil),    // 8: ServiceRouterInfo
-	(*AddRouterRequest)(nil),     // 9: AddRouterRequest
-	(*AddRouterReply)(nil),       // 10: AddRouterReply
-	(*RemoveRouterRequest)(nil),  // 11: RemoveRouterRequest
-	(*RemoveRouterReply)(nil),    // 12: RemoveRouterReply
-	(*GetInstancesRequest)(nil),  // 13: GetInstancesRequest
-	(*GetInstancesReply)(nil),    // 14: GetInstancesReply
-	(*GetServicesRequest)(nil),   // 15: GetServicesRequest
-	(*GetServicesReply)(nil),     // 16: GetServicesReply
-	(*GetRoutersRequest)(nil),    // 17: GetRoutersRequest
-	(*GetRoutersReply)(nil),      // 18: GetRoutersReply
-	(*HeartBeatRequest)(nil),     // 19: HeartBeatRequest
-	(*HeartBeatReply)(nil),       // 20: HeartBeatReply
-	(*InstanceHealthInfo)(nil),   // 21: InstanceHealthInfo
-	(*ServiceHealthInfo)(nil),    // 22: ServiceHealthInfo
-	(*GetHealthInfoRequest)(nil), // 23: GetHealthInfoRequest
-	(*GetHealthInfoReply)(nil),   // 24: GetHealthInfoReply
+	(*InstanceInfo)(nil),     // 0: InstanceInfo
+	(*TargetRouterInfo)(nil), // 1: TargetRouterInfo
+	(*KVRouterInfo)(nil),     // 2: KVRouterInfo
+	(*ClusterInfo)(nil),      // 3: ClusterInfo
+	(*InitArgv)(nil),         // 4: InitArgv
+	(*RouterTableInfo)(nil),  // 5: RouterTableInfo
+	(*InitResult)(nil),       // 6: InitResult
+	nil,                      // 7: KVRouterInfo.DicEntry
 }
 var file_miniRouter_proto_depIdxs = []int32{
-	0,  // 0: ServiceInfo.Instances:type_name -> InstanceInfo
-	6,  // 1: ServiceRouterInfo.TargetRouters:type_name -> TargetRouterInfo
-	7,  // 2: ServiceRouterInfo.KVRouters:type_name -> KVRouterInfo
-	7,  // 3: AddRouterRequest.KvRouterInfo:type_name -> KVRouterInfo
-	6,  // 4: AddRouterRequest.targetRouterInfo:type_name -> TargetRouterInfo
-	7,  // 5: RemoveRouterRequest.KvRouterInfo:type_name -> KVRouterInfo
-	6,  // 6: RemoveRouterRequest.targetRouterInfo:type_name -> TargetRouterInfo
-	1,  // 7: GetInstancesReply.service:type_name -> ServiceInfo
-	8,  // 8: GetRoutersReply.router:type_name -> ServiceRouterInfo
-	21, // 9: ServiceHealthInfo.InstanceHealthInfo:type_name -> InstanceHealthInfo
-	22, // 10: GetHealthInfoReply.HealthInfo:type_name -> ServiceHealthInfo
-	2,  // 11: RegisterService.Register:input_type -> RegisterRequest
-	4,  // 12: RegisterService.Deregister:input_type -> DeregisterRequest
-	9,  // 13: RegisterService.AddRouter:input_type -> AddRouterRequest
-	11, // 14: RegisterService.RemoveRouter:input_type -> RemoveRouterRequest
-	15, // 15: DiscoveryService.GetServices:input_type -> GetServicesRequest
-	13, // 16: DiscoveryService.GetInstances:input_type -> GetInstancesRequest
-	17, // 17: DiscoveryService.GetRouters:input_type -> GetRoutersRequest
-	19, // 18: HealthService.HeartBeat:input_type -> HeartBeatRequest
-	23, // 19: HealthService.GetHealthInfo:input_type -> GetHealthInfoRequest
-	3,  // 20: RegisterService.Register:output_type -> RegisterReply
-	5,  // 21: RegisterService.Deregister:output_type -> DeregisterReply
-	10, // 22: RegisterService.AddRouter:output_type -> AddRouterReply
-	12, // 23: RegisterService.RemoveRouter:output_type -> RemoveRouterReply
-	16, // 24: DiscoveryService.GetServices:output_type -> GetServicesReply
-	14, // 25: DiscoveryService.GetInstances:output_type -> GetInstancesReply
-	18, // 26: DiscoveryService.GetRouters:output_type -> GetRoutersReply
-	20, // 27: HealthService.HeartBeat:output_type -> HeartBeatReply
-	24, // 28: HealthService.GetHealthInfo:output_type -> GetHealthInfoReply
-	20, // [20:29] is the sub-list for method output_type
-	11, // [11:20] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	7, // 0: KVRouterInfo.Dic:type_name -> KVRouterInfo.DicEntry
+	3, // 1: InitResult.Instances:type_name -> ClusterInfo
+	3, // 2: InitResult.Routers:type_name -> ClusterInfo
+	4, // 3: ConfigService.Init:input_type -> InitArgv
+	6, // 4: ConfigService.Init:output_type -> InitResult
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_miniRouter_proto_init() }
@@ -1716,66 +560,6 @@ func file_miniRouter_proto_init() {
 			}
 		}
 		file_miniRouter_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ServiceInfo); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RegisterRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RegisterReply); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DeregisterRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DeregisterReply); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*TargetRouterInfo); i {
 			case 0:
 				return &v.state
@@ -1787,7 +571,7 @@ func file_miniRouter_proto_init() {
 				return nil
 			}
 		}
-		file_miniRouter_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+		file_miniRouter_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*KVRouterInfo); i {
 			case 0:
 				return &v.state
@@ -1799,8 +583,8 @@ func file_miniRouter_proto_init() {
 				return nil
 			}
 		}
-		file_miniRouter_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ServiceRouterInfo); i {
+		file_miniRouter_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ClusterInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1811,8 +595,8 @@ func file_miniRouter_proto_init() {
 				return nil
 			}
 		}
-		file_miniRouter_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*AddRouterRequest); i {
+		file_miniRouter_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*InitArgv); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1823,8 +607,8 @@ func file_miniRouter_proto_init() {
 				return nil
 			}
 		}
-		file_miniRouter_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*AddRouterReply); i {
+		file_miniRouter_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RouterTableInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1835,164 +619,8 @@ func file_miniRouter_proto_init() {
 				return nil
 			}
 		}
-		file_miniRouter_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RemoveRouterRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RemoveRouterReply); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetInstancesRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetInstancesReply); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetServicesRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetServicesReply); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetRoutersRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetRoutersReply); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*HeartBeatRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*HeartBeatReply); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*InstanceHealthInfo); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[22].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ServiceHealthInfo); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[23].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetHealthInfoRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_miniRouter_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetHealthInfoReply); i {
+		file_miniRouter_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*InitResult); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2004,18 +632,15 @@ func file_miniRouter_proto_init() {
 			}
 		}
 	}
-	file_miniRouter_proto_msgTypes[2].OneofWrappers = []interface{}{}
-	file_miniRouter_proto_msgTypes[9].OneofWrappers = []interface{}{}
-	file_miniRouter_proto_msgTypes[11].OneofWrappers = []interface{}{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_miniRouter_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   8,
 			NumExtensions: 0,
-			NumServices:   3,
+			NumServices:   1,
 		},
 		GoTypes:           file_miniRouter_proto_goTypes,
 		DependencyIndexes: file_miniRouter_proto_depIdxs,

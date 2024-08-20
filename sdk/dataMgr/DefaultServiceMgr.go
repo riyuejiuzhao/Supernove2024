@@ -4,341 +4,327 @@ import (
 	"Supernove2024/pb"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/metrics"
 	"Supernove2024/util"
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
+	circuit "github.com/rubyist/circuitbreaker"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/protobuf/proto"
+	"strconv"
 	"sync"
 	"time"
 )
 
-type KVRouterDictBuffer struct {
-	dict map[string]*pb.KVRouterInfo
-}
-
-func (b *KVRouterDictBuffer) Add(info *pb.KVRouterInfo) {
-	b.dict[info.Key] = info
-}
-
-func (b *KVRouterDictBuffer) Get(key string) (*pb.KVRouterInfo, bool) {
-	info, ok := b.dict[key]
-	return info, ok
-}
-
-func (b *KVRouterDictBuffer) Remove(key string) {
-	delete(b.dict, key)
-}
-
-func (b *KVRouterDictBuffer) Clear() {
-	clear(b.dict)
-}
-
-type KVRouterBuffer interface {
-	Add(info *pb.KVRouterInfo)
-	Get(key string) (*pb.KVRouterInfo, bool)
-	Remove(key string)
-	Clear()
-}
-
-type ServiceRouterBuffer struct {
-	*pb.ServiceRouterInfo
-
-	routerBufferLock sync.RWMutex
-	kvRouterDic      KVRouterBuffer
-	targetRouterDic  map[string]*pb.TargetRouterInfo
-}
-
-func (b *ServiceRouterBuffer) SetRouterInfo(info *pb.ServiceRouterInfo) {
-	b.Revision = info.Revision
-	b.ServiceRouterInfo = info
-
-	b.kvRouterDic = &KVRouterDictBuffer{
-		dict: make(map[string]*pb.KVRouterInfo),
-	}
-	b.targetRouterDic = make(map[string]*pb.TargetRouterInfo)
-	for _, v := range info.KVRouters {
-		b.kvRouterDic.Add(v)
-	}
-	for _, v := range info.TargetRouters {
-		b.targetRouterDic[v.SrcInstanceID] = v
-	}
-}
-
-func (b *ServiceRouterBuffer) TryGetKVRouter(key string, skipTimeCheck bool) (*pb.KVRouterInfo, bool) {
-	b.routerBufferLock.RLock()
-	defer b.routerBufferLock.RUnlock()
-	r, ok := b.kvRouterDic.Get(key)
-	if !ok || skipTimeCheck {
-		return r, ok
-	}
-	if r.Timeout+r.CreateTime >= time.Now().Unix() {
-		return r, ok
-	}
-	return nil, false
-}
-
-func (b *ServiceRouterBuffer) TryGetTargetRouter(srcID string, skipTimeCheck bool) (*pb.TargetRouterInfo, bool) {
-	b.routerBufferLock.RLock()
-	defer b.routerBufferLock.RUnlock()
-	r, ok := b.targetRouterDic[srcID]
-	if !ok || skipTimeCheck {
-		return r, ok
-	}
-	if r.CreateTime+r.Timeout >= time.Now().Unix() {
-		return r, ok
-	}
-	return nil, false
-}
-
-type SyncContainer[T any] struct {
-	Mutex sync.RWMutex
-	Value T
-}
-
 type ServiceInfoBuffer struct {
-	*pb.ServiceInfo
-	Mutex       sync.RWMutex
-	InstanceDic map[string]*pb.InstanceInfo
-}
-
-func (b *ServiceInfoBuffer) SetServiceInfo(info *pb.ServiceInfo) {
-	b.ServiceInfo = info
-	b.InstanceDic = make(map[string]*pb.InstanceInfo)
-	if info.Instances == nil {
-		return
-	}
-	for _, i := range info.Instances {
-		b.InstanceDic[i.InstanceID] = i
-	}
+	Mutex       sync.Mutex
+	InstanceDic map[int64]*InstanceInfo
+	NameDic     map[string]*InstanceInfo
 }
 
 type DefaultServiceMgr struct {
+	SkipSave bool
+
 	config      *config.Config
 	connManager connMgr.ConnManager
+	mt          *metrics.MetricsManager
 
-	serviceBuffer *SyncContainer[map[string]*ServiceInfoBuffer]
+	serviceBuffer *util.SyncContainer[map[string]*ServiceInfoBuffer]
+	routerBuffer  *util.SyncContainer[map[string]*ServiceRouterBuffer]
 
-	healthBuffer *SyncContainer[map[string]*SyncContainer[map[string]*pb.InstanceHealthInfo]]
-
-	routerBuffer *SyncContainer[map[string]*ServiceRouterBuffer]
+	watchChan *util.SyncContainer[map[string]*util.SyncContainer[[]chan<- *util.ServiceInfo]]
 }
 
-func (m *DefaultServiceMgr) flushAllHealthInfoLocked() {
-	for _, serviceName := range m.config.Global.Discovery.DstService {
-		m.healthBuffer.Mutex.Lock()
-		service, ok := m.healthBuffer.Value[serviceName]
-		if !ok {
-			service = &SyncContainer[map[string]*pb.InstanceHealthInfo]{}
-			m.healthBuffer.Value[serviceName] = service
-		}
-		service.Mutex.Lock()
-		m.healthBuffer.Mutex.Unlock()
-		m.flushHealthInfo(serviceName, service)
-		service.Mutex.Unlock()
-	}
-}
-
-func (m *DefaultServiceMgr) flushAllRouterLocked() {
-	for _, serviceName := range m.config.Global.Discovery.DstService {
-		m.routerBuffer.Mutex.Lock()
-		router, ok := m.routerBuffer.Value[serviceName]
-		if !ok {
-			router = &ServiceRouterBuffer{ServiceRouterInfo: &pb.ServiceRouterInfo{
-				ServiceName: serviceName,
-				Revision:    0,
-			}}
-			m.routerBuffer.Value[serviceName] = router
-		}
-		router.routerBufferLock.Lock()
-		m.routerBuffer.Mutex.Unlock()
-		m.flushRouter(router)
-		router.routerBufferLock.Unlock()
-	}
-}
-
-func (m *DefaultServiceMgr) flushRouter(buffer *ServiceRouterBuffer) {
-	disConn, err := m.connManager.GetServiceConn(connMgr.Discovery)
-	if err != nil {
-		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", buffer.ServiceName, err)
-		return
-	}
-	defer disConn.Close()
-	cli := pb.NewDiscoveryServiceClient(disConn.Value())
-
-	request := &pb.GetRoutersRequest{
-		ServiceName: buffer.ServiceName,
-		Revision:    buffer.Revision,
-	}
-
-	reply, err := cli.GetRouters(context.Background(), request)
-	if err != nil {
-		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", buffer.ServiceName, err)
-		return
-	}
-	if reply.Router.Revision == request.Revision {
-		util.Info("无需更新本地路由缓存 %v", request.Revision)
-		return
-	}
-
-	buffer.SetRouterInfo(reply.Router)
-	util.Info("更新本地路由缓存 %v->%v", request.Revision, reply.Router.Revision)
-}
-
-func (m *DefaultServiceMgr) flushAllServiceLocked() {
-	for _, serviceName := range m.config.Global.Discovery.DstService {
+func (m *DefaultServiceMgr) RemoveInstance(serviceName string, instanceID int64) {
+	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
 		m.serviceBuffer.Mutex.Lock()
+		defer m.serviceBuffer.Mutex.Unlock()
+		service, ok = m.serviceBuffer.Value[serviceName]
+		if ok {
+			service.Mutex.Lock()
+		}
+		return
+	}()
+	if !ok {
+		return
+	}
+	defer service.Mutex.Unlock()
+	info, ok := service.InstanceDic[instanceID]
+	if !ok {
+		return
+	}
+	delete(service.InstanceDic, instanceID)
+	delete(service.NameDic, info.Name)
+	util.Info("removeKVRouter %s Instance %v", serviceName, instanceID)
+}
+
+func (m *DefaultServiceMgr) AddInstance(serviceName string, info *pb.InstanceInfo) {
+	if m.SkipSave {
+		return
+	}
+	service := func() (service *ServiceInfoBuffer) {
+		m.serviceBuffer.Mutex.Lock()
+		defer m.serviceBuffer.Mutex.Unlock()
 		service, ok := m.serviceBuffer.Value[serviceName]
 		if !ok {
-			service = &ServiceInfoBuffer{}
-			service.SetServiceInfo(&pb.ServiceInfo{ServiceName: serviceName, Revision: 0})
+			service = &ServiceInfoBuffer{
+				InstanceDic: make(map[int64]*InstanceInfo),
+				NameDic:     make(map[string]*InstanceInfo),
+			}
 			m.serviceBuffer.Value[serviceName] = service
 		}
 		service.Mutex.Lock()
-		m.serviceBuffer.Mutex.Unlock()
-		m.flushService(service)
-		service.Mutex.Unlock()
+		return
+	}()
+	defer service.Mutex.Unlock()
+	nowInfo, ok := service.NameDic[info.Name]
+	if ok {
+		delete(service.InstanceDic, nowInfo.InstanceID)
 	}
+	infoNow := &InstanceInfo{
+		InstanceInfo: info,
+		Breaker: circuit.NewBreakerWithOptions(&circuit.Options{
+			ShouldTrip: circuit.ThresholdTripFunc(m.config.SDK.Breaker.ThresholdTrip),
+			WindowTime: time.Duration(m.config.SDK.Breaker.WindowTime) * time.Second,
+		}),
+	}
+	service.InstanceDic[info.InstanceID] = infoNow
+	service.NameDic[info.Name] = infoNow
+	util.Info("%s Add Instance %v", serviceName, info.InstanceID)
 }
 
-func (m *DefaultServiceMgr) flushService(service *ServiceInfoBuffer) {
-	disConn, err := m.connManager.GetServiceConn(connMgr.Discovery)
+func (m *DefaultServiceMgr) GetServiceInfo(serviceName string) (*util.ServiceInfo, bool) {
+	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
+		m.serviceBuffer.Mutex.Lock()
+		defer m.serviceBuffer.Mutex.Unlock()
+		service, ok = m.serviceBuffer.Value[serviceName]
+		if ok {
+			service.Mutex.Lock()
+		}
+		return
+	}()
+	if !ok {
+		return nil, false
+	}
+	defer service.Mutex.Unlock()
+	info := &util.ServiceInfo{
+		Name:      serviceName,
+		Instances: make([]util.DstInstanceInfo, 0, len(service.InstanceDic)),
+	}
+	for _, v := range service.InstanceDic {
+		info.Instances = append(info.Instances, v)
+	}
+	return info, true
+}
+
+func (m *DefaultServiceMgr) GetInstanceInfo(serviceName string, instanceID int64) (*InstanceInfo, bool) {
+	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
+		m.serviceBuffer.Mutex.Lock()
+		defer m.serviceBuffer.Mutex.Unlock()
+		service, ok = m.serviceBuffer.Value[serviceName]
+		if ok {
+			service.Mutex.Lock()
+		}
+		return
+	}()
+	if !ok {
+		return nil, false
+	}
+	defer service.Mutex.Unlock()
+	info, ok := service.InstanceDic[instanceID]
+	return info, ok
+}
+
+func (m *DefaultServiceMgr) handleInstancePut(serviceName string, ev *clientv3.Event) (err error) {
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "InstanceKeyPut"}, err)
+	}()
+	info := &pb.InstanceInfo{}
+	err = proto.Unmarshal(ev.Kv.Value, info)
 	if err != nil {
-		util.Error("更新服务 %v 缓冲数据失败, 无法获取链接, err: %v", service.ServiceName, err)
+		util.Error("err %v", err)
 		return
 	}
-	defer disConn.Close()
-	cli := pb.NewDiscoveryServiceClient(disConn.Value())
+	m.AddInstance(serviceName, info)
+	return
+}
 
-	request := &pb.GetInstancesRequest{
-		ServiceName: service.ServiceName,
-		Revision:    service.Revision,
-	}
-
-	reply, err := cli.GetInstances(context.Background(), request)
+func (m *DefaultServiceMgr) handleInstanceDelete(serviceName string, ev *clientv3.Event) {
+	begin := time.Now()
+	defer func() {
+		m.mt.MetricsUpload(begin, prometheus.Labels{"Method": "InstanceKeyDelete"}, nil)
+	}()
+	id := util.InstanceKey2InstanceID(string(ev.Kv.Key), serviceName)
+	instanceID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		util.Error("更新服务 %v 缓冲数据失败, grpc错误, err: %v", service.ServiceName, err)
-		return
+		util.Error("remove instance error: %v", err)
+	} else {
+		m.RemoveInstance(serviceName, instanceID)
 	}
-	if reply.Service.Revision == request.Revision {
-		util.Info("无需更新本地缓存 %v", request.Revision)
-		return
-	}
-
-	service.SetServiceInfo(reply.Service)
-	util.Info("更新本地缓存 %v->%v", request.Revision, reply.Service.Revision)
 }
 
-func (m *DefaultServiceMgr) GetServiceInfo(serviceName string) (*pb.ServiceInfo, bool) {
-	m.serviceBuffer.Mutex.RLock()
-	defer m.serviceBuffer.Mutex.RUnlock()
-	service, ok := m.serviceBuffer.Value[serviceName]
-	if !ok {
-		return nil, false
-	}
-	service.Mutex.RLock()
-	defer service.Mutex.RUnlock()
-	return service.ServiceInfo, true
-}
-
-func (m *DefaultServiceMgr) GetInstanceInfo(serviceName string, instanceID string) (*pb.InstanceInfo, bool) {
-	m.serviceBuffer.Mutex.RLock()
-	defer m.serviceBuffer.Mutex.RUnlock()
-	service, ok := m.serviceBuffer.Value[serviceName]
-	if !ok {
-		return nil, false
-	}
-	service.Mutex.RLock()
-	defer service.Mutex.RUnlock()
-	instance, ok := service.InstanceDic[instanceID]
-	if !ok {
-		return nil, false
-	}
-	return instance, true
-}
-
-func (m *DefaultServiceMgr) GetHealthInfo(serviceName string, instanceID string) (*pb.InstanceHealthInfo, bool) {
-	m.healthBuffer.Mutex.RLock()
-	defer m.healthBuffer.Mutex.RUnlock()
-	serviceDic, ok := m.healthBuffer.Value[serviceName]
-	if !ok {
-		return nil, false
-	}
-	serviceDic.Mutex.RLock()
-	defer serviceDic.Mutex.RUnlock()
-	ins, ok := serviceDic.Value[instanceID]
-	if !ok {
-		return nil, false
-	}
-	return ins, true
-}
-
-func (m *DefaultServiceMgr) flushHealthInfo(serviceName string, serviceHealth *SyncContainer[map[string]*pb.InstanceHealthInfo]) {
-	conn, err := m.connManager.GetServiceConn(connMgr.HealthCheck)
+func (m *DefaultServiceMgr) handleInstanceService(cli *clientv3.Client, serviceName string) {
+	m.tryAddServiceInfoChanList(serviceName)
+	revision, err := m.initServiceInfo(cli, serviceName)
 	if err != nil {
-		util.Error("更新健康信息连接获取失败 err:%v", err)
-		return
+		util.Error("获取全量数据失败：%v", err)
 	}
-	defer conn.Close()
+	go func() {
+		rch := cli.Watch(context.Background(),
+			serviceName,
+			clientv3.WithPrefix(),
+			clientv3.WithRev(revision),
+		)
+		for wresp := range rch {
+			if m.SkipSave {
+				continue
+			}
+			for _, ev := range wresp.Events {
+				switch ev.Type {
+				case clientv3.EventTypePut:
+					err = m.handleInstancePut(serviceName, ev)
+					if err != nil {
+						util.Error("Put err: %v", err)
+					}
+				case clientv3.EventTypeDelete:
+					m.handleInstanceDelete(serviceName, ev)
+				}
+			}
+			m.sendServiceInfoAllChan(serviceName)
+		}
+	}()
 
-	cli := pb.NewHealthServiceClient(conn.Value())
-	reply, err := cli.GetHealthInfo(context.Background(), &pb.GetHealthInfoRequest{ServiceName: serviceName})
+}
+
+func (m *DefaultServiceMgr) handleWatchService(serviceName string) {
+	instanceCli, err := m.connManager.GetServiceConn(connMgr.InstancesEtcd, "")
 	if err != nil {
-		util.Error("更新健康信息rpc失败 err:%v", err)
+		util.Error("%s 服务数据初始化失败", serviceName)
 		return
 	}
-	serviceHealthInfo := make(map[string]*pb.InstanceHealthInfo)
-	for _, ins := range reply.HealthInfo.InstanceHealthInfo {
-		serviceHealthInfo[ins.InstanceID] = ins
+	m.handleInstanceService(instanceCli, serviceName)
+	clis := m.connManager.GetAllServiceConn(connMgr.RoutersEtcd)
+	for _, cli := range clis {
+		m.handleWatchRouter(cli, serviceName)
 	}
-	serviceHealth.Value = serviceHealthInfo
 }
 
-func (m *DefaultServiceMgr) GetTargetRouter(ServiceName string, SrcInstanceID string, skipTimeCheck bool) (*pb.TargetRouterInfo, bool) {
-	m.routerBuffer.Mutex.RLock()
-	defer m.routerBuffer.Mutex.RUnlock()
-
-	b, ok := m.routerBuffer.Value[ServiceName]
-	if !ok {
-		return nil, false
+func (m *DefaultServiceMgr) tryAddServiceInfoChanList(serviceName string) *util.SyncContainer[[]chan<- *util.ServiceInfo] {
+	var chans *util.SyncContainer[[]chan<- *util.ServiceInfo] = nil
+	m.watchChan.Mutex.Lock()
+	defer m.watchChan.Mutex.Unlock()
+	if _, ok := m.watchChan.Value[serviceName]; ok {
+		chans = m.watchChan.Value[serviceName]
+	} else {
+		chans = &util.SyncContainer[[]chan<- *util.ServiceInfo]{
+			Value: make([]chan<- *util.ServiceInfo, 0),
+		}
+		m.watchChan.Value[serviceName] = chans
 	}
-	return b.TryGetTargetRouter(SrcInstanceID, skipTimeCheck)
+	return chans
 }
 
-func (m *DefaultServiceMgr) GetKVRouter(ServiceName string, Key string, skipTimeCheck bool) (*pb.KVRouterInfo, bool) {
-	m.routerBuffer.Mutex.RLock()
-	defer m.routerBuffer.Mutex.RUnlock()
-
-	b, ok := m.routerBuffer.Value[ServiceName]
+func (m *DefaultServiceMgr) sendServiceInfoAllChan(serviceName string) {
+	var chanList *util.SyncContainer[[]chan<- *util.ServiceInfo]
+	var ok bool
+	func() {
+		m.watchChan.Mutex.Lock()
+		defer m.watchChan.Mutex.Unlock()
+		chanList, ok = m.watchChan.Value[serviceName]
+		if !ok {
+			return
+		}
+		chanList.Mutex.Lock()
+	}()
 	if !ok {
-		return nil, false
+		return
 	}
-	return b.TryGetKVRouter(Key, skipTimeCheck)
+	defer chanList.Mutex.Unlock()
+	service, ok := m.GetServiceInfo(serviceName)
+	if !ok {
+		return
+	}
+	for _, ch := range chanList.Value {
+		ch <- service
+	}
+}
+
+func (m *DefaultServiceMgr) initServiceInfo(cli *clientv3.Client, serviceName string) (revision int64, err error) {
+	resp, err := cli.Get(context.Background(), serviceName, clientv3.WithPrefix())
+	if err != nil {
+		return
+	}
+	for _, kv := range resp.Kvs {
+		info := &pb.InstanceInfo{}
+		err = proto.Unmarshal(kv.Value, info)
+		if err != nil {
+			continue
+		}
+		m.AddInstance(serviceName, info)
+	}
+	revision = resp.Header.Revision
+	return
 }
 
 func (m *DefaultServiceMgr) startFlushInfo() {
-	m.flushAllServiceLocked()
-	m.flushAllHealthInfoLocked()
-	m.flushAllRouterLocked()
-	go func() {
-		for {
-			time.Sleep(time.Duration(m.config.Global.Discovery.DefaultTimeout) * time.Second)
-			m.flushAllHealthInfoLocked()
-			m.flushAllRouterLocked()
-			m.flushAllServiceLocked()
-		}
-	}()
+	//如果处于离线模式
+	//离线模式仅供性能测试使用
+	if m.connManager == nil {
+		return
+	}
+	for _, serviceName := range m.config.SDK.Discovery.DstService {
+		m.handleWatchService(serviceName)
+	}
 }
 
-func NewDefaultServiceMgr(config *config.Config, manager connMgr.ConnManager) *DefaultServiceMgr {
+func (m *DefaultServiceMgr) GetInstanceInfoByName(serviceName string, name string) (*InstanceInfo, bool) {
+	service, ok := func() (service *ServiceInfoBuffer, ok bool) {
+		m.serviceBuffer.Mutex.Lock()
+		defer m.serviceBuffer.Mutex.Unlock()
+		service, ok = m.serviceBuffer.Value[serviceName]
+		if ok {
+			service.Mutex.Lock()
+		}
+		return
+	}()
+	if !ok {
+		return nil, false
+	}
+	defer service.Mutex.Unlock()
+	info, ok := service.NameDic[name]
+	return info, ok
+}
+
+func (m *DefaultServiceMgr) WatchServiceInfo(serviceName string) (<-chan *util.ServiceInfo, error) {
+	serviceChan := m.tryAddServiceInfoChanList(serviceName)
+	serviceChan.Mutex.Lock()
+	defer serviceChan.Mutex.Unlock()
+	ch := make(chan *util.ServiceInfo)
+	serviceChan.Value = append(serviceChan.Value, ch)
+	return ch, nil
+}
+
+func NewDefaultServiceMgr(
+	config *config.Config,
+	manager connMgr.ConnManager,
+	mt *metrics.MetricsManager,
+) *DefaultServiceMgr {
 	mgr := &DefaultServiceMgr{
+		SkipSave: false,
+
 		config:      config,
 		connManager: manager,
-		serviceBuffer: &SyncContainer[map[string]*ServiceInfoBuffer]{
+		mt:          mt,
+
+		serviceBuffer: &util.SyncContainer[map[string]*ServiceInfoBuffer]{
 			Value: make(map[string]*ServiceInfoBuffer),
 		},
-		healthBuffer: &SyncContainer[map[string]*SyncContainer[map[string]*pb.InstanceHealthInfo]]{
-			Value: make(map[string]*SyncContainer[map[string]*pb.InstanceHealthInfo]),
-		},
-		routerBuffer: &SyncContainer[map[string]*ServiceRouterBuffer]{
+		routerBuffer: &util.SyncContainer[map[string]*ServiceRouterBuffer]{
 			Value: make(map[string]*ServiceRouterBuffer),
+		},
+		watchChan: &util.SyncContainer[map[string]*util.SyncContainer[[]chan<- *util.ServiceInfo]]{
+			Value: make(map[string]*util.SyncContainer[[]chan<- *util.ServiceInfo]),
 		},
 	}
 	mgr.startFlushInfo()

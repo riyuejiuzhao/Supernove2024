@@ -3,153 +3,48 @@ syntax = "proto3";
 option go_package=".;pb";
 
 message InstanceInfo {
-  string InstanceID = 1;
-  string Host = 2;
-  int32 Port = 3;
-  int32 Weight = 4;
-}
-
-message ServiceInfo {
-  string ServiceName = 1;
-  int64 Revision = 2;
-  repeated InstanceInfo Instances = 3;
-}
-
-message RegisterRequest{
-  string ServiceName = 1;
-  string Host = 2;
-  int32 Port = 3;
-  int32 Weight = 4; // 权重
-  int64 TTL = 5; //上报时间间隔
-
-  //可选，如果不设置那么服务器将其设置为IP:Port
-  optional string InstanceID = 6;
-}
-
-message RegisterReply{
-  string InstanceID = 1;
-}
-
-message DeregisterRequest{
-  string ServiceName =1;
-  string InstanceID = 2;
+  int64 InstanceID = 1;
+  string Name = 2;
   string Host = 3;
   int32 Port = 4;
-}
-
-message DeregisterReply{
+  int32 Weight = 5;
 }
 
 message TargetRouterInfo{
-  string SrcInstanceID = 1;
-  string DstInstanceID = 2;
-  int64 Timeout = 3;
-  int64 CreateTime = 4;
+  int64 RouterID =1;
+  string SrcInstanceName = 2;
+  string DstInstanceName = 3;
 }
 
 message KVRouterInfo{
-  string Key = 1;
-  string DstInstanceID = 2;
-  int64 Timeout = 3;
-  int64 CreateTime = 4;
+  int64 RouterID =1;
+  int32 weight = 2;
+  map<string,string> Dic = 3;
+  repeated string DstInstanceName = 4;
+  //如果有多个，那么允许指定更进一步的筛选方式
+  int32 RouterType = 5;
 }
 
-message ServiceRouterInfo{
+message ClusterInfo {
+  string Name = 1;
+  repeated string Address = 2;
+}
+
+message InitArgv {
+}
+
+//路由表没有时间限制
+//说到底一个服务一个也不会很多，一直不断的用heartbeat续也不合理
+message RouterTableInfo{
   string ServiceName = 1;
-  int64 Revision = 2;
-  repeated TargetRouterInfo TargetRouters = 3;
-  repeated KVRouterInfo KVRouters = 4;
+  repeated string Tags = 2;
 }
 
-message AddRouterRequest {
-  int32 RouterType = 1;
-  string ServiceName = 2;
-
-  optional KVRouterInfo KvRouterInfo = 3;
-  optional TargetRouterInfo targetRouterInfo = 4;
+message InitResult{
+  repeated ClusterInfo Instances = 1;
+  repeated ClusterInfo Routers = 2;
 }
 
-message AddRouterReply {
-}
-
-message RemoveRouterRequest{
-  int32 RouterType = 1;
-  string ServiceName = 2;
-
-  optional KVRouterInfo KvRouterInfo = 3;
-  optional TargetRouterInfo targetRouterInfo = 4;
-}
-
-message RemoveRouterReply {
-}
-
-service RegisterService{
-  rpc Register(RegisterRequest) returns (RegisterReply){}
-  rpc Deregister(DeregisterRequest) returns (DeregisterReply){}
-
-  rpc AddRouter(AddRouterRequest) returns (AddRouterReply){}
-  rpc RemoveRouter(RemoveRouterRequest) returns (RemoveRouterReply){}
-}
-
-message GetInstancesRequest{
-  string ServiceName = 1;
-  int64 Revision = 2;
-}
-
-message GetInstancesReply{
-  ServiceInfo service = 1;
-}
-
-message GetServicesRequest{
-}
-
-message GetServicesReply{
-  repeated string ServiceName = 1;
-}
-
-message GetRoutersRequest{
-  string ServiceName = 1;
-  int64 Revision = 2;
-}
-
-message GetRoutersReply{
-  ServiceRouterInfo router = 1;
-}
-
-service DiscoveryService{
-  rpc GetServices(GetServicesRequest) returns(GetServicesReply){}
-  rpc GetInstances(GetInstancesRequest) returns (GetInstancesReply){}
-  rpc GetRouters(GetRoutersRequest) returns (GetRoutersReply){}
-}
-
-message HeartBeatRequest{
-  string ServiceName =1;
-  string InstanceID = 2;
-}
-
-message HeartBeatReply{
-}
-
-message InstanceHealthInfo{
-  string InstanceID = 1;
-  int64 TTL = 2;
-  int64 LastHeartBeat = 3;
-}
-
-message ServiceHealthInfo {
-  string  ServiceName = 1;
-  repeated InstanceHealthInfo InstanceHealthInfo = 2;
-}
-
-message GetHealthInfoRequest{
-  string ServiceName = 1;
-}
-
-message GetHealthInfoReply{
-  ServiceHealthInfo HealthInfo = 1;
-}
-
-service HealthService{
-  rpc HeartBeat(HeartBeatRequest) returns (HeartBeatReply) {}
-  rpc GetHealthInfo(GetHealthInfoRequest) returns (GetHealthInfoReply){}
+service ConfigService {
+  rpc Init(InitArgv) returns (InitResult){}
 }

@@ -2,46 +2,45 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
+	"sync"
 )
 
-type InstanceConfig struct {
-	Host string `yaml:"Host"`
-	Port int32  `yaml:"Port"`
-}
-
-func (s InstanceConfig) String() string {
-	return fmt.Sprintf("%s:%v", s.Host, s.Port)
-}
-
 type Config struct {
-	Global struct {
-		DiscoverService []InstanceConfig `yaml:"DiscoverService"`
-		RegisterService []InstanceConfig `yaml:"RegisterService"`
-		HealthService   []InstanceConfig `yaml:"HealthService"`
-		Register        struct {
-			DefaultWeight int32 `yaml:"DefaultWeight"`
-			DefaultTTL    int64 `yaml:"DefaultTTL"`
+	SDK struct {
+		ConfigSvr struct {
+			Host string `yaml:"Host"`
+			Port int32  `yaml:"Port"`
+		} `yaml:"ConfigSvr"`
+		Register struct {
+			DefaultWeight     int32 `yaml:"DefaultWeight"`
+			DefaultServiceTTL int64 `yaml:"DefaultServiceTTL"`
+			DefaultRouterTTL  int64 `yaml:"DefaultRouterTTL"`
 		} `yaml:"Register"`
 		Discovery struct {
-			//获取远程服务的时间间隔
-			DefaultTimeout int32 `yaml:"DefaultTimeout"`
-			//Service
 			DstService []string `yaml:"DstService"`
 		} `yaml:"Discovery"`
-	} `yaml:"Global"`
+		Metrics string `yaml:"Metrics"`
+		Breaker struct {
+			ThresholdTrip int64 `yaml:"ThresholdTrip"`
+			WindowTime    int64 `yaml:"WindowTime"`
+		} `yaml:"Breaker"`
+	} `yaml:"SDK"`
 }
 
 var globalConfig *Config = nil
-var GlobalConfigFilePath = ""
+var GlobalConfigFilePath = "mini-router.yaml"
+
+var configMutex sync.Mutex
 
 func GlobalConfig() (*Config, error) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
 	if globalConfig != nil {
 		return globalConfig, nil
 	}
-	config, err := loadConfig()
+	config, err := LoadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +48,8 @@ func GlobalConfig() (*Config, error) {
 	return globalConfig, nil
 }
 
-// 从文件中读取配置
-func loadConfig(configFileOpts ...string) (*Config, error) {
+// LoadConfig 从文件中读取配置
+func LoadConfig(configFileOpts ...string) (*Config, error) {
 	configFile := GlobalConfigFilePath
 	if len(configFileOpts) == 1 {
 		configFile = configFileOpts[0]
@@ -65,6 +64,12 @@ func loadConfig(configFileOpts ...string) (*Config, error) {
 	err = yaml.Unmarshal(configYaml, &config)
 	if err != nil {
 		return nil, err
+	}
+	if config.SDK.Breaker.ThresholdTrip == 0 {
+		config.SDK.Breaker.ThresholdTrip = 10
+	}
+	if config.SDK.Breaker.WindowTime == 0 {
+		config.SDK.Breaker.WindowTime = 10
 	}
 	return &config, nil
 }

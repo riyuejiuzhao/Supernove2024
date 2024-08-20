@@ -1,0 +1,23 @@
+SDK:
+  ConfigSvr:
+    Host: 127.0.0.1
+    Port: 30000
+  Register:
+    DefaultWeight: 10
+    DefaultServiceTTL: 1000
+    DefaultRouterTTL: 1000
+  Discovery:
+    DefaultTimeout: 10
+    DstService:
+      - testDiscovery0
+      - testDiscovery1
+      - testDiscovery2
+      - testDiscovery3
+      - testDiscovery4
+      - testDiscovery5
+      - testDiscovery6
+      - testDiscovery7
+      - testDiscovery8
+      - testDiscovery9
+  Metrics: 127.0.0.1:10000
+

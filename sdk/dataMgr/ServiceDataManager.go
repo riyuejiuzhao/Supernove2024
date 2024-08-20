@@ -4,14 +4,28 @@ import (
 	"Supernove2024/pb"
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/metrics"
+	"Supernove2024/util"
+	circuit "github.com/rubyist/circuitbreaker"
+	"sync"
 )
 
+type InstanceInfo struct {
+	*pb.InstanceInfo
+	Breaker *circuit.Breaker
+}
+
+func (m *InstanceInfo) GetBreaker() *circuit.Breaker {
+	return m.Breaker
+}
+
 type ServiceDataManager interface {
-	GetHealthInfo(serviceName string, instanceID string) (*pb.InstanceHealthInfo, bool)
-	GetServiceInfo(serviceName string) (*pb.ServiceInfo, bool)
-	GetInstanceInfo(serviceName string, instanceID string) (*pb.InstanceInfo, bool)
-	GetTargetRouter(ServiceName string, SrcInstanceID string, skipTimeCheck bool) (*pb.TargetRouterInfo, bool)
-	GetKVRouter(ServiceName string, Key string, skipTimeCheck bool) (*pb.KVRouterInfo, bool)
+	GetServiceInfo(serviceName string) (*util.ServiceInfo, bool)
+	WatchServiceInfo(serviceName string) (<-chan *util.ServiceInfo, error)
+	GetInstanceInfo(serviceName string, instanceID int64) (*InstanceInfo, bool)
+	GetInstanceInfoByName(serviceName string, name string) (*InstanceInfo, bool)
+	GetTargetRouter(ServiceName string, SrcInstanceName string) (*pb.TargetRouterInfo, bool)
+	GetKVRouter(ServiceName string, Key map[string]string) ([]*pb.KVRouterInfo, bool)
 }
 
 var (
@@ -19,7 +33,11 @@ var (
 	NewServiceDataManager                    = NewDefaultServiceMgr
 )
 
+var dataMgrMutex sync.Mutex
+
 func Instance() (ServiceDataManager, error) {
+	dataMgrMutex.Lock()
+	defer dataMgrMutex.Unlock()
 	if serviceDataMgr == nil {
 		cfg, err := config.GlobalConfig()
 		if err != nil {
@@ -29,7 +47,11 @@ func Instance() (ServiceDataManager, error) {
 		if err != nil {
 			return nil, err
 		}
-		serviceDataMgr = NewServiceDataManager(cfg, conn)
+		mt, err := metrics.Instance()
+		if err != nil {
+			return nil, err
+		}
+		serviceDataMgr = NewServiceDataManager(cfg, conn, mt)
 	}
 	return serviceDataMgr, nil
 }

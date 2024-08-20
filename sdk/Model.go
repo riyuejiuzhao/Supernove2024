@@ -3,6 +3,7 @@ package sdk
 import (
 	"Supernove2024/sdk/config"
 	"Supernove2024/sdk/connMgr"
+	"Supernove2024/sdk/metrics"
 )
 
 type APIContext struct {
@@ -10,6 +11,20 @@ type APIContext struct {
 	Config *config.Config
 	//连接管理
 	ConnManager connMgr.ConnManager
+
+	Metrics *metrics.MetricsManager
+}
+
+func NewAPIContextStandalone(
+	config *config.Config,
+	conn connMgr.ConnManager,
+	mt *metrics.MetricsManager,
+) *APIContext {
+	return &APIContext{
+		Config:      config,
+		ConnManager: conn,
+		Metrics:     mt,
+	}
 }
 
 func NewAPIContext() (*APIContext, error) {
@@ -17,12 +32,22 @@ func NewAPIContext() (*APIContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	//随机选择一个配置中的DiscoverySvr
 	connManager, err := connMgr.Instance()
 	if err != nil {
 		return nil, err
 	}
-	api := APIContext{ConnManager: connManager,
-		Config: globalConfig}
+
+	metricsMgr, err := metrics.Instance()
+	if err != nil {
+		return nil, err
+	}
+
+	api := APIContext{
+		ConnManager: connManager,
+		Config:      globalConfig,
+		//DataMgr:     mgr,
+		Metrics: metricsMgr,
+	}
+
 	return &api, nil
 }

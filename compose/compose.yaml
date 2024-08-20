@@ -1,0 +1,27 @@
+version: "3.9"
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    network_mode: host
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    network_mode: host
+  jaeger:
+    image: jaegertracing/all-in-one:1.22
+    container_name: jaeger
+    environment:
+      QUERY_PORT: 16686
+      AGENT_COMPACT_PORT: 6831
+      AGENT_BINARY_PORT: 6832
+    network_mode: host
+
+volumes:
+  grafana-data:
