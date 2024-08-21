@@ -110,7 +110,9 @@ type MiniRouterPicker struct {
 func (p *MiniRouterPicker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	md, ok := metadata.FromOutgoingContext(info.Ctx)
 	if !ok {
-		return balancer.PickResult{}, fmt.Errorf("缺少metadata")
+		bInfo := util.RandomDicValue(p.infos)
+		return balancer.PickResult{SubConn: bInfo}, nil
+		//return balancer.PickResult{}, fmt.Errorf("缺少metadata")
 	}
 	routerTypes, ok := md[RouterTypeHeader]
 	if !ok {
