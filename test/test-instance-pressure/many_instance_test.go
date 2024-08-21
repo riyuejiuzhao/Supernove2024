@@ -48,6 +48,26 @@ func TestManyInstance(t *testing.T) {
 		cfg.SDK.Discovery.DstService = append(cfg.SDK.Discovery.DstService, nowServiceName)
 	}
 
+	mt, err := metrics.Instance()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	conn, err := connMgr.NewConnManager(cfg)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	begin := time.Now()
+	dmg := dataMgr.NewServiceDataManager(cfg, conn, mt)
+	util.Info("create dmg:%v", time.Now().Sub(begin).Milliseconds())
+	begin = time.Now()
+	dis := sdk.NewDiscoveryAPIStandalone(cfg, conn, dmg, mt)
+	util.Info("create dis:%v", time.Now().Sub(begin).Milliseconds())
+	begin = time.Now()
+	_, err = dis.GetInstances(&sdk.GetInstancesArgv{ServiceName: ""})
+	util.Info("GetInstances:%v", time.Now().Sub(begin).Milliseconds())
+
 	for i := 0; i < serviceNum; i++ {
 		nowServiceName := fmt.Sprintf("%s%v", serviceName, i)
 		for j := 0; j < instanceNum; j++ {
@@ -73,32 +93,12 @@ func TestManyInstance(t *testing.T) {
 					return
 				}
 			}()
-			if j % 100 == 0 {
-				time.Sleep(1*time.Second)
+			if j%100 == 0 {
+				time.Sleep(1 * time.Second)
 			}
 		}
 		util.Info("now:%s", nowServiceName)
 		time.Sleep(1 * time.Second)
 	}
 	util.Info("finish send")
-	mt, err := metrics.Instance()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	conn, err := connMgr.NewConnManager(cfg)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	begin := time.Now()
-	dmg := dataMgr.NewServiceDataManager(cfg, conn, mt)
-	util.Info("create dmg:%v", time.Now().Sub(begin).Milliseconds())
-	begin = time.Now()
-	dis := sdk.NewDiscoveryAPIStandalone(cfg, conn, dmg, mt)
-	util.Info("create dis:%v", time.Now().Sub(begin).Milliseconds())
-	begin = time.Now()
-	_, err = dis.GetInstances(&sdk.GetInstancesArgv{ServiceName: ""})
-	util.Info("GetInstances:%v", time.Now().Sub(begin).Milliseconds())
-	time.Sleep(30 * time.Second)
 }
