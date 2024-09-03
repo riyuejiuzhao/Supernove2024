@@ -1,5 +1,7 @@
 # Supernove2024
 
+详细介绍可以查看文件 document/超新星期末报告.ppt
+
 **文件结构**:
 - test：测试文件
 - sdk：SDK代码实现
